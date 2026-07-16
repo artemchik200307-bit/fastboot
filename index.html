@@ -4,10 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#080c12">
-  <meta name="description" content="FASTBOOT — криптовалютный терминал с реальными котировками.">
-  <title>FASTBOOT — Crypto Terminal</title>
+  <meta name="description" content="FASTBOOT — обзор криптовалютного рынка с реальными котировками.">
+  <title>FASTBOOT — Crypto Market</title>
   <link rel="stylesheet" href="styles.css">
-  <script src="https://unpkg.com/lightweight-charts@5.2.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 
 <body>
@@ -19,9 +18,7 @@
       </div>
     </div>
 
-    <a class="brand" href="#" aria-label="FASTBOOT — главная">
-      FASTBOOT
-    </a>
+    <a class="brand" href="#" aria-label="FASTBOOT — главная">FASTBOOT</a>
 
     <div class="topbar-side auth-actions">
       <button id="loginButton" class="auth-button ghost-button" type="button">
@@ -40,162 +37,293 @@
   </section>
 
   <main class="app-shell">
-    <section class="summary-grid">
-      <article class="summary-card">
-        <span>Инструмент</span>
-        <strong id="summarySymbol">BTCUSDT</strong>
-        <small id="summaryName">Bitcoin</small>
+    <section class="market-overview">
+      <div>
+        <span class="section-kicker">Рынок криптовалют</span>
+        <h1>Котировки в реальном времени</h1>
+      </div>
+
+      <div class="overview-meta">
+        <span>100 активных USDT-пар</span>
+        <span id="lastUpdate">Обновление данных…</span>
+      </div>
+    </section>
+
+    <section class="movers-grid">
+      <article class="panel mover-panel">
+        <div class="section-head">
+          <div>
+            <h2>Топ роста</h2>
+            <span class="muted">Максимальный рост за 24 часа</span>
+          </div>
+          <span class="mover-badge up">24ч</span>
+        </div>
+        <div id="topGainers" class="mover-list"></div>
       </article>
 
-      <article class="summary-card">
-        <span>Текущая цена</span>
-        <strong id="summaryPrice">—</strong>
-        <small id="summaryChange">—</small>
-      </article>
-
-      <article class="summary-card">
-        <span>Таймфрейм</span>
-        <strong id="summaryTimeframe">15m</strong>
-        <small>Реальные свечи Binance Spot</small>
+      <article class="panel mover-panel">
+        <div class="section-head">
+          <div>
+            <h2>Топ падения</h2>
+            <span class="muted">Максимальное снижение за 24 часа</span>
+          </div>
+          <span class="mover-badge down">24ч</span>
+        </div>
+        <div id="topLosers" class="mover-list"></div>
       </article>
     </section>
 
-    <section class="platform-grid" id="market">
-      <article class="panel chart-panel">
-        <div class="section-head">
+    <section class="main-grid">
+      <article class="panel market-list-panel">
+        <div class="section-head market-list-head">
           <div>
-            <div class="symbol-title-row">
-              <h1 id="activeSymbol">BTCUSDT</h1>
-              <span class="live-badge">LIVE</span>
-            </div>
-
-            <div class="price-row">
-              <strong id="activePrice">—</strong>
-              <span id="activeChange">—</span>
-            </div>
-          </div>
-
-          <div class="chart-controls">
-            <button id="resetChartButton" class="icon-button" type="button"
-              title="Показать все свечи">
-              ⛶
-            </button>
-
-            <button id="fullscreenButton" class="icon-button" type="button"
-              title="Развернуть график">
-              ⤢
-            </button>
-
-            <button id="refreshButton" class="icon-button" type="button"
-              title="Обновить данные">
-              ↻
-            </button>
-
-            <select id="intervalSelect" aria-label="Таймфрейм">
-              <option value="1m">1m</option>
-              <option value="5m">5m</option>
-              <option value="15m" selected>15m</option>
-              <option value="1h">1H</option>
-              <option value="4h">4H</option>
-              <option value="1d">1D</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="ohlc-row">
-          <span>O <strong id="ohlcOpen">—</strong></span>
-          <span>H <strong id="ohlcHigh">—</strong></span>
-          <span>L <strong id="ohlcLow">—</strong></span>
-          <span>C <strong id="ohlcClose">—</strong></span>
-          <span>Vol <strong id="ohlcVolume">—</strong></span>
-        </div>
-
-        <div id="chartPanel" class="interactive-chart-panel">
-          <div class="chart-help">
-            <span>Перетаскивание — двигать</span>
-            <span>Колесо — масштаб</span>
-            <span>Шкала справа — масштаб цены</span>
-          </div>
-
-          <div class="chart-wrap">
-            <div id="chart" aria-label="Интерактивный график"></div>
-            <div id="chartLoader" class="chart-loader">Загрузка свечей…</div>
-          </div>
-
-          <button id="chartResizeHandle" class="chart-resize-handle"
-            type="button" aria-label="Изменить высоту графика">
-            <span></span>
-          </button>
-        </div>
-
-        <div class="chart-footer">
-          <span id="chartHint">Ожидание данных</span>
-          <span>Публичные рыночные данные</span>
-        </div>
-      </article>
-
-      <aside class="panel watchlist-panel">
-        <div class="section-head">
-          <div>
-            <h2>Топ‑100 криптовалют</h2>
-            <span class="muted">По объёму торгов в USDT</span>
+            <h2>Криптовалюты</h2>
+            <span class="muted">Топ‑100 по объёму торгов в USDT</span>
           </div>
 
           <input id="searchInput" class="search-input"
-            type="search" placeholder="Поиск">
+            type="search" placeholder="Поиск монеты">
         </div>
 
-        <div class="watchlist-labels">
-          <span>Пара</span>
+        <div class="market-table-head">
+          <span>#</span>
+          <span>Инструмент</span>
           <span>Цена</span>
           <span>24ч</span>
+          <span>Максимум</span>
+          <span>Минимум</span>
+          <span>Объём USDT</span>
         </div>
 
-        <div id="symbols" class="symbol-list">
+        <div id="symbols" class="market-list">
           <div class="list-loading">Загрузка инструментов…</div>
+        </div>
+      </article>
+
+      <aside class="panel selected-market-panel">
+        <div class="selected-header">
+          <div>
+            <span class="muted">Выбранный инструмент</span>
+            <h2 id="selectedSymbol">BTC/USDT</h2>
+            <span id="selectedName" class="muted">Bitcoin</span>
+          </div>
+
+          <div class="selected-price">
+            <strong id="selectedPrice">—</strong>
+            <span id="selectedChange">—</span>
+          </div>
+        </div>
+
+        <div class="selected-divider"></div>
+
+        <h3>Статистика рынка</h3>
+        <p class="selected-description">
+          Данные выбранного инструмента за последние 24 часа.
+        </p>
+
+        <div class="stats-grid">
+          <div>
+            <span>Максимум 24ч</span>
+            <strong id="dayHigh">—</strong>
+          </div>
+
+          <div>
+            <span>Минимум 24ч</span>
+            <strong id="dayLow">—</strong>
+          </div>
+
+          <div>
+            <span>Изменение цены</span>
+            <strong id="priceChange">—</strong>
+          </div>
+
+          <div>
+            <span>Средняя цена</span>
+            <strong id="weightedAverage">—</strong>
+          </div>
+
+          <div>
+            <span>Объём монеты</span>
+            <strong id="baseVolume">—</strong>
+          </div>
+
+          <div>
+            <span>Объём USDT</span>
+            <strong id="quoteVolume">—</strong>
+          </div>
+
+          <div>
+            <span>Сделок за 24ч</span>
+            <strong id="tradeCount">—</strong>
+          </div>
+
+          <div>
+            <span>Цена открытия</span>
+            <strong id="openPrice">—</strong>
+          </div>
         </div>
       </aside>
     </section>
 
-    <section class="panel market-stats-panel">
-      <div class="section-head">
-        <div>
-          <h2>Статистика рынка</h2>
-          <span class="muted">Данные выбранного инструмента за 24 часа</span>
+    <section class="ai-ecosystem-section" id="ai-ecosystem">
+      <div class="ai-hero">
+        <div class="ai-hero-copy">
+          <span class="section-kicker">FASTBOOT AI TRADING ECOSYSTEM</span>
+          <h2>Торговая платформа на основе искусственного интеллекта</h2>
+          <p>
+            FASTBOOT создаётся как интеллектуальная экосистема для торговли
+            криптовалютами. Будущая система объединит рыночные данные,
+            технический и фундаментальный анализ, обработку новостей и
+            управление рисками в едином интерфейсе.
+          </p>
+        </div>
+
+        <div class="ai-status-card">
+          <span class="ai-status-label">Статус продукта</span>
+          <strong>В разработке</strong>
+          <p>
+            Модули будут подключаться постепенно после тестирования на
+            исторических и демонстрационных данных.
+          </p>
         </div>
       </div>
 
-      <div class="stats-grid">
+      <div class="ai-features-grid">
+        <article class="ai-feature-card">
+          <div class="ai-feature-icon">01</div>
+          <h3>AI Market Analysis</h3>
+          <p>
+            Комплексная оценка рыночной структуры и текущего состояния актива.
+          </p>
+          <ul>
+            <li>Технический анализ</li>
+            <li>Фундаментальный анализ</li>
+            <li>Настроения рынка</li>
+            <li>Ликвидность и объёмы</li>
+            <li>Волатильность и корреляции</li>
+          </ul>
+        </article>
+
+        <article class="ai-feature-card">
+          <div class="ai-feature-icon">02</div>
+          <h3>AI News Analysis</h3>
+          <p>
+            Анализ новостей и событий с оценкой их возможного влияния на рынок.
+          </p>
+          <ul>
+            <li>Криптовалютные новости</li>
+            <li>Макроэкономические события</li>
+            <li>Определение важности новости</li>
+            <li>Оценка рыночной реакции</li>
+            <li>Контроль новостной волатильности</li>
+          </ul>
+        </article>
+
+        <article class="ai-feature-card">
+          <div class="ai-feature-icon">03</div>
+          <h3>AI Smart Money System</h3>
+          <p>
+            Поиск зон интереса и признаков активности крупных участников рынка.
+          </p>
+          <ul>
+            <li>Market Structure</li>
+            <li>Order Blocks</li>
+            <li>Fair Value Gaps</li>
+            <li>Liquidity Sweeps</li>
+            <li>Institutional Concepts</li>
+          </ul>
+        </article>
+
+        <article class="ai-feature-card">
+          <div class="ai-feature-icon">04</div>
+          <h3>AI Risk Management</h3>
+          <p>
+            Система контроля капитала для ограничения риска и дисциплины.
+          </p>
+          <ul>
+            <li>Расчёт риска на сделку</li>
+            <li>Размер позиции</li>
+            <li>Risk / Reward</li>
+            <li>Stop Loss и Take Profit</li>
+            <li>Дневные лимиты риска</li>
+          </ul>
+        </article>
+
+        <article class="ai-feature-card">
+          <div class="ai-feature-icon">05</div>
+          <h3>AI Trading Assistant</h3>
+          <p>
+            Персональный помощник для подготовки и объяснения торгового плана.
+          </p>
+          <ul>
+            <li>Поиск торговых сценариев</li>
+            <li>Анализ выбранного инструмента</li>
+            <li>Объяснение логики решения</li>
+            <li>Формирование торгового плана</li>
+            <li>Помощь в обучении</li>
+          </ul>
+        </article>
+
+        <article class="ai-feature-card">
+          <div class="ai-feature-icon">06</div>
+          <h3>Institutional Analysis</h3>
+          <p>
+            Анализ поведения крупных игроков без заявления о прямом копировании
+            закрытых стратегий фондов.
+          </p>
+          <ul>
+            <li>Институциональная ликвидность</li>
+            <li>Поведение крупных участников</li>
+            <li>Рыночные аномалии</li>
+            <li>Сценарный анализ</li>
+            <li>Адаптация под фазу рынка</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="ai-metrics">
         <div>
-          <span>Максимум 24ч</span>
-          <strong id="dayHigh">—</strong>
+          <strong>24/7</strong>
+          <span>мониторинг рынка</span>
+        </div>
+        <div>
+          <strong>100+</strong>
+          <span>криптовалютных пар</span>
+        </div>
+        <div>
+          <strong>6</strong>
+          <span>аналитических модулей</span>
+        </div>
+        <div>
+          <strong>1</strong>
+          <span>единая экосистема</span>
+        </div>
+      </div>
+
+      <div class="ai-closing-banner">
+        <div>
+          <span class="section-kicker">TRADE SMARTER WITH ARTIFICIAL INTELLIGENCE</span>
+          <h2>Профессиональные инструменты анализа в понятном интерфейсе</h2>
+          <p>
+            Цель FASTBOOT — объединить реальные рыночные данные,
+            автоматизированный анализ и управление рисками, сохраняя решения
+            прозрачными и понятными для пользователя.
+          </p>
         </div>
 
-        <div>
-          <span>Минимум 24ч</span>
-          <strong id="dayLow">—</strong>
-        </div>
-
-        <div>
-          <span>Объём монеты</span>
-          <strong id="baseVolume">—</strong>
-        </div>
-
-        <div>
-          <span>Объём USDT</span>
-          <strong id="quoteVolume">—</strong>
-        </div>
+        <button id="learnMoreButton" class="ai-cta-button" type="button">
+          Узнать больше
+        </button>
       </div>
     </section>
   </main>
 
   <footer class="footer">
-    <span>FASTBOOT Crypto Terminal</span>
+    <span>FASTBOOT Crypto Market</span>
     <span>Рыночные данные Binance · не является инвестиционной рекомендацией</span>
   </footer>
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
-
   <script src="app.js"></script>
 </body>
 </html>
