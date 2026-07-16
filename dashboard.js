@@ -52,6 +52,7 @@ function showToast(message) {
 
 function openSection(id) {
   state.section = id;
+  document.body.classList.toggle("trading-mode", id === "trading");
   document.querySelectorAll(".dashboard-section").forEach((el) => el.classList.toggle("active", el.id === id));
   document.querySelectorAll(".nav-item[data-section]").forEach((el) => el.classList.toggle("active", el.dataset.section === id));
   $("pageTitle").textContent = titles[id] || "FASTBOOT";
@@ -205,13 +206,6 @@ $("toggleBotButton").addEventListener("click",()=>{
   if (state.botBalance <= 0 && !state.botRunning) return showToast("Сначала переведите средства на счёт бота");
   state.botRunning = !state.botRunning; saveState(); renderBot(); showToast(state.botRunning ? "Торговля бота запущена" : "Торговля бота остановлена");
 });
-$("botRiskSettingsButton").addEventListener("click",()=>{
-  $("modalTitle").textContent = "Риск-менеджмент бота";
-  $("modalBody").innerHTML = `<div class="modal-form"><label>Риск на сделку, %<input id="botRiskInput" type="number" value="${localStorage.getItem("fastboot-bot-risk")||1}" min=".1" max="10" step=".1"></label><label>Максимум сделок в день<input id="botMaxTrades" type="number" value="${localStorage.getItem("fastboot-bot-max-trades")||3}" min="1"></label><button id="saveBotRisk" class="primary-action">Сохранить</button></div>`;
-  $("actionModal").classList.remove("hidden");
-  $("saveBotRisk").addEventListener("click",()=>{localStorage.setItem("fastboot-bot-risk",$("botRiskInput").value);localStorage.setItem("fastboot-bot-max-trades",$("botMaxTrades").value);$("actionModal").classList.add("hidden");showToast("Настройки риска сохранены")});
-});
-
 const periodStats = {
   day:[0,0,0,0], week:[0,0,0,0], month:[0,0,0,0], quarter:[0,0,0,0]
 };
@@ -240,7 +234,14 @@ async function loadTradingTerminal() {
     fetchJson(`${REST_BASE}/api/v3/trades?symbol=${symbol}&limit=20`)
   ]);
 
+  $("terminalSymbolLabel").textContent = symbol;
+  $("baseAssetSuffix").textContent = symbol.replace("USDT", "");
   $("terminalPrice").textContent = formatPrice(ticker.lastPrice);
+  $("terminalHigh").textContent = formatPrice(ticker.highPrice);
+  $("terminalLow").textContent = formatPrice(ticker.lowPrice);
+  $("terminalVolume").textContent = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 }).format(Number(ticker.quoteVolume));
+  const usdt = state.portfolio.find((item) => item.asset === "USDT");
+  $("availableUsdt").textContent = `${(usdt?.amount || 0).toFixed(2)} USDT`;
   const change = Number(ticker.priceChangePercent);
   $("terminalChange").textContent = `${change>=0?"+":""}${change.toFixed(2)}%`;
   $("terminalChange").className = change>=0?"positive":"negative";
@@ -329,3 +330,33 @@ $("saveProfileButton").addEventListener("click",()=>{
 });
 
 initializeUser(); loadPrices(); renderOrders(); renderJournal();
+
+
+$("tradingHomeButton")?.addEventListener("click", () => {
+  $("sidebar").classList.toggle("open");
+});
+
+$("fitChartButton")?.addEventListener("click", () => {
+  state.chart?.timeScale().fitContent();
+});
+
+document.querySelectorAll(".order-type-tabs button").forEach((button) => {
+  button.addEventListener("click", () => {
+    document.querySelectorAll(".order-type-tabs button").forEach((item) => item.classList.toggle("active", item === button));
+    $("orderType").value = button.dataset.orderType;
+    const market = button.dataset.orderType === "MARKET";
+    $("orderPrice").disabled = market;
+    $("orderPrice").placeholder = market ? "Рыночная цена" : "Цена";
+  });
+});
+
+document.querySelectorAll(".amount-percent-row button").forEach((button) => {
+  button.addEventListener("click", () => {
+    const percent = Number(button.dataset.percent) / 100;
+    const available = state.portfolio.find((item) => item.asset === "USDT")?.amount || 0;
+    const price = Number($("orderPrice").value) || Number($("terminalPrice").textContent.replaceAll(",", ""));
+    if (!(price > 0)) return;
+    $("orderAmount").value = ((available * percent) / price).toFixed(8);
+    $("orderAmount").dispatchEvent(new Event("input"));
+  });
+});

@@ -166,9 +166,6 @@
               </button>
             </div>
             <div class="bot-control-buttons">
-              <button id="botRiskSettingsButton" class="secondary-action" type="button">
-                Настройки риск-менеджмента
-              </button>
               <button id="toggleBotButton" class="primary-action" type="button">
                 Запустить торговлю
               </button>
@@ -208,97 +205,136 @@
           </article>
         </section>
 
-        <section class="dashboard-section" id="trading">
-          <div class="section-heading">
-            <span class="section-kicker">SPOT TRADING TERMINAL</span>
-            <h2>Ручная торговля</h2>
-            <p>График, стакан, лента сделок и размещение ордеров.</p>
-          </div>
-
-          <div class="terminal-toolbar">
-            <select id="tradeSymbolSelect">
-              <option value="BTCUSDT">BTC/USDT</option>
-              <option value="ETHUSDT">ETH/USDT</option>
-              <option value="SOLUSDT">SOL/USDT</option>
-              <option value="BNBUSDT">BNB/USDT</option>
-              <option value="XRPUSDT">XRP/USDT</option>
-            </select>
-            <select id="tradeIntervalSelect">
-              <option value="1m">1m</option>
-              <option value="5m">5m</option>
-              <option value="15m" selected>15m</option>
-              <option value="1h">1H</option>
-              <option value="4h">4H</option>
-            </select>
-            <strong id="terminalPrice">—</strong>
-            <span id="terminalChange">—</span>
-          </div>
-
-          <div class="terminal-grid">
-            <article class="panel chart-terminal-panel">
-              <div id="terminalChart" class="terminal-chart"></div>
-            </article>
-
-            <article class="panel orderbook-panel">
-              <div class="panel-head">
-                <div><h3>Стакан</h3><span>Цена / количество</span></div>
-              </div>
-              <div class="orderbook-head"><span>Цена</span><span>Количество</span></div>
-              <div id="asksList" class="orderbook-list asks"></div>
-              <div class="orderbook-mid" id="orderbookMid">—</div>
-              <div id="bidsList" class="orderbook-list bids"></div>
-            </article>
-
-            <article class="panel recent-trades-panel">
-              <div class="panel-head">
-                <div><h3>Последние сделки</h3><span>Рыночная лента</span></div>
-              </div>
-              <div class="recent-head"><span>Цена</span><span>Количество</span><span>Время</span></div>
-              <div id="recentTradesList" class="recent-trades-list"></div>
-            </article>
-
-            <article class="panel order-form-panel">
-              <div class="order-tabs">
-                <button class="active buy-tab" data-side="BUY">Купить</button>
-                <button class="sell-tab" data-side="SELL">Продать</button>
-              </div>
-              <label>
-                Тип ордера
-                <select id="orderType">
-                  <option value="MARKET">Market</option>
-                  <option value="LIMIT">Limit</option>
-                </select>
-              </label>
-              <label>
-                Цена
-                <input id="orderPrice" type="number" step="any" placeholder="Рыночная">
-              </label>
-              <label>
-                Количество
-                <input id="orderAmount" type="number" step="any" placeholder="Количество монет">
-              </label>
-              <div class="order-total">
-                <span>Сумма</span><strong id="orderTotal">0.00 USDT</strong>
-              </div>
-              <button id="placeOrderButton" class="buy-order-button" type="button">
-                Купить
+        <section class="dashboard-section trading-section" id="trading">
+          <div class="exchange-shell">
+            <header class="exchange-topbar">
+              <button id="tradingHomeButton" class="trading-home-button" type="button" title="Открыть меню" aria-label="Открыть меню">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5v9a1.5 1.5 0 0 1-1.5 1.5H15v-6H9v6H4.5A1.5 1.5 0 0 1 3 19.5z"/></svg>
               </button>
-              <small class="terminal-warning">
-                Биржевой API пока не подключён. Ордер сохраняется локально в истории.
-              </small>
-            </article>
-          </div>
 
-          <article class="panel orders-panel">
-            <div class="panel-head">
-              <div><h3>История ордеров</h3><span>Ручные операции терминала</span></div>
+              <div class="exchange-brand">FASTBOOT <span>TRADE</span></div>
+
+              <div class="exchange-market-selector">
+                <select id="tradeSymbolSelect">
+                  <option value="BTCUSDT">BTC/USDT</option>
+                  <option value="ETHUSDT">ETH/USDT</option>
+                  <option value="SOLUSDT">SOL/USDT</option>
+                  <option value="BNBUSDT">BNB/USDT</option>
+                  <option value="XRPUSDT">XRP/USDT</option>
+                </select>
+              </div>
+
+              <div class="exchange-live"><i></i> LIVE</div>
+            </header>
+
+            <div class="market-summary-bar">
+              <div class="market-symbol-block">
+                <strong id="terminalSymbolLabel">BTCUSDT</strong>
+                <span>Spot</span>
+              </div>
+              <div class="market-price-block">
+                <strong id="terminalPrice">—</strong>
+                <span id="terminalChange">—</span>
+              </div>
+              <div class="market-summary-stat"><span>Макс. 24ч</span><strong id="terminalHigh">—</strong></div>
+              <div class="market-summary-stat"><span>Мин. 24ч</span><strong id="terminalLow">—</strong></div>
+              <div class="market-summary-stat"><span>Объём 24ч</span><strong id="terminalVolume">—</strong></div>
+              <select id="tradeIntervalSelect" class="terminal-timeframe">
+                <option value="1m">1m</option>
+                <option value="5m">5m</option>
+                <option value="15m" selected>15m</option>
+                <option value="1h">1H</option>
+                <option value="4h">4H</option>
+                <option value="1d">1D</option>
+              </select>
             </div>
-            <div class="orders-table-head">
-              <span>Дата</span><span>Пара</span><span>Тип</span><span>Сторона</span>
-              <span>Цена</span><span>Количество</span><span>Статус</span>
+
+            <div class="exchange-workspace">
+              <section class="exchange-chart-area">
+                <div class="chart-tools-row">
+                  <span>График</span>
+                  <span>Информация</span>
+                  <span>Данные</span>
+                  <button id="fitChartButton" type="button">Показать всё</button>
+                </div>
+                <div id="terminalChart" class="terminal-chart"></div>
+              </section>
+
+              <aside class="exchange-orderbook-area">
+                <div class="exchange-panel-title">
+                  <strong>Биржевой стакан</strong>
+                  <span>Цена / количество</span>
+                </div>
+                <div class="orderbook-head"><span>Цена (USDT)</span><span>Количество</span></div>
+                <div id="asksList" class="orderbook-list asks"></div>
+                <div class="orderbook-mid" id="orderbookMid">—</div>
+                <div id="bidsList" class="orderbook-list bids"></div>
+
+                <div class="trades-divider"></div>
+                <div class="exchange-panel-title compact-title">
+                  <strong>Сделки</strong>
+                  <span>Рыночная лента</span>
+                </div>
+                <div class="recent-head"><span>Цена</span><span>Количество</span><span>Время</span></div>
+                <div id="recentTradesList" class="recent-trades-list"></div>
+              </aside>
+
+              <aside class="exchange-order-area">
+                <div class="account-balance-line">
+                  <span>Доступно</span>
+                  <strong id="availableUsdt">0.00 USDT</strong>
+                </div>
+
+                <div class="order-tabs">
+                  <button class="active buy-tab" data-side="BUY">Купить</button>
+                  <button class="sell-tab" data-side="SELL">Продать</button>
+                </div>
+
+                <div class="order-type-tabs">
+                  <button class="active" data-order-type="LIMIT">Лимит</button>
+                  <button data-order-type="MARKET">Рынок</button>
+                </div>
+
+                <input id="orderType" type="hidden" value="LIMIT">
+
+                <label>
+                  Цена
+                  <div class="field-with-suffix"><input id="orderPrice" type="number" step="any"><span>USDT</span></div>
+                </label>
+
+                <label>
+                  Количество
+                  <div class="field-with-suffix"><input id="orderAmount" type="number" step="any"><span id="baseAssetSuffix">BTC</span></div>
+                </label>
+
+                <div class="amount-percent-row">
+                  <button type="button" data-percent="25">25%</button>
+                  <button type="button" data-percent="50">50%</button>
+                  <button type="button" data-percent="75">75%</button>
+                  <button type="button" data-percent="100">100%</button>
+                </div>
+
+                <div class="order-total"><span>Сумма</span><strong id="orderTotal">0.00 USDT</strong></div>
+                <button id="placeOrderButton" class="buy-order-button" type="button">Купить</button>
+
+                <div class="terminal-warning">
+                  Биржевой API пока не подключён. Ордер сохраняется локально.
+                </div>
+              </aside>
             </div>
-            <div id="ordersHistory" class="orders-history empty-list">Ордеров пока нет</div>
-          </article>
+
+            <section class="exchange-orders-area">
+              <div class="exchange-panel-title">
+                <strong>История ордеров</strong>
+                <span>Ручные операции терминала</span>
+              </div>
+              <div class="orders-table-head">
+                <span>Дата</span><span>Пара</span><span>Тип</span><span>Сторона</span>
+                <span>Цена</span><span>Количество</span><span>Статус</span>
+              </div>
+              <div id="ordersHistory" class="orders-history empty-list">Ордеров пока нет</div>
+            </section>
+          </div>
         </section>
 
         <section class="dashboard-section" id="market-analysis">
