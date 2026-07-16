@@ -1,149 +1,290 @@
-const SYMBOLS = {
-  BTCUSDT: { name: "Bitcoin", price: 118420, digits: 2, market: "crypto" },
-  ETHUSDT: { name: "Ethereum", price: 3560, digits: 2, market: "crypto" },
-  EURUSD: { name: "Euro / Dollar", price: 1.1684, digits: 5, market: "forex" },
-  GBPUSD: { name: "Pound / Dollar", price: 1.3421, digits: 5, market: "forex" },
-  XAUUSD: { name: "Gold", price: 3340.5, digits: 2, market: "forex" },
-  NAS100: { name: "Nasdaq 100", price: 23180, digits: 1, market: "index" },
-};
+const REST_BASE = "https://data-api.binance.vision";
+const WS_BASE = "wss://stream.binance.com:9443/ws";
+
+const COINS = [
+  { symbol: "BTCUSDT", name: "Bitcoin" },
+  { symbol: "ETHUSDT", name: "Ethereum" },
+  { symbol: "BNBUSDT", name: "BNB" },
+  { symbol: "SOLUSDT", name: "Solana" },
+  { symbol: "XRPUSDT", name: "XRP" },
+  { symbol: "DOGEUSDT", name: "Dogecoin" },
+  { symbol: "ADAUSDT", name: "Cardano" },
+  { symbol: "AVAXUSDT", name: "Avalanche" },
+  { symbol: "LINKUSDT", name: "Chainlink" },
+  { symbol: "SUIUSDT", name: "Sui" },
+  { symbol: "TRXUSDT", name: "TRON" },
+  { symbol: "LTCUSDT", name: "Litecoin" },
+];
 
 const state = {
   symbol: "BTCUSDT",
   interval: "15m",
   candles: [],
-  analysis: null,
+  tickers: new Map(),
+  socket: null,
+  hoveredIndex: null,
+  loading: false,
 };
 
 const $ = (id) => document.getElementById(id);
 
-function seededRandom(seedText) {
-  let seed = 2166136261;
-  for (const char of seedText) {
-    seed ^= char.charCodeAt(0);
-    seed = Math.imul(seed, 16777619);
-  }
-  return () => {
-    seed += 0x6d2b79f5;
-    let value = seed;
-    value = Math.imul(value ^ (value >>> 15), value | 1);
-    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
-    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function normalRandom(random) {
-  const u = Math.max(random(), 1e-9);
-  const v = Math.max(random(), 1e-9);
-  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
-}
-
-function generateCandles(symbol, interval, limit = 120) {
-  const info = SYMBOLS[symbol];
-  const hourSeed = Math.floor(Date.now() / 3600000);
-  const random = seededRandom(`${symbol}:${interval}:${hourSeed}`);
-
-  let volatility = info.market === "crypto" ? 0.004 : 0.0015;
-  if (symbol === "XAUUSD") volatility = 0.002;
-
-  let current = info.price * (1 + (random() - 0.5) * 0.04);
-  const result = [];
-
-  for (let index = 0; index < limit; index += 1) {
-    const drift = Math.sin(index / 10) * volatility * 0.15;
-    const movement = normalRandom(random) * volatility + drift;
-    const open = current;
-    const close = Math.max(0.00001, open * (1 + movement));
-    const wick = Math.abs(normalRandom(random) * volatility * 0.35);
-    const high = Math.max(open, close) * (1 + wick);
-    const low = Math.min(open, close) * (1 - wick);
-
-    result.push({
-      open,
-      high,
-      low,
-      close,
-      volume: Math.abs(1000 + normalRandom(random) * 350),
-    });
-
-    current = close;
-  }
-
-  return result;
+function setConnection(status, text) {
+  const dot = $("connectionDot");
+  dot.className = `connection-dot ${status}`;
+  $("connectionText").textContent = text;
 }
 
 function formatPrice(value) {
-  if (value >= 1000) {
-    return value.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "—";
+
+  if (number >= 1000) {
+    return number.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
   }
 
-  return value.toLocaleString("en-US", { maximumFractionDigits: 5 });
-}
+  if (number >= 1) {
+    return number.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 4,
+    });
+  }
 
-function getSymbolRows() {
-  const hourSeed = Math.floor(Date.now() / 3600000);
-
-  return Object.entries(SYMBOLS).map(([symbol, info], index) => {
-    const change24h = Math.sin(index + hourSeed) * 3.2;
-    const price = info.price * (1 + Math.sin(Date.now() / 300000 + index) * 0.003);
-
-    return {
-      symbol,
-      ...info,
-      price,
-      change24h,
-    };
+  return number.toLocaleString("en-US", {
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 8,
   });
 }
 
-function renderSymbols() {
-  const rows = getSymbolRows();
+function formatCompact(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "—";
 
-  $("symbols").innerHTML = rows.map((item) => `
-    <button type="button"
-      class="symbol-row ${item.symbol === state.symbol ? "selected" : ""}"
-      data-symbol="${item.symbol}">
-      <span class="symbol-name">
-        <strong>${item.symbol}</strong>
-        <span>${item.name}</span>
-      </span>
-      <strong>${formatPrice(item.price)}</strong>
-      <span class="${item.change24h >= 0 ? "up" : "down"}">
-        ${item.change24h >= 0 ? "+" : ""}${item.change24h.toFixed(2)}%
-      </span>
-    </button>
-  `).join("");
+  return new Intl.NumberFormat("en-US", {
+    notation: "compact",
+    maximumFractionDigits: 2,
+  }).format(number);
+}
+
+async function fetchJson(url) {
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`Ошибка Binance API: ${response.status}`);
+  }
+  return response.json();
+}
+
+async function loadTickers() {
+  const symbolsParam = encodeURIComponent(
+    JSON.stringify(COINS.map((coin) => coin.symbol))
+  );
+
+  const rows = await fetchJson(
+    `${REST_BASE}/api/v3/ticker/24hr?symbols=${symbolsParam}`
+  );
+
+  state.tickers.clear();
+  rows.forEach((row) => state.tickers.set(row.symbol, row));
+
+  renderSymbols();
+  updateSelectedTicker();
+}
+
+async function loadCandles() {
+  if (state.loading) return;
+
+  state.loading = true;
+  $("refreshButton").disabled = true;
+  $("chartLoader").classList.remove("hidden");
+  $("chartLoader").textContent = "Загрузка реальных свечей…";
+
+  try {
+    closeSocket();
+
+    const rows = await fetchJson(
+      `${REST_BASE}/api/v3/klines?symbol=${state.symbol}` +
+      `&interval=${state.interval}&limit=300`
+    );
+
+    state.candles = rows.map((row) => ({
+      openTime: Number(row[0]),
+      open: Number(row[1]),
+      high: Number(row[2]),
+      low: Number(row[3]),
+      close: Number(row[4]),
+      volume: Number(row[5]),
+      closeTime: Number(row[6]),
+    }));
+
+    state.hoveredIndex = null;
+    drawChart();
+    updateOHLC(state.candles.at(-1));
+
+    $("chartHint").textContent =
+      `${state.candles.length} свечей · ${state.interval} · Binance Spot`;
+
+    openSocket();
+    setConnection("online", "Реальные данные");
+  } catch (error) {
+    console.error(error);
+    setConnection("offline", "Ошибка подключения");
+    $("chartLoader").textContent =
+      "Не удалось загрузить данные. Нажмите обновить.";
+    showToast(error.message);
+  } finally {
+    state.loading = false;
+    $("refreshButton").disabled = false;
+
+    if (state.candles.length) {
+      $("chartLoader").classList.add("hidden");
+    }
+  }
+}
+
+function openSocket() {
+  closeSocket();
+
+  const stream =
+    `${state.symbol.toLowerCase()}@kline_${state.interval}`;
+
+  state.socket = new WebSocket(`${WS_BASE}/${stream}`);
+
+  state.socket.addEventListener("open", () => {
+    setConnection("online", "Реальные данные");
+  });
+
+  state.socket.addEventListener("message", (event) => {
+    const payload = JSON.parse(event.data);
+    const kline = payload.k;
+
+    const liveCandle = {
+      openTime: Number(kline.t),
+      open: Number(kline.o),
+      high: Number(kline.h),
+      low: Number(kline.l),
+      close: Number(kline.c),
+      volume: Number(kline.v),
+      closeTime: Number(kline.T),
+    };
+
+    const last = state.candles.at(-1);
+
+    if (last && last.openTime === liveCandle.openTime) {
+      state.candles[state.candles.length - 1] = liveCandle;
+    } else {
+      state.candles.push(liveCandle);
+      if (state.candles.length > 300) state.candles.shift();
+    }
+
+    const ticker = state.tickers.get(state.symbol);
+    if (ticker) ticker.lastPrice = String(liveCandle.close);
+
+    updateSelectedTicker();
+    if (state.hoveredIndex === null) updateOHLC(liveCandle);
+    drawChart();
+  });
+
+  state.socket.addEventListener("close", () => {
+    if (state.socket) setConnection("", "Переподключение…");
+  });
+
+  state.socket.addEventListener("error", () => {
+    setConnection("offline", "WebSocket недоступен");
+  });
+}
+
+function closeSocket() {
+  if (state.socket) {
+    state.socket.onclose = null;
+    state.socket.close();
+    state.socket = null;
+  }
+}
+
+function renderSymbols() {
+  const query = $("searchInput").value.trim().toLowerCase();
+
+  const filtered = COINS.filter((coin) =>
+    `${coin.symbol} ${coin.name}`.toLowerCase().includes(query)
+  );
+
+  $("symbols").innerHTML = filtered.map((coin) => {
+    const ticker = state.tickers.get(coin.symbol);
+    const price = ticker ? formatPrice(ticker.lastPrice) : "—";
+    const change = ticker ? Number(ticker.priceChangePercent) : 0;
+
+    return `
+      <button type="button"
+        class="symbol-row ${coin.symbol === state.symbol ? "selected" : ""}"
+        data-symbol="${coin.symbol}">
+        <span class="symbol-name">
+          <strong>${coin.symbol.replace("USDT", "")}</strong>
+          <span>${coin.name}</span>
+        </span>
+        <strong>${price}</strong>
+        <span class="${change >= 0 ? "up" : "down"}">
+          ${ticker ? `${change >= 0 ? "+" : ""}${change.toFixed(2)}%` : "—"}
+        </span>
+      </button>
+    `;
+  }).join("");
 
   document.querySelectorAll(".symbol-row").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
+      if (button.dataset.symbol === state.symbol) return;
+
       state.symbol = button.dataset.symbol;
-      state.analysis = null;
-      $("analysisResult").classList.add("hidden");
-      $("analysisEmpty").classList.remove("hidden");
       renderSymbols();
-      updateActiveHeader();
-      loadChart();
+      updateSelectedTicker();
+      await loadCandles();
     });
   });
 }
 
-function updateActiveHeader() {
-  const row = getSymbolRows().find((item) => item.symbol === state.symbol);
-  $("activeSymbol").textContent = row.symbol;
-  $("activePrice").textContent = formatPrice(row.price);
-  $("activeChange").textContent =
-    `${row.change24h >= 0 ? "+" : ""}${row.change24h.toFixed(2)}%`;
-  $("activeChange").className = row.change24h >= 0 ? "up" : "down";
-  $("summarySymbol").textContent = row.symbol;
+function updateSelectedTicker() {
+  const coin = COINS.find((item) => item.symbol === state.symbol);
+  const ticker = state.tickers.get(state.symbol);
+
+  $("activeSymbol").textContent = state.symbol;
+  $("summarySymbol").textContent = state.symbol;
+  $("summaryName").textContent = coin?.name || "";
   $("summaryTimeframe").textContent = state.interval;
+
+  if (!ticker) return;
+
+  const price = Number(ticker.lastPrice);
+  const change = Number(ticker.priceChangePercent);
+
+  $("activePrice").textContent = formatPrice(price);
+  $("summaryPrice").textContent = `${formatPrice(price)} USDT`;
+
+  const changeText = `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`;
+  $("activeChange").textContent = changeText;
+  $("activeChange").className = change >= 0 ? "up" : "down";
+  $("summaryChange").textContent = `24ч: ${changeText}`;
+  $("summaryChange").className = change >= 0 ? "up" : "down";
+
+  $("dayHigh").textContent = formatPrice(ticker.highPrice);
+  $("dayLow").textContent = formatPrice(ticker.lowPrice);
+  $("baseVolume").textContent = formatCompact(ticker.volume);
+  $("quoteVolume").textContent = `${formatCompact(ticker.quoteVolume)} USDT`;
 }
 
-function loadChart() {
-  state.candles = generateCandles(state.symbol, state.interval);
-  drawChart();
-  $("chartHint").textContent = `${state.candles.length} свечей · ${state.interval}`;
+function updateOHLC(candle) {
+  if (!candle) return;
+
+  $("ohlcOpen").textContent = formatPrice(candle.open);
+  $("ohlcHigh").textContent = formatPrice(candle.high);
+  $("ohlcLow").textContent = formatPrice(candle.low);
+  $("ohlcClose").textContent = formatPrice(candle.close);
+  $("ohlcVolume").textContent = formatCompact(candle.volume);
 }
 
 function drawChart() {
+  if (!state.candles.length) return;
+
   const canvas = $("chart");
   const rect = canvas.getBoundingClientRect();
   const ratio = window.devicePixelRatio || 1;
@@ -151,12 +292,12 @@ function drawChart() {
   canvas.width = Math.max(1, Math.floor(rect.width * ratio));
   canvas.height = Math.max(1, Math.floor(rect.height * ratio));
 
-  const context = canvas.getContext("2d");
-  context.scale(ratio, ratio);
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
 
   const width = rect.width;
   const height = rect.height;
-  const padding = { top: 18, right: 68, bottom: 24, left: 12 };
+  const padding = { top: 18, right: 76, bottom: 30, left: 12 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
@@ -164,131 +305,136 @@ function drawChart() {
   const muted = styles.getPropertyValue("--muted").trim();
   const green = styles.getPropertyValue("--green").trim();
   const red = styles.getPropertyValue("--red").trim();
+  const text = styles.getPropertyValue("--text").trim();
 
   const lows = state.candles.map((candle) => candle.low);
   const highs = state.candles.map((candle) => candle.high);
 
   let min = Math.min(...lows);
   let max = Math.max(...highs);
-  const range = Math.max(max - min, max * 0.001);
-  min -= range * 0.05;
-  max += range * 0.05;
+  const rawRange = Math.max(max - min, max * 0.0001);
+  min -= rawRange * 0.06;
+  max += rawRange * 0.06;
 
   const y = (price) =>
     padding.top + ((max - price) / (max - min)) * chartHeight;
 
-  context.clearRect(0, 0, width, height);
-  context.font = "11px system-ui";
+  ctx.clearRect(0, 0, width, height);
+  ctx.font = "11px system-ui";
 
   for (let index = 0; index <= 5; index += 1) {
     const lineY = padding.top + (chartHeight / 5) * index;
     const price = max - ((max - min) / 5) * index;
 
-    context.strokeStyle = "rgba(128, 140, 160, 0.14)";
-    context.beginPath();
-    context.moveTo(padding.left, lineY);
-    context.lineTo(width - padding.right, lineY);
-    context.stroke();
+    ctx.strokeStyle = "rgba(128, 140, 160, 0.14)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padding.left, lineY);
+    ctx.lineTo(width - padding.right, lineY);
+    ctx.stroke();
 
-    context.fillStyle = muted;
-    context.fillText(formatPrice(price), width - padding.right + 8, lineY + 4);
+    ctx.fillStyle = muted;
+    ctx.textAlign = "left";
+    ctx.fillText(formatPrice(price), width - padding.right + 8, lineY + 4);
   }
 
   const step = chartWidth / state.candles.length;
-  const bodyWidth = Math.max(2, Math.min(7, step * 0.65));
+  const bodyWidth = Math.max(1.2, Math.min(6, step * 0.68));
 
   state.candles.forEach((candle, index) => {
     const x = padding.left + index * step + step / 2;
     const color = candle.close >= candle.open ? green : red;
 
-    context.strokeStyle = color;
-    context.beginPath();
-    context.moveTo(x, y(candle.high));
-    context.lineTo(x, y(candle.low));
-    context.stroke();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, y(candle.high));
+    ctx.lineTo(x, y(candle.low));
+    ctx.stroke();
 
     const top = y(Math.max(candle.open, candle.close));
     const bottom = y(Math.min(candle.open, candle.close));
 
-    context.fillStyle = color;
-    context.fillRect(
+    ctx.fillStyle = color;
+    ctx.fillRect(
       x - bodyWidth / 2,
       top,
       bodyWidth,
       Math.max(1, bottom - top)
     );
   });
+
+  const last = state.candles.at(-1);
+  const lastY = y(last.close);
+
+  ctx.strokeStyle = last.close >= last.open ? green : red;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(padding.left, lastY);
+  ctx.lineTo(width - padding.right, lastY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  if (state.hoveredIndex !== null) {
+    const index = Math.max(
+      0,
+      Math.min(state.candles.length - 1, state.hoveredIndex)
+    );
+    const x = padding.left + index * step + step / 2;
+
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.28)";
+    ctx.beginPath();
+    ctx.moveTo(x, padding.top);
+    ctx.lineTo(x, height - padding.bottom);
+    ctx.stroke();
+
+    const candle = state.candles[index];
+    updateOHLC(candle);
+
+    const date = new Date(candle.openTime);
+    const label = date.toLocaleString("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    ctx.fillStyle = "rgba(17, 24, 35, 0.96)";
+    ctx.fillRect(
+      Math.max(padding.left, Math.min(x - 52, width - padding.right - 104)),
+      height - padding.bottom + 5,
+      104,
+      20
+    );
+
+    ctx.fillStyle = text;
+    ctx.textAlign = "center";
+    ctx.fillText(
+      label,
+      Math.max(padding.left + 52, Math.min(x, width - padding.right - 52)),
+      height - padding.bottom + 19
+    );
+  }
 }
 
-function analyzeMarket() {
-  const recent = state.candles.slice(-20);
-  const broader = state.candles.slice(-60, -20);
-  const current = state.candles.at(-1).close;
+function handleChartMove(event) {
+  if (!state.candles.length) return;
 
-  const recentHigh = Math.max(...recent.map((item) => item.high));
-  const recentLow = Math.min(...recent.map((item) => item.low));
-  const broaderHigh = Math.max(...broader.map((item) => item.high));
-  const broaderLow = Math.min(...broader.map((item) => item.low));
+  const rect = $("chart").getBoundingClientRect();
+  const padding = { right: 76, left: 12 };
+  const chartWidth = rect.width - padding.left - padding.right;
+  const x = event.clientX - rect.left - padding.left;
 
-  const impulse = recent.at(-1).close - recent[0].open;
-  const bias = impulse >= 0 ? "LONG" : "SHORT";
-
-  let entry = current;
-  let stopLoss;
-  let takeProfit;
-
-  if (bias === "LONG") {
-    stopLoss = Math.min(recentLow, broaderLow);
-    const risk = Math.max(entry - stopLoss, entry * 0.002);
-    takeProfit = entry + risk * 2;
+  if (x < 0 || x > chartWidth) {
+    state.hoveredIndex = null;
+    updateOHLC(state.candles.at(-1));
   } else {
-    stopLoss = Math.max(recentHigh, broaderHigh);
-    const risk = Math.max(stopLoss - entry, entry * 0.002);
-    takeProfit = entry - risk * 2;
+    state.hoveredIndex = Math.floor(
+      (x / chartWidth) * state.candles.length
+    );
   }
 
-  state.analysis = {
-    symbol: state.symbol,
-    interval: state.interval,
-    bias,
-    confidence: 67,
-    entry,
-    stopLoss,
-    takeProfit,
-    riskReward: 2,
-    demand: [broaderLow, (broaderLow + recentLow) / 2],
-    supply: [(broaderHigh + recentHigh) / 2, broaderHigh],
-    summary:
-      "Демонстрационный алгоритм анализирует последние 60 свечей, направление импульса и более широкий диапазон зон. Перед реальной торговлей стратегию необходимо проверить на истории и подключить настоящий источник котировок.",
-  };
-
-  renderAnalysis();
-}
-
-function renderAnalysis() {
-  const analysis = state.analysis;
-
-  $("analysisEmpty").classList.add("hidden");
-  $("analysisResult").classList.remove("hidden");
-
-  $("biasBadge").textContent = analysis.bias;
-  $("biasBadge").className =
-    `signal-badge ${analysis.bias === "LONG" ? "long" : "short"}`;
-
-  $("confidence").textContent = `Уверенность: ${analysis.confidence}%`;
-  $("entry").textContent = formatPrice(analysis.entry);
-  $("stopLoss").textContent = formatPrice(analysis.stopLoss);
-  $("takeProfit").textContent = formatPrice(analysis.takeProfit);
-  $("rr").textContent = `1:${analysis.riskReward}`;
-  $("demandZone").textContent =
-    `${formatPrice(analysis.demand[0])} — ${formatPrice(analysis.demand[1])}`;
-  $("supplyZone").textContent =
-    `${formatPrice(analysis.supply[0])} — ${formatPrice(analysis.supply[1])}`;
-  $("analysisSummary").textContent = analysis.summary;
-
-  $("calcEntry").value = analysis.entry;
-  $("calcStop").value = analysis.stopLoss;
-  calculateRisk();
+  drawChart();
 }
 
 function calculateRisk() {
@@ -298,14 +444,13 @@ function calculateRisk() {
   const stop = Number($("calcStop").value);
 
   const riskMoney = balance * (riskPercent / 100);
-  $("calcRiskMoney").textContent = `$${riskMoney.toFixed(2)}`;
-  $("riskSummary").textContent = `${riskPercent.toFixed(1)}%`;
-  $("riskMoney").textContent = `$${riskMoney.toFixed(2)}`;
+  $("calcRiskMoney").textContent = `${riskMoney.toFixed(2)} USDT`;
 
   const distance = Math.abs(entry - stop);
 
   if (entry > 0 && stop > 0 && distance > 0) {
-    $("positionSize").textContent = `${(riskMoney / distance).toFixed(4)} ед.`;
+    $("positionSize").textContent =
+      `${(riskMoney / distance).toFixed(6)} ${state.symbol.replace("USDT", "")}`;
   } else {
     $("positionSize").textContent = "—";
   }
@@ -313,36 +458,45 @@ function calculateRisk() {
 
 function getJournal() {
   try {
-    return JSON.parse(localStorage.getItem("tradescope-journal") || "[]");
+    return JSON.parse(localStorage.getItem("fastboot-crypto-journal") || "[]");
   } catch {
     return [];
   }
 }
 
 function saveJournal(items) {
-  localStorage.setItem("tradescope-journal", JSON.stringify(items));
+  localStorage.setItem("fastboot-crypto-journal", JSON.stringify(items));
 }
 
 function savePlan() {
-  if (!state.analysis) return;
+  const entry = Number($("calcEntry").value);
+  const stop = Number($("calcStop").value);
+  const balance = Number($("balanceInput").value);
+  const riskPercent = Number($("riskInput").value);
 
+  if (!(entry > 0) || !(stop > 0) || entry === stop) {
+    showToast("Укажите корректные цены входа и Stop Loss");
+    return;
+  }
+
+  const riskMoney = balance * (riskPercent / 100);
+  const size = riskMoney / Math.abs(entry - stop);
   const items = getJournal();
 
   items.unshift({
     id: Date.now(),
     createdAt: new Date().toLocaleString("ru-RU"),
-    symbol: state.analysis.symbol,
-    interval: state.analysis.interval,
-    side: state.analysis.bias,
-    entry: state.analysis.entry,
-    stopLoss: state.analysis.stopLoss,
-    takeProfit: state.analysis.takeProfit,
-    riskPercent: Number($("riskInput").value),
+    symbol: state.symbol,
+    entry,
+    stop,
+    riskPercent,
+    riskMoney,
+    size,
   });
 
   saveJournal(items.slice(0, 100));
   renderJournal();
-  showToast("Торговый план сохранён");
+  showToast("Расчёт сохранён в журнал");
 }
 
 function renderJournal() {
@@ -350,23 +504,20 @@ function renderJournal() {
 
   if (!items.length) {
     $("journalList").innerHTML =
-      '<div class="empty-state">В журнале пока нет сохранённых планов.</div>';
+      '<div class="empty-state">В журнале пока нет сохранённых расчётов.</div>';
     return;
   }
 
   $("journalList").innerHTML = items.map((item) => `
     <article class="journal-item">
       <div>
-        <strong>
-          ${item.symbol} ·
-          <span class="${item.side === "LONG" ? "up" : "down"}">${item.side}</span>
-        </strong>
+        <strong>${item.symbol}</strong>
         <div>
           <small>
-            ${item.interval} · Вход ${formatPrice(item.entry)}
-            · SL ${formatPrice(item.stopLoss)}
-            · TP ${formatPrice(item.takeProfit)}
+            Вход ${formatPrice(item.entry)}
+            · SL ${formatPrice(item.stop)}
             · риск ${item.riskPercent}%
+            · размер ${Number(item.size).toFixed(6)}
           </small>
         </div>
       </div>
@@ -377,7 +528,7 @@ function renderJournal() {
 
 function clearJournal() {
   if (!getJournal().length) return;
-  localStorage.removeItem("tradescope-journal");
+  localStorage.removeItem("fastboot-crypto-journal");
   renderJournal();
   showToast("Журнал очищен");
 }
@@ -390,16 +541,21 @@ function showToast(message) {
   clearTimeout(showToast.timer);
   showToast.timer = setTimeout(() => {
     toast.classList.add("hidden");
-  }, 2200);
+  }, 2400);
 }
 
-$("intervalSelect").addEventListener("change", (event) => {
+$("intervalSelect").addEventListener("change", async (event) => {
   state.interval = event.target.value;
-  updateActiveHeader();
-  loadChart();
+  $("summaryTimeframe").textContent = state.interval;
+  await loadCandles();
 });
 
-$("analyzeButton").addEventListener("click", analyzeMarket);
+$("refreshButton").addEventListener("click", async () => {
+  await Promise.all([loadTickers(), loadCandles()]);
+  showToast("Данные обновлены");
+});
+
+$("searchInput").addEventListener("input", renderSymbols);
 $("savePlanButton").addEventListener("click", savePlan);
 $("clearJournal").addEventListener("click", clearJournal);
 
@@ -407,13 +563,38 @@ $("clearJournal").addEventListener("click", clearJournal);
   $(id).addEventListener("input", calculateRisk);
 });
 
+$("chart").addEventListener("mousemove", handleChartMove);
+$("chart").addEventListener("mouseleave", () => {
+  state.hoveredIndex = null;
+  updateOHLC(state.candles.at(-1));
+  drawChart();
+});
+
 window.addEventListener("resize", () => {
   clearTimeout(drawChart.resizeTimer);
   drawChart.resizeTimer = setTimeout(drawChart, 100);
 });
 
-renderSymbols();
-updateActiveHeader();
-loadChart();
-calculateRisk();
-renderJournal();
+window.addEventListener("beforeunload", closeSocket);
+
+async function start() {
+  calculateRisk();
+  renderJournal();
+
+  try {
+    await loadTickers();
+    await loadCandles();
+
+    setInterval(() => {
+      loadTickers().catch(console.error);
+    }, 30000);
+  } catch (error) {
+    console.error(error);
+    setConnection("offline", "Ошибка подключения");
+    showToast(
+      "Не удалось подключиться к Binance. Проверьте интернет или доступность сервиса."
+    );
+  }
+}
+
+start();
