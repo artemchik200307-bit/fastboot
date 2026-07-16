@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="theme-color" content="#0b0f16">
+  <meta name="description" content="FASTBOOT — demo торговая платформа с графиком, анализом и риск-калькулятором.">
+  <title>FASTBOOT — торговая платформа</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#">FASTBOOT</a>
+      <nav class="desktop-nav">
+        <a href="#market">Рынок</a>
+        <a href="#analysis">Анализ</a>
+        <a href="#risk">Риск</a>
+        <a href="#journal">Журнал</a>
+      </nav>
+      <span class="demo-badge">DEMO</span>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div>
+          <span class="eyebrow">Торговая платформа</span>
+          <h1>Рынок, анализ и риск-менеджмент в одном месте</h1>
+          <p>
+            Первая версия FASTBOOT работает полностью в браузере.
+            Реальные сделки и подключение брокера пока отключены.
+          </p>
+          <a class="primary-link" href="#market">Открыть платформу</a>
+        </div>
+        <div class="hero-metrics">
+          <div><span>Инструментов</span><strong>6</strong></div>
+          <div><span>Таймфреймов</span><strong>5</strong></div>
+          <div><span>Режим</span><strong>Paper</strong></div>
+        </div>
+      </section>
+
+      <section class="summary-grid">
+        <article class="summary-card">
+          <span>Баланс</span>
+          <strong>$10,000.00</strong>
+          <small>Виртуальный счёт</small>
+        </article>
+        <article class="summary-card">
+          <span>Риск на сделку</span>
+          <strong id="riskSummary">1.0%</strong>
+          <small id="riskMoney">$100.00</small>
+        </article>
+        <article class="summary-card">
+          <span>Текущий инструмент</span>
+          <strong id="summarySymbol">BTCUSDT</strong>
+          <small id="summaryTimeframe">15m</small>
+        </article>
+      </section>
+
+      <section class="platform-grid" id="market">
+        <article class="panel chart-panel">
+          <div class="section-head">
+            <div>
+              <h2 id="activeSymbol">BTCUSDT</h2>
+              <div class="price-row">
+                <strong id="activePrice">—</strong>
+                <span id="activeChange">—</span>
+              </div>
+            </div>
+            <select id="intervalSelect" aria-label="Таймфрейм">
+              <option value="5m">5m</option>
+              <option value="15m" selected>15m</option>
+              <option value="1h">1H</option>
+              <option value="4h">4H</option>
+              <option value="1d">1D</option>
+            </select>
+          </div>
+          <canvas id="chart" aria-label="Свечной график"></canvas>
+          <div class="chart-footer">
+            <span id="chartHint">Демонстрационные котировки</span>
+            <span>Данные обновляются локально</span>
+          </div>
+        </article>
+
+        <aside class="panel watchlist-panel">
+          <div class="section-head">
+            <h2>Инструменты</h2>
+            <span class="muted">Watchlist</span>
+          </div>
+          <div id="symbols" class="symbol-list"></div>
+        </aside>
+      </section>
+
+      <section class="content-grid">
+        <article class="panel" id="analysis">
+          <div class="section-head">
+            <div>
+              <h2>Анализ рынка</h2>
+              <span class="muted">Структура, зоны и RR</span>
+            </div>
+            <button id="analyzeButton" class="primary-button" type="button">
+              Анализировать
+            </button>
+          </div>
+
+          <div id="analysisEmpty" class="empty-state">
+            Выберите инструмент и запустите анализ.
+          </div>
+
+          <div id="analysisResult" class="analysis-result hidden">
+            <div class="analysis-top">
+              <span id="biasBadge" class="signal-badge">—</span>
+              <span id="confidence">—</span>
+            </div>
+
+            <div class="levels-grid">
+              <div><span>Вход</span><strong id="entry">—</strong></div>
+              <div><span>Stop Loss</span><strong id="stopLoss">—</strong></div>
+              <div><span>Take Profit</span><strong id="takeProfit">—</strong></div>
+              <div><span>RR</span><strong id="rr">—</strong></div>
+            </div>
+
+            <div class="zones-block">
+              <div>
+                <span>Зона спроса</span>
+                <strong id="demandZone">—</strong>
+              </div>
+              <div>
+                <span>Зона предложения</span>
+                <strong id="supplyZone">—</strong>
+              </div>
+            </div>
+
+            <p id="analysisSummary"></p>
+            <button id="savePlanButton" class="secondary-button" type="button">
+              Сохранить торговый план
+            </button>
+          </div>
+        </article>
+
+        <article class="panel" id="risk">
+          <h2>Риск-калькулятор</h2>
+          <div class="form-grid">
+            <label>
+              Баланс, $
+              <input id="balanceInput" type="number" min="1" value="10000">
+            </label>
+            <label>
+              Риск, %
+              <input id="riskInput" type="number" min="0.1" max="10" step="0.1" value="1">
+            </label>
+            <label>
+              Вход
+              <input id="calcEntry" type="number" step="any" placeholder="Цена входа">
+            </label>
+            <label>
+              Stop Loss
+              <input id="calcStop" type="number" step="any" placeholder="Цена стопа">
+            </label>
+          </div>
+
+          <div class="calculator-output">
+            <div><span>Риск деньгами</span><strong id="calcRiskMoney">$100.00</strong></div>
+            <div><span>Размер позиции</span><strong id="positionSize">—</strong></div>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel" id="journal">
+        <div class="section-head">
+          <div>
+            <h2>Торговый журнал</h2>
+            <span class="muted">Хранится в этом браузере</span>
+          </div>
+          <button id="clearJournal" class="text-button danger" type="button">
+            Очистить
+          </button>
+        </div>
+        <div id="journalList" class="journal-list"></div>
+      </section>
+
+      <section class="roadmap">
+        <h2>Следующие этапы</h2>
+        <div class="roadmap-grid">
+          <article>
+            <span>01</span>
+            <h3>Реальные котировки</h3>
+            <p>Подключение Binance и отдельного провайдера Forex.</p>
+          </article>
+          <article>
+            <span>02</span>
+            <h3>Backend и аккаунты</h3>
+            <p>Авторизация, база данных и синхронизация журнала.</p>
+          </article>
+          <article>
+            <span>03</span>
+            <h3>Telegram Mini App</h3>
+            <p>Откроем этот же сайт внутри Telegram без переделки интерфейса.</p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>FASTBOOT Demo</span>
+      <span>Не является инвестиционной рекомендацией</span>
+    </footer>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
