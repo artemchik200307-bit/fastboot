@@ -239,6 +239,14 @@
               </div>
             </header>
 
+            <nav class="mobile-trading-nav">
+              <button class="active">USDⓢ-M</button>
+              <button>COIN-M</button>
+              <button>Опционы</button>
+              <button>Smart Money</button>
+              <button id="mobileTradingMenuButton" class="mobile-menu-button" type="button">☰</button>
+            </nav>
+
             <section class="terminal-market-strip">
               <div class="terminal-pair">
                 <strong id="terminalSymbolLabel">BTCUSDT</strong>
@@ -383,6 +391,12 @@
                   </div>
 
                   <div id="bidsList" class="pro-orderbook-list bids"></div>
+
+                  <div class="mobile-orderbook-ratio">
+                    <span id="mobileBidRatio" class="positive">50.00%</span>
+                    <div><i id="mobileBidRatioBar"></i><b id="mobileAskRatioBar"></b></div>
+                    <span id="mobileAskRatio" class="negative">50.00%</span>
+                  </div>
                 </section>
 
                 <section class="terminal-side-module trades-module">
@@ -402,8 +416,14 @@
               <aside class="terminal-order-column">
                 <section class="terminal-side-module order-entry-module">
                   <div class="order-settings-row">
-                    <button id="marginModeButton" type="button">Spot</button>
-                    <button id="feeInfoButton" type="button">Комиссия 0.10%</button>
+                    <button id="marginModeButton" type="button">Кросс</button>
+                    <button id="leverageButton" type="button">10x</button>
+                    <button id="feeInfoButton" type="button">M</button>
+                  </div>
+
+                  <div class="mobile-funding-line">
+                    <span>Ставка (4ч) / Отсчёт</span>
+                    <strong id="mobileFundingRate">0.0000% / 00:00:00</strong>
                   </div>
 
                   <div class="terminal-order-type-tabs">
@@ -455,8 +475,10 @@
                   </div>
 
                   <div class="order-options">
+                    <label><input id="slippageOption" type="checkbox"> Допустимое проскальзывание</label>
                     <label><input id="takeProfitStopLoss" type="checkbox"> TP/SL</label>
-                    <label><input id="postOnly" type="checkbox"> Post Only</label>
+                    <label><input id="reduceOnly" type="checkbox"> Только сокращение</label>
+                    <label class="desktop-only-option"><input id="postOnly" type="checkbox"> Post Only</label>
                   </div>
 
                   <div class="tp-sl-fields hidden" id="tpSlFields">
@@ -475,13 +497,23 @@
                     <div><span>Ориентир. комиссия</span><strong id="estimatedFee">0.00 USDT</strong></div>
                   </div>
 
+                  <div class="mobile-order-limits">
+                    <div><span>Макс.</span><strong id="mobileMaxBuy">0.00 USDT</strong></div>
+                    <div><span>Стоимость</span><strong id="mobileBuyCost">0.00 USDT</strong></div>
+                  </div>
+
                   <div class="dual-order-buttons">
                     <button id="buyOrderButton" class="buy-order-button" type="button">
-                      Купить
+                      Купить/Лонг
                     </button>
                     <button id="sellOrderButton" class="sell-order-button" type="button">
-                      Продать
+                      Продать/Шорт
                     </button>
+                  </div>
+
+                  <div class="mobile-order-limits mobile-sell-limits">
+                    <div><span>Макс.</span><strong id="mobileMaxSell">0.00 USDT</strong></div>
+                    <div><span>Стоимость</span><strong id="mobileSellCost">0.00 USDT</strong></div>
                   </div>
 
                   <p class="terminal-disclaimer">
@@ -504,6 +536,22 @@
               </aside>
             </div>
           </div>
+
+            <nav class="mobile-terminal-bottom-nav">
+              <button class="active" data-mobile-bottom="open-orders">
+                Открытые ордера <span id="mobileOpenOrdersCount">(0)</span>
+              </button>
+              <button data-mobile-bottom="positions">
+                Позиции <span id="mobilePositionsCount">(0)</span>
+              </button>
+              <button data-mobile-bottom="bots">Боты</button>
+              <button id="mobileOrdersIconButton" type="button">▱</button>
+            </nav>
+
+            <div class="mobile-terminal-subtabs">
+              <button class="active">Базовые <span id="mobileBasicOrdersCount">(0)</span></button>
+              <button>Условные <span id="mobileConditionalOrdersCount">(0)</span></button>
+            </div>
         </section>
 
         <section class="dashboard-section" id="market-analysis">

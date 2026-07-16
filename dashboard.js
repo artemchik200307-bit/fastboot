@@ -465,6 +465,17 @@ function renderProOrderbook(depth) {
       <span>${item.total.toFixed(5)}</span>
     </div>
   `).join("");
+
+  const bidTotal = bids.reduce((sum, item) => sum + item.quantity, 0);
+  const askTotal = asks.reduce((sum, item) => sum + item.quantity, 0);
+  const total = bidTotal + askTotal || 1;
+  const bidPercent = bidTotal / total * 100;
+  const askPercent = 100 - bidPercent;
+
+  $("mobileBidRatio").textContent = `${bidPercent.toFixed(2)}%`;
+  $("mobileAskRatio").textContent = `${askPercent.toFixed(2)}%`;
+  $("mobileBidRatioBar").style.width = `${bidPercent}%`;
+  $("mobileAskRatioBar").style.width = `${askPercent}%`;
 }
 
 function renderProRecentTrades(trades) {
@@ -527,6 +538,15 @@ function updateOrderCalculation() {
 
   $("orderTotal").textContent = `${total.toFixed(2)} USDT`;
   $("estimatedFee").textContent = `${fee.toFixed(2)} USDT`;
+
+  const usdt = state.portfolio.find((item) => item.asset === "USDT")?.amount || 0;
+  const asset = state.currentSymbol.replace("USDT", "");
+  const assetAmount = state.portfolio.find((item) => item.asset === asset)?.amount || 0;
+
+  $("mobileMaxBuy").textContent = `${usdt.toFixed(2)} USDT`;
+  $("mobileBuyCost").textContent = `${total.toFixed(2)} USDT`;
+  $("mobileMaxSell").textContent = `${assetAmount.toFixed(8)} ${asset}`;
+  $("mobileSellCost").textContent = `${total.toFixed(2)} USDT`;
 }
 
 function placeLocalTerminalOrder(side) {
@@ -591,6 +611,10 @@ function renderOrders() {
 
   const openCount = state.orders.filter((order) => order.status === "Открыт").length;
   $("openOrdersTabCount").textContent = `(${openCount})`;
+  $("mobileOpenOrdersCount").textContent = `(${openCount})`;
+  $("mobileBasicOrdersCount").textContent = `(${openCount})`;
+  $("mobileConditionalOrdersCount").textContent =
+    `(${state.orders.filter((order) => order.type === "STOP").length})`;
 
   $("openOrdersContent").innerHTML = openCount
     ? state.orders
@@ -786,3 +810,42 @@ document.querySelectorAll(".amount-percent-row button").forEach((button) => {
     $("orderAmount").dispatchEvent(new Event("input"));
   });
 });
+
+
+$("mobileTradingMenuButton")?.addEventListener("click", () => {
+  $("sidebar").classList.toggle("open");
+});
+
+$("mobileOrdersIconButton")?.addEventListener("click", () => {
+  document.querySelector('[data-bottom-tab="order-history"]')?.click();
+  window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+});
+
+document.querySelectorAll("[data-mobile-bottom]").forEach((button) => {
+  button.addEventListener("click", () => {
+    document.querySelectorAll("[data-mobile-bottom]").forEach((item) =>
+      item.classList.toggle("active", item === button)
+    );
+
+    const map = {
+      "open-orders": "open-orders",
+      positions: "positions",
+      bots: "positions",
+    };
+
+    document.querySelector(`[data-bottom-tab="${map[button.dataset.mobileBottom]}"]`)?.click();
+  });
+});
+
+function updateFundingCountdown() {
+  const now = new Date();
+  const totalSeconds = (4 * 60 * 60) - ((now.getUTCHours() % 4) * 3600 + now.getUTCMinutes() * 60 + now.getUTCSeconds());
+  const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
+  const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
+  const seconds = String(totalSeconds % 60).padStart(2, "0");
+  const element = $("mobileFundingRate");
+  if (element) element.textContent = `0.0000% / ${hours}:${minutes}:${seconds}`;
+}
+
+updateFundingCountdown();
+setInterval(updateFundingCountdown, 1000);
