@@ -3,204 +3,196 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta name="theme-color" content="#0a0e15">
-  <meta name="description" content="FASTBOOT — криптовалютная платформа с реальными котировками Binance.">
+  <meta name="theme-color" content="#080c12">
+  <meta name="description" content="FASTBOOT — криптовалютный терминал с реальными котировками.">
   <title>FASTBOOT — Crypto Terminal</title>
   <link rel="stylesheet" href="styles.css">
+  <script src="https://unpkg.com/lightweight-charts@5.2.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
+
 <body>
-  <div class="app-shell">
-    <header class="topbar">
-      <a class="brand" href="#">FASTBOOT</a>
-      <nav class="desktop-nav">
-        <a href="#market">Рынок</a>
-        <a href="#risk">Риск</a>
-        <a href="#journal">Журнал</a>
-      </nav>
+  <header class="topbar">
+    <div class="topbar-side topbar-left">
       <div class="status-wrap">
         <span id="connectionDot" class="connection-dot"></span>
-        <span id="connectionText" class="connection-text">Подключение…</span>
+        <span id="connectionText">Подключение…</span>
       </div>
-    </header>
+    </div>
 
-    <main>
-      <section class="hero">
-        <div>
-          <span class="eyebrow">Crypto Terminal</span>
-          <h1>Реальные криптовалютные котировки</h1>
-          <p>
-            Свечи, текущая цена и изменение за 24 часа загружаются
-            из публичного рыночного API Binance.
-          </p>
-          <a class="primary-link" href="#market">Открыть рынок</a>
-        </div>
+    <a class="brand" href="#" aria-label="FASTBOOT — главная">
+      FASTBOOT
+    </a>
 
-        <div class="hero-metrics">
-          <div><span>Источник данных</span><strong>Binance</strong></div>
-          <div><span>Режим</span><strong>Live</strong></div>
-          <div><span>Торговля</span><strong>Отключена</strong></div>
-        </div>
-      </section>
+    <div class="topbar-side auth-actions">
+      <button id="loginButton" class="auth-button ghost-button" type="button">
+        Войти
+      </button>
+      <button id="registerButton" class="auth-button primary-button" type="button">
+        Регистрация
+      </button>
+    </div>
+  </header>
 
-      <section class="summary-grid">
-        <article class="summary-card">
-          <span>Инструмент</span>
-          <strong id="summarySymbol">BTCUSDT</strong>
-          <small id="summaryName">Bitcoin</small>
-        </article>
+  <section class="ticker-bar" aria-label="Криптовалютные котировки">
+    <div id="tickerTrack" class="ticker-track">
+      <span class="ticker-loading">Загрузка котировок…</span>
+    </div>
+  </section>
 
-        <article class="summary-card">
-          <span>Текущая цена</span>
-          <strong id="summaryPrice">—</strong>
-          <small id="summaryChange">—</small>
-        </article>
+  <main class="app-shell">
+    <section class="summary-grid">
+      <article class="summary-card">
+        <span>Инструмент</span>
+        <strong id="summarySymbol">BTCUSDT</strong>
+        <small id="summaryName">Bitcoin</small>
+      </article>
 
-        <article class="summary-card">
-          <span>Таймфрейм</span>
-          <strong id="summaryTimeframe">15m</strong>
-          <small>Последние 300 свечей</small>
-        </article>
-      </section>
+      <article class="summary-card">
+        <span>Текущая цена</span>
+        <strong id="summaryPrice">—</strong>
+        <small id="summaryChange">—</small>
+      </article>
 
-      <section class="platform-grid" id="market">
-        <article class="panel chart-panel">
-          <div class="section-head">
-            <div>
-              <div class="symbol-title-row">
-                <h2 id="activeSymbol">BTCUSDT</h2>
-                <span class="live-badge">LIVE</span>
-              </div>
-              <div class="price-row">
-                <strong id="activePrice">—</strong>
-                <span id="activeChange">—</span>
-              </div>
+      <article class="summary-card">
+        <span>Таймфрейм</span>
+        <strong id="summaryTimeframe">15m</strong>
+        <small>Реальные свечи Binance Spot</small>
+      </article>
+    </section>
+
+    <section class="platform-grid" id="market">
+      <article class="panel chart-panel">
+        <div class="section-head">
+          <div>
+            <div class="symbol-title-row">
+              <h1 id="activeSymbol">BTCUSDT</h1>
+              <span class="live-badge">LIVE</span>
             </div>
 
-            <div class="chart-controls">
-              <button id="refreshButton" class="icon-button" type="button" title="Обновить">
-                ↻
-              </button>
-              <select id="intervalSelect" aria-label="Таймфрейм">
-                <option value="1m">1m</option>
-                <option value="5m">5m</option>
-                <option value="15m" selected>15m</option>
-                <option value="1h">1H</option>
-                <option value="4h">4H</option>
-                <option value="1d">1D</option>
-              </select>
+            <div class="price-row">
+              <strong id="activePrice">—</strong>
+              <span id="activeChange">—</span>
             </div>
           </div>
 
-          <div class="ohlc-row" id="ohlcRow">
-            <span>O <strong id="ohlcOpen">—</strong></span>
-            <span>H <strong id="ohlcHigh">—</strong></span>
-            <span>L <strong id="ohlcLow">—</strong></span>
-            <span>C <strong id="ohlcClose">—</strong></span>
-            <span>Vol <strong id="ohlcVolume">—</strong></span>
+          <div class="chart-controls">
+            <button id="resetChartButton" class="icon-button" type="button"
+              title="Показать все свечи">
+              ⛶
+            </button>
+
+            <button id="fullscreenButton" class="icon-button" type="button"
+              title="Развернуть график">
+              ⤢
+            </button>
+
+            <button id="refreshButton" class="icon-button" type="button"
+              title="Обновить данные">
+              ↻
+            </button>
+
+            <select id="intervalSelect" aria-label="Таймфрейм">
+              <option value="1m">1m</option>
+              <option value="5m">5m</option>
+              <option value="15m" selected>15m</option>
+              <option value="1h">1H</option>
+              <option value="4h">4H</option>
+              <option value="1d">1D</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="ohlc-row">
+          <span>O <strong id="ohlcOpen">—</strong></span>
+          <span>H <strong id="ohlcHigh">—</strong></span>
+          <span>L <strong id="ohlcLow">—</strong></span>
+          <span>C <strong id="ohlcClose">—</strong></span>
+          <span>Vol <strong id="ohlcVolume">—</strong></span>
+        </div>
+
+        <div id="chartPanel" class="interactive-chart-panel">
+          <div class="chart-help">
+            <span>Перетаскивание — двигать</span>
+            <span>Колесо — масштаб</span>
+            <span>Шкала справа — масштаб цены</span>
           </div>
 
           <div class="chart-wrap">
-            <canvas id="chart" aria-label="Свечной график Binance"></canvas>
+            <div id="chart" aria-label="Интерактивный график"></div>
             <div id="chartLoader" class="chart-loader">Загрузка свечей…</div>
           </div>
 
-          <div class="chart-footer">
-            <span id="chartHint">Ожидание данных</span>
-            <span>Публичные market data · без API-ключа</span>
-          </div>
-        </article>
-
-        <aside class="panel watchlist-panel">
-          <div class="section-head">
-            <div>
-              <h2>Криптовалюты</h2>
-              <span class="muted">USDT пары</span>
-            </div>
-            <input id="searchInput" class="search-input" type="search" placeholder="Поиск">
-          </div>
-
-          <div class="watchlist-labels">
-            <span>Пара</span>
-            <span>Цена</span>
-            <span>24ч</span>
-          </div>
-
-          <div id="symbols" class="symbol-list"></div>
-        </aside>
-      </section>
-
-      <section class="content-grid">
-        <article class="panel market-stats-panel">
-          <div class="section-head">
-            <div>
-              <h2>Статистика рынка</h2>
-              <span class="muted">Выбранная пара за 24 часа</span>
-            </div>
-          </div>
-
-          <div class="stats-grid">
-            <div><span>Максимум 24ч</span><strong id="dayHigh">—</strong></div>
-            <div><span>Минимум 24ч</span><strong id="dayLow">—</strong></div>
-            <div><span>Объём монеты</span><strong id="baseVolume">—</strong></div>
-            <div><span>Объём USDT</span><strong id="quoteVolume">—</strong></div>
-          </div>
-        </article>
-
-        <article class="panel" id="risk">
-          <h2>Риск-калькулятор</h2>
-
-          <div class="form-grid">
-            <label>
-              Баланс, USDT
-              <input id="balanceInput" type="number" min="1" value="10000">
-            </label>
-            <label>
-              Риск, %
-              <input id="riskInput" type="number" min="0.1" max="10" step="0.1" value="1">
-            </label>
-            <label>
-              Цена входа
-              <input id="calcEntry" type="number" step="any" placeholder="Цена входа">
-            </label>
-            <label>
-              Stop Loss
-              <input id="calcStop" type="number" step="any" placeholder="Цена стопа">
-            </label>
-          </div>
-
-          <div class="calculator-output">
-            <div><span>Риск деньгами</span><strong id="calcRiskMoney">100.00 USDT</strong></div>
-            <div><span>Размер позиции</span><strong id="positionSize">—</strong></div>
-          </div>
-
-          <button id="savePlanButton" class="secondary-button" type="button">
-            Сохранить расчёт в журнал
-          </button>
-        </article>
-      </section>
-
-      <section class="panel" id="journal">
-        <div class="section-head">
-          <div>
-            <h2>Торговый журнал</h2>
-            <span class="muted">Хранится только в этом браузере</span>
-          </div>
-          <button id="clearJournal" class="text-button danger" type="button">
-            Очистить
+          <button id="chartResizeHandle" class="chart-resize-handle"
+            type="button" aria-label="Изменить высоту графика">
+            <span></span>
           </button>
         </div>
 
-        <div id="journalList" class="journal-list"></div>
-      </section>
-    </main>
+        <div class="chart-footer">
+          <span id="chartHint">Ожидание данных</span>
+          <span>Публичные рыночные данные</span>
+        </div>
+      </article>
 
-    <footer>
-      <span>FASTBOOT Crypto Terminal</span>
-      <span>
-        Рыночные данные Binance · не является инвестиционной рекомендацией
-      </span>
-    </footer>
-  </div>
+      <aside class="panel watchlist-panel">
+        <div class="section-head">
+          <div>
+            <h2>Топ‑100 криптовалют</h2>
+            <span class="muted">По объёму торгов в USDT</span>
+          </div>
+
+          <input id="searchInput" class="search-input"
+            type="search" placeholder="Поиск">
+        </div>
+
+        <div class="watchlist-labels">
+          <span>Пара</span>
+          <span>Цена</span>
+          <span>24ч</span>
+        </div>
+
+        <div id="symbols" class="symbol-list">
+          <div class="list-loading">Загрузка инструментов…</div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="panel market-stats-panel">
+      <div class="section-head">
+        <div>
+          <h2>Статистика рынка</h2>
+          <span class="muted">Данные выбранного инструмента за 24 часа</span>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div>
+          <span>Максимум 24ч</span>
+          <strong id="dayHigh">—</strong>
+        </div>
+
+        <div>
+          <span>Минимум 24ч</span>
+          <strong id="dayLow">—</strong>
+        </div>
+
+        <div>
+          <span>Объём монеты</span>
+          <strong id="baseVolume">—</strong>
+        </div>
+
+        <div>
+          <span>Объём USDT</span>
+          <strong id="quoteVolume">—</strong>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>FASTBOOT Crypto Terminal</span>
+    <span>Рыночные данные Binance · не является инвестиционной рекомендацией</span>
+  </footer>
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 

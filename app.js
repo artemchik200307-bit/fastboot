@@ -1,41 +1,75 @@
 const REST_BASE = "https://data-api.binance.vision";
 const WS_BASE = "wss://stream.binance.com:9443/ws";
 
-const COINS = [
-  { symbol: "BTCUSDT", name: "Bitcoin" },
-  { symbol: "ETHUSDT", name: "Ethereum" },
-  { symbol: "BNBUSDT", name: "BNB" },
-  { symbol: "SOLUSDT", name: "Solana" },
-  { symbol: "XRPUSDT", name: "XRP" },
-  { symbol: "DOGEUSDT", name: "Dogecoin" },
-  { symbol: "ADAUSDT", name: "Cardano" },
-  { symbol: "AVAXUSDT", name: "Avalanche" },
-  { symbol: "LINKUSDT", name: "Chainlink" },
-  { symbol: "SUIUSDT", name: "Sui" },
-  { symbol: "TRXUSDT", name: "TRON" },
-  { symbol: "LTCUSDT", name: "Litecoin" },
-];
+const EXCLUDED_BASE_ASSETS = new Set([
+  "USDC", "FDUSD", "TUSD", "USDP", "DAI", "EUR", "AEUR", "TRY", "BRL",
+]);
+
+const EXCLUDED_SUFFIXES = ["UP", "DOWN", "BULL", "BEAR"];
+
+const COIN_NAMES = {
+  BTC: "Bitcoin",
+  ETH: "Ethereum",
+  BNB: "BNB",
+  SOL: "Solana",
+  XRP: "XRP",
+  DOGE: "Dogecoin",
+  ADA: "Cardano",
+  AVAX: "Avalanche",
+  LINK: "Chainlink",
+  SUI: "Sui",
+  TRX: "TRON",
+  LTC: "Litecoin",
+  TON: "Toncoin",
+  DOT: "Polkadot",
+  BCH: "Bitcoin Cash",
+  SHIB: "Shiba Inu",
+  XLM: "Stellar",
+  HBAR: "Hedera",
+  UNI: "Uniswap",
+  AAVE: "Aave",
+  NEAR: "NEAR Protocol",
+  APT: "Aptos",
+  FIL: "Filecoin",
+  ICP: "Internet Computer",
+  ATOM: "Cosmos",
+  ARB: "Arbitrum",
+  OP: "Optimism",
+  ETC: "Ethereum Classic",
+  ALGO: "Algorand",
+  VET: "VeChain",
+  INJ: "Injective",
+  RENDER: "Render",
+  FET: "Artificial Superintelligence",
+  PEPE: "Pepe",
+  WIF: "dogwifhat",
+  BONK: "Bonk",
+};
 
 const state = {
   symbol: "BTCUSDT",
   interval: "15m",
-  candles: [],
+  instruments: [],
   tickers: new Map(),
+  candles: [],
   socket: null,
-  hoveredIndex: null,
+  chart: null,
+  candleSeries: null,
+  volumeSeries: null,
+  chartHeight: Number(localStorage.getItem("fastboot-chart-height")) || 470,
   loading: false,
 };
 
 const $ = (id) => document.getElementById(id);
 
 function setConnection(status, text) {
-  const dot = $("connectionDot");
-  dot.className = `connection-dot ${status}`;
+  $("connectionDot").className = `connection-dot ${status}`;
   $("connectionText").textContent = text;
 }
 
 function formatPrice(value) {
   const number = Number(value);
+
   if (!Number.isFinite(number)) return "—";
 
   if (number >= 1000) {
@@ -60,6 +94,7 @@ function formatPrice(value) {
 
 function formatCompact(value) {
   const number = Number(value);
+
   if (!Number.isFinite(number)) return "—";
 
   return new Intl.NumberFormat("en-US", {
@@ -70,162 +105,148 @@ function formatCompact(value) {
 
 async function fetchJson(url) {
   const response = await fetch(url, { cache: "no-store" });
+
   if (!response.ok) {
-    throw new Error(`Ошибка Binance API: ${response.status}`);
+    throw new Error(`Ошибка рыночного API: ${response.status}`);
   }
+
   return response.json();
 }
 
-async function loadTickers() {
-  const symbolsParam = encodeURIComponent(
-    JSON.stringify(COINS.map((coin) => coin.symbol))
+function isAllowedInstrument(symbolInfo) {
+  const base = symbolInfo.baseAsset;
+
+  return (
+    symbolInfo.status === "TRADING" &&
+    symbolInfo.quoteAsset === "USDT" &&
+    symbolInfo.isSpotTradingAllowed !== false &&
+    !EXCLUDED_BASE_ASSETS.has(base) &&
+    !EXCLUDED_SUFFIXES.some((suffix) => base.endsWith(suffix))
+  );
+}
+
+async function loadMarketUniverse() {
+  const [exchangeInfo, allTickers] = await Promise.all([
+    fetchJson(`${REST_BASE}/api/v3/exchangeInfo`),
+    fetchJson(`${REST_BASE}/api/v3/ticker/24hr`),
+  ]);
+
+  const allowed = new Map(
+    exchangeInfo.symbols
+      .filter(isAllowedInstrument)
+      .map((item) => [item.symbol, item])
   );
 
-  const rows = await fetchJson(
-    `${REST_BASE}/api/v3/ticker/24hr?symbols=${symbolsParam}`
-  );
+  const ranked = allTickers
+    .filter((ticker) => allowed.has(ticker.symbol))
+    .sort((a, b) => Number(b.quoteVolume) - Number(a.quoteVolume))
+    .slice(0, 100)
+    .map((ticker) => {
+      const info = allowed.get(ticker.symbol);
 
+      return {
+        symbol: ticker.symbol,
+        baseAsset: info.baseAsset,
+        name: COIN_NAMES[info.baseAsset] || info.baseAsset,
+        ticker,
+      };
+    });
+
+  state.instruments = ranked;
   state.tickers.clear();
-  rows.forEach((row) => state.tickers.set(row.symbol, row));
+
+  ranked.forEach((item) => {
+    state.tickers.set(item.symbol, item.ticker);
+  });
+
+  if (!state.tickers.has(state.symbol) && ranked.length) {
+    state.symbol = ranked[0].symbol;
+  }
 
   renderSymbols();
+  renderTickerBar();
   updateSelectedTicker();
 }
 
-async function loadCandles() {
-  if (state.loading) return;
+async function refreshTickers() {
+  const rows = await fetchJson(`${REST_BASE}/api/v3/ticker/24hr`);
+  const rowMap = new Map(rows.map((row) => [row.symbol, row]));
 
-  state.loading = true;
-  $("refreshButton").disabled = true;
-  $("chartLoader").classList.remove("hidden");
-  $("chartLoader").textContent = "Загрузка реальных свечей…";
+  state.instruments.forEach((item) => {
+    const latest = rowMap.get(item.symbol);
 
-  try {
-    closeSocket();
-
-    const rows = await fetchJson(
-      `${REST_BASE}/api/v3/klines?symbol=${state.symbol}` +
-      `&interval=${state.interval}&limit=300`
-    );
-
-    state.candles = rows.map((row) => ({
-      openTime: Number(row[0]),
-      open: Number(row[1]),
-      high: Number(row[2]),
-      low: Number(row[3]),
-      close: Number(row[4]),
-      volume: Number(row[5]),
-      closeTime: Number(row[6]),
-    }));
-
-    state.hoveredIndex = null;
-    drawChart();
-    updateOHLC(state.candles.at(-1));
-
-    $("chartHint").textContent =
-      `${state.candles.length} свечей · ${state.interval} · Binance Spot`;
-
-    openSocket();
-    setConnection("online", "Реальные данные");
-  } catch (error) {
-    console.error(error);
-    setConnection("offline", "Ошибка подключения");
-    $("chartLoader").textContent =
-      "Не удалось загрузить данные. Нажмите обновить.";
-    showToast(error.message);
-  } finally {
-    state.loading = false;
-    $("refreshButton").disabled = false;
-
-    if (state.candles.length) {
-      $("chartLoader").classList.add("hidden");
+    if (latest) {
+      item.ticker = latest;
+      state.tickers.set(item.symbol, latest);
     }
-  }
+  });
+
+  state.instruments.sort(
+    (a, b) => Number(b.ticker.quoteVolume) - Number(a.ticker.quoteVolume)
+  );
+
+  renderSymbols();
+  renderTickerBar();
+  updateSelectedTicker();
 }
 
-function openSocket() {
-  closeSocket();
+function renderTickerBar() {
+  const items = state.instruments.slice(0, 24);
 
-  const stream =
-    `${state.symbol.toLowerCase()}@kline_${state.interval}`;
+  if (!items.length) return;
 
-  state.socket = new WebSocket(`${WS_BASE}/${stream}`);
+  const group = items.map((item) => {
+    const price = formatPrice(item.ticker.lastPrice);
+    const change = Number(item.ticker.priceChangePercent);
 
-  state.socket.addEventListener("open", () => {
-    setConnection("online", "Реальные данные");
-  });
+    return `
+      <span class="ticker-item">
+        <span class="ticker-symbol">${item.baseAsset}/USDT</span>
+        <span class="ticker-price">${price}</span>
+        <span class="${change >= 0 ? "up" : "down"}">
+          ${change >= 0 ? "+" : ""}${change.toFixed(2)}%
+        </span>
+      </span>
+    `;
+  }).join("");
 
-  state.socket.addEventListener("message", (event) => {
-    const payload = JSON.parse(event.data);
-    const kline = payload.k;
-
-    const liveCandle = {
-      openTime: Number(kline.t),
-      open: Number(kline.o),
-      high: Number(kline.h),
-      low: Number(kline.l),
-      close: Number(kline.c),
-      volume: Number(kline.v),
-      closeTime: Number(kline.T),
-    };
-
-    const last = state.candles.at(-1);
-
-    if (last && last.openTime === liveCandle.openTime) {
-      state.candles[state.candles.length - 1] = liveCandle;
-    } else {
-      state.candles.push(liveCandle);
-      if (state.candles.length > 300) state.candles.shift();
-    }
-
-    const ticker = state.tickers.get(state.symbol);
-    if (ticker) ticker.lastPrice = String(liveCandle.close);
-
-    updateSelectedTicker();
-    if (state.hoveredIndex === null) updateOHLC(liveCandle);
-    drawChart();
-  });
-
-  state.socket.addEventListener("close", () => {
-    if (state.socket) setConnection("", "Переподключение…");
-  });
-
-  state.socket.addEventListener("error", () => {
-    setConnection("offline", "WebSocket недоступен");
-  });
-}
-
-function closeSocket() {
-  if (state.socket) {
-    state.socket.onclose = null;
-    state.socket.close();
-    state.socket = null;
-  }
+  $("tickerTrack").innerHTML = `
+    <div class="ticker-group">${group}</div>
+    <div class="ticker-group" aria-hidden="true">${group}</div>
+  `;
 }
 
 function renderSymbols() {
   const query = $("searchInput").value.trim().toLowerCase();
 
-  const filtered = COINS.filter((coin) =>
-    `${coin.symbol} ${coin.name}`.toLowerCase().includes(query)
-  );
+  const filtered = state.instruments.filter((item) => {
+    return `${item.symbol} ${item.baseAsset} ${item.name}`
+      .toLowerCase()
+      .includes(query);
+  });
 
-  $("symbols").innerHTML = filtered.map((coin) => {
-    const ticker = state.tickers.get(coin.symbol);
-    const price = ticker ? formatPrice(ticker.lastPrice) : "—";
-    const change = ticker ? Number(ticker.priceChangePercent) : 0;
+  if (!filtered.length) {
+    $("symbols").innerHTML =
+      '<div class="empty-list">Инструменты не найдены.</div>';
+    return;
+  }
+
+  $("symbols").innerHTML = filtered.map((item) => {
+    const change = Number(item.ticker.priceChangePercent);
 
     return `
       <button type="button"
-        class="symbol-row ${coin.symbol === state.symbol ? "selected" : ""}"
-        data-symbol="${coin.symbol}">
+        class="symbol-row ${item.symbol === state.symbol ? "selected" : ""}"
+        data-symbol="${item.symbol}">
         <span class="symbol-name">
-          <strong>${coin.symbol.replace("USDT", "")}</strong>
-          <span>${coin.name}</span>
+          <strong>${item.baseAsset}/USDT</strong>
+          <span>${item.name}</span>
         </span>
-        <strong>${price}</strong>
+
+        <strong>${formatPrice(item.ticker.lastPrice)}</strong>
+
         <span class="${change >= 0 ? "up" : "down"}">
-          ${ticker ? `${change >= 0 ? "+" : ""}${change.toFixed(2)}%` : "—"}
+          ${change >= 0 ? "+" : ""}${change.toFixed(2)}%
         </span>
       </button>
     `;
@@ -243,33 +264,147 @@ function renderSymbols() {
   });
 }
 
+function selectedInstrument() {
+  return state.instruments.find((item) => item.symbol === state.symbol);
+}
+
 function updateSelectedTicker() {
-  const coin = COINS.find((item) => item.symbol === state.symbol);
+  const instrument = selectedInstrument();
   const ticker = state.tickers.get(state.symbol);
 
-  $("activeSymbol").textContent = state.symbol;
-  $("summarySymbol").textContent = state.symbol;
-  $("summaryName").textContent = coin?.name || "";
-  $("summaryTimeframe").textContent = state.interval;
-
-  if (!ticker) return;
+  if (!instrument || !ticker) return;
 
   const price = Number(ticker.lastPrice);
   const change = Number(ticker.priceChangePercent);
+  const changeText = `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`;
+
+  $("activeSymbol").textContent = `${instrument.baseAsset}/USDT`;
+  $("summarySymbol").textContent = `${instrument.baseAsset}/USDT`;
+  $("summaryName").textContent = instrument.name;
+  $("summaryTimeframe").textContent = state.interval;
 
   $("activePrice").textContent = formatPrice(price);
   $("summaryPrice").textContent = `${formatPrice(price)} USDT`;
 
-  const changeText = `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`;
   $("activeChange").textContent = changeText;
   $("activeChange").className = change >= 0 ? "up" : "down";
+
   $("summaryChange").textContent = `24ч: ${changeText}`;
   $("summaryChange").className = change >= 0 ? "up" : "down";
 
   $("dayHigh").textContent = formatPrice(ticker.highPrice);
   $("dayLow").textContent = formatPrice(ticker.lowPrice);
-  $("baseVolume").textContent = formatCompact(ticker.volume);
-  $("quoteVolume").textContent = `${formatCompact(ticker.quoteVolume)} USDT`;
+  $("baseVolume").textContent =
+    `${formatCompact(ticker.volume)} ${instrument.baseAsset}`;
+  $("quoteVolume").textContent =
+    `${formatCompact(ticker.quoteVolume)} USDT`;
+}
+
+async function loadCandles() {
+  if (state.loading) return;
+
+  state.loading = true;
+  $("refreshButton").disabled = true;
+  $("chartLoader").classList.remove("hidden");
+  $("chartLoader").textContent = "Загрузка реальных свечей…";
+
+  try {
+    closeSocket();
+
+    const rows = await fetchJson(
+      `${REST_BASE}/api/v3/klines?symbol=${state.symbol}` +
+      `&interval=${state.interval}&limit=500`
+    );
+
+    state.candles = rows.map((row) => ({
+      openTime: Number(row[0]),
+      open: Number(row[1]),
+      high: Number(row[2]),
+      low: Number(row[3]),
+      close: Number(row[4]),
+      volume: Number(row[5]),
+      closeTime: Number(row[6]),
+    }));
+
+    setChartData({ fit: true });
+    updateOHLC(state.candles.at(-1));
+
+    $("chartHint").textContent =
+      `${state.candles.length} свечей · ${state.interval} · Binance Spot`;
+
+    openSocket();
+    setConnection("online", "Реальные данные");
+    $("chartLoader").classList.add("hidden");
+  } catch (error) {
+    console.error(error);
+    setConnection("offline", "Ошибка подключения");
+    $("chartLoader").textContent =
+      "Не удалось загрузить свечи. Нажмите обновить.";
+    showToast(error.message);
+  } finally {
+    state.loading = false;
+    $("refreshButton").disabled = false;
+  }
+}
+
+function openSocket() {
+  closeSocket();
+
+  const stream = `${state.symbol.toLowerCase()}@kline_${state.interval}`;
+  state.socket = new WebSocket(`${WS_BASE}/${stream}`);
+
+  state.socket.addEventListener("open", () => {
+    setConnection("online", "Реальные данные");
+  });
+
+  state.socket.addEventListener("message", (event) => {
+    const payload = JSON.parse(event.data);
+    const kline = payload.k;
+
+    const candle = {
+      openTime: Number(kline.t),
+      open: Number(kline.o),
+      high: Number(kline.h),
+      low: Number(kline.l),
+      close: Number(kline.c),
+      volume: Number(kline.v),
+      closeTime: Number(kline.T),
+    };
+
+    const last = state.candles.at(-1);
+
+    if (last && last.openTime === candle.openTime) {
+      state.candles[state.candles.length - 1] = candle;
+    } else {
+      state.candles.push(candle);
+
+      if (state.candles.length > 500) {
+        state.candles.shift();
+      }
+    }
+
+    const ticker = state.tickers.get(state.symbol);
+
+    if (ticker) {
+      ticker.lastPrice = String(candle.close);
+    }
+
+    updateSelectedTicker();
+    updateOHLC(candle);
+    updateLiveChart(candle);
+  });
+
+  state.socket.addEventListener("error", () => {
+    setConnection("offline", "WebSocket недоступен");
+  });
+}
+
+function closeSocket() {
+  if (!state.socket) return;
+
+  state.socket.onclose = null;
+  state.socket.close();
+  state.socket = null;
 }
 
 function updateOHLC(candle) {
@@ -282,255 +417,222 @@ function updateOHLC(candle) {
   $("ohlcVolume").textContent = formatCompact(candle.volume);
 }
 
-function drawChart() {
-  if (!state.candles.length) return;
+function chartCandle(candle) {
+  return {
+    time: Math.floor(candle.openTime / 1000),
+    open: candle.open,
+    high: candle.high,
+    low: candle.low,
+    close: candle.close,
+  };
+}
 
-  const canvas = $("chart");
-  const rect = canvas.getBoundingClientRect();
-  const ratio = window.devicePixelRatio || 1;
+function chartVolume(candle) {
+  return {
+    time: Math.floor(candle.openTime / 1000),
+    value: candle.volume,
+    color: candle.close >= candle.open
+      ? "rgba(32, 201, 135, 0.35)"
+      : "rgba(255, 95, 120, 0.35)",
+  };
+}
 
-  canvas.width = Math.max(1, Math.floor(rect.width * ratio));
-  canvas.height = Math.max(1, Math.floor(rect.height * ratio));
+function createInteractiveChart() {
+  if (!window.LightweightCharts) {
+    throw new Error("Библиотека графика не загрузилась");
+  }
 
-  const ctx = canvas.getContext("2d");
-  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-
-  const width = rect.width;
-  const height = rect.height;
-  const padding = { top: 18, right: 76, bottom: 30, left: 12 };
-  const chartWidth = width - padding.left - padding.right;
-  const chartHeight = height - padding.top - padding.bottom;
+  const container = $("chart");
+  container.style.height = `${state.chartHeight}px`;
 
   const styles = getComputedStyle(document.documentElement);
+  const bg = styles.getPropertyValue("--bg").trim();
   const muted = styles.getPropertyValue("--muted").trim();
   const green = styles.getPropertyValue("--green").trim();
   const red = styles.getPropertyValue("--red").trim();
-  const text = styles.getPropertyValue("--text").trim();
 
-  const lows = state.candles.map((candle) => candle.low);
-  const highs = state.candles.map((candle) => candle.high);
+  state.chart = LightweightCharts.createChart(container, {
+    width: container.clientWidth,
+    height: state.chartHeight,
 
-  let min = Math.min(...lows);
-  let max = Math.max(...highs);
-  const rawRange = Math.max(max - min, max * 0.0001);
-  min -= rawRange * 0.06;
-  max += rawRange * 0.06;
+    layout: {
+      background: { type: "solid", color: bg },
+      textColor: muted,
+      attributionLogo: false,
+    },
 
-  const y = (price) =>
-    padding.top + ((max - price) / (max - min)) * chartHeight;
+    grid: {
+      vertLines: { color: "rgba(128, 140, 160, 0.10)" },
+      horzLines: { color: "rgba(128, 140, 160, 0.10)" },
+    },
 
-  ctx.clearRect(0, 0, width, height);
-  ctx.font = "11px system-ui";
+    crosshair: {
+      mode: LightweightCharts.CrosshairMode.Normal,
+    },
 
-  for (let index = 0; index <= 5; index += 1) {
-    const lineY = padding.top + (chartHeight / 5) * index;
-    const price = max - ((max - min) / 5) * index;
+    rightPriceScale: {
+      borderColor: "rgba(255, 255, 255, 0.08)",
+      scaleMargins: {
+        top: 0.08,
+        bottom: 0.24,
+      },
+    },
 
-    ctx.strokeStyle = "rgba(128, 140, 160, 0.14)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(padding.left, lineY);
-    ctx.lineTo(width - padding.right, lineY);
-    ctx.stroke();
+    timeScale: {
+      borderColor: "rgba(255, 255, 255, 0.08)",
+      timeVisible: true,
+      secondsVisible: false,
+      rightOffset: 8,
+      barSpacing: 8,
+      minBarSpacing: 1.5,
+    },
 
-    ctx.fillStyle = muted;
-    ctx.textAlign = "left";
-    ctx.fillText(formatPrice(price), width - padding.right + 8, lineY + 4);
-  }
+    handleScroll: {
+      mouseWheel: true,
+      pressedMouseMove: true,
+      horzTouchDrag: true,
+      vertTouchDrag: true,
+    },
 
-  const step = chartWidth / state.candles.length;
-  const bodyWidth = Math.max(1.2, Math.min(6, step * 0.68));
-
-  state.candles.forEach((candle, index) => {
-    const x = padding.left + index * step + step / 2;
-    const color = candle.close >= candle.open ? green : red;
-
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(x, y(candle.high));
-    ctx.lineTo(x, y(candle.low));
-    ctx.stroke();
-
-    const top = y(Math.max(candle.open, candle.close));
-    const bottom = y(Math.min(candle.open, candle.close));
-
-    ctx.fillStyle = color;
-    ctx.fillRect(
-      x - bodyWidth / 2,
-      top,
-      bodyWidth,
-      Math.max(1, bottom - top)
-    );
+    handleScale: {
+      axisPressedMouseMove: {
+        time: true,
+        price: true,
+      },
+      mouseWheel: true,
+      pinch: true,
+    },
   });
 
-  const last = state.candles.at(-1);
-  const lastY = y(last.close);
+  state.candleSeries = state.chart.addSeries(
+    LightweightCharts.CandlestickSeries,
+    {
+      upColor: green,
+      downColor: red,
+      borderVisible: false,
+      wickUpColor: green,
+      wickDownColor: red,
+      priceLineVisible: true,
+      lastValueVisible: true,
+    }
+  );
 
-  ctx.strokeStyle = last.close >= last.open ? green : red;
-  ctx.setLineDash([4, 4]);
-  ctx.beginPath();
-  ctx.moveTo(padding.left, lastY);
-  ctx.lineTo(width - padding.right, lastY);
-  ctx.stroke();
-  ctx.setLineDash([]);
+  state.volumeSeries = state.chart.addSeries(
+    LightweightCharts.HistogramSeries,
+    {
+      priceFormat: { type: "volume" },
+      priceScaleId: "volume",
+      lastValueVisible: false,
+      priceLineVisible: false,
+    }
+  );
 
-  if (state.hoveredIndex !== null) {
-    const index = Math.max(
-      0,
-      Math.min(state.candles.length - 1, state.hoveredIndex)
-    );
-    const x = padding.left + index * step + step / 2;
-
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.28)";
-    ctx.beginPath();
-    ctx.moveTo(x, padding.top);
-    ctx.lineTo(x, height - padding.bottom);
-    ctx.stroke();
-
-    const candle = state.candles[index];
-    updateOHLC(candle);
-
-    const date = new Date(candle.openTime);
-    const label = date.toLocaleString("ru-RU", {
-      day: "2-digit",
-      month: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-
-    ctx.fillStyle = "rgba(17, 24, 35, 0.96)";
-    ctx.fillRect(
-      Math.max(padding.left, Math.min(x - 52, width - padding.right - 104)),
-      height - padding.bottom + 5,
-      104,
-      20
-    );
-
-    ctx.fillStyle = text;
-    ctx.textAlign = "center";
-    ctx.fillText(
-      label,
-      Math.max(padding.left + 52, Math.min(x, width - padding.right - 52)),
-      height - padding.bottom + 19
-    );
-  }
-}
-
-function handleChartMove(event) {
-  if (!state.candles.length) return;
-
-  const rect = $("chart").getBoundingClientRect();
-  const padding = { right: 76, left: 12 };
-  const chartWidth = rect.width - padding.left - padding.right;
-  const x = event.clientX - rect.left - padding.left;
-
-  if (x < 0 || x > chartWidth) {
-    state.hoveredIndex = null;
-    updateOHLC(state.candles.at(-1));
-  } else {
-    state.hoveredIndex = Math.floor(
-      (x / chartWidth) * state.candles.length
-    );
-  }
-
-  drawChart();
-}
-
-function calculateRisk() {
-  const balance = Number($("balanceInput").value);
-  const riskPercent = Number($("riskInput").value);
-  const entry = Number($("calcEntry").value);
-  const stop = Number($("calcStop").value);
-
-  const riskMoney = balance * (riskPercent / 100);
-  $("calcRiskMoney").textContent = `${riskMoney.toFixed(2)} USDT`;
-
-  const distance = Math.abs(entry - stop);
-
-  if (entry > 0 && stop > 0 && distance > 0) {
-    $("positionSize").textContent =
-      `${(riskMoney / distance).toFixed(6)} ${state.symbol.replace("USDT", "")}`;
-  } else {
-    $("positionSize").textContent = "—";
-  }
-}
-
-function getJournal() {
-  try {
-    return JSON.parse(localStorage.getItem("fastboot-crypto-journal") || "[]");
-  } catch {
-    return [];
-  }
-}
-
-function saveJournal(items) {
-  localStorage.setItem("fastboot-crypto-journal", JSON.stringify(items));
-}
-
-function savePlan() {
-  const entry = Number($("calcEntry").value);
-  const stop = Number($("calcStop").value);
-  const balance = Number($("balanceInput").value);
-  const riskPercent = Number($("riskInput").value);
-
-  if (!(entry > 0) || !(stop > 0) || entry === stop) {
-    showToast("Укажите корректные цены входа и Stop Loss");
-    return;
-  }
-
-  const riskMoney = balance * (riskPercent / 100);
-  const size = riskMoney / Math.abs(entry - stop);
-  const items = getJournal();
-
-  items.unshift({
-    id: Date.now(),
-    createdAt: new Date().toLocaleString("ru-RU"),
-    symbol: state.symbol,
-    entry,
-    stop,
-    riskPercent,
-    riskMoney,
-    size,
+  state.volumeSeries.priceScale().applyOptions({
+    scaleMargins: {
+      top: 0.80,
+      bottom: 0,
+    },
   });
 
-  saveJournal(items.slice(0, 100));
-  renderJournal();
-  showToast("Расчёт сохранён в журнал");
+  state.chart.subscribeCrosshairMove((param) => {
+    if (!param?.time || !param.seriesData) {
+      updateOHLC(state.candles.at(-1));
+      return;
+    }
+
+    const candle = param.seriesData.get(state.candleSeries);
+    const volume = param.seriesData.get(state.volumeSeries);
+
+    if (candle) {
+      updateOHLC({
+        open: candle.open,
+        high: candle.high,
+        low: candle.low,
+        close: candle.close,
+        volume: volume?.value || 0,
+      });
+    }
+  });
+
+  new ResizeObserver(resizeInteractiveChart).observe(container);
 }
 
-function renderJournal() {
-  const items = getJournal();
-
-  if (!items.length) {
-    $("journalList").innerHTML =
-      '<div class="empty-state">В журнале пока нет сохранённых расчётов.</div>';
-    return;
+function setChartData({ fit = false } = {}) {
+  if (!state.chart) {
+    createInteractiveChart();
   }
 
-  $("journalList").innerHTML = items.map((item) => `
-    <article class="journal-item">
-      <div>
-        <strong>${item.symbol}</strong>
-        <div>
-          <small>
-            Вход ${formatPrice(item.entry)}
-            · SL ${formatPrice(item.stop)}
-            · риск ${item.riskPercent}%
-            · размер ${Number(item.size).toFixed(6)}
-          </small>
-        </div>
-      </div>
-      <small>${item.createdAt}</small>
-    </article>
-  `).join("");
+  state.candleSeries.setData(state.candles.map(chartCandle));
+  state.volumeSeries.setData(state.candles.map(chartVolume));
+
+  if (fit) {
+    state.chart.timeScale().fitContent();
+  }
 }
 
-function clearJournal() {
-  if (!getJournal().length) return;
-  localStorage.removeItem("fastboot-crypto-journal");
-  renderJournal();
-  showToast("Журнал очищен");
+function updateLiveChart(candle) {
+  if (!state.candleSeries || !state.volumeSeries) return;
+
+  state.candleSeries.update(chartCandle(candle));
+  state.volumeSeries.update(chartVolume(candle));
+}
+
+function resizeInteractiveChart() {
+  if (!state.chart) return;
+
+  const container = $("chart");
+  const panel = $("chartPanel");
+
+  const height = panel.classList.contains("fullscreen")
+    ? Math.max(300, panel.clientHeight - 56)
+    : state.chartHeight;
+
+  container.style.height = `${height}px`;
+  state.chart.resize(container.clientWidth, height);
+}
+
+function setupChartResize() {
+  const handle = $("chartResizeHandle");
+  let startY = 0;
+  let startHeight = 0;
+
+  const move = (event) => {
+    const nextHeight = Math.max(
+      280,
+      Math.min(900, startHeight + event.clientY - startY)
+    );
+
+    state.chartHeight = nextHeight;
+    localStorage.setItem("fastboot-chart-height", String(nextHeight));
+    resizeInteractiveChart();
+  };
+
+  const stop = () => {
+    document.body.classList.remove("chart-resizing");
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", stop);
+  };
+
+  handle.addEventListener("pointerdown", (event) => {
+    if ($("chartPanel").classList.contains("fullscreen")) return;
+
+    startY = event.clientY;
+    startHeight = state.chartHeight;
+
+    document.body.classList.add("chart-resizing");
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+  });
+}
+
+function toggleChartFullscreen() {
+  const panel = $("chartPanel");
+  const enabled = panel.classList.toggle("fullscreen");
+
+  $("fullscreenButton").textContent = enabled ? "✕" : "⤢";
+  document.body.style.overflow = enabled ? "hidden" : "";
+
+  requestAnimationFrame(resizeInteractiveChart);
 }
 
 function showToast(message) {
@@ -539,9 +641,10 @@ function showToast(message) {
   toast.classList.remove("hidden");
 
   clearTimeout(showToast.timer);
+
   showToast.timer = setTimeout(() => {
     toast.classList.add("hidden");
-  }, 2400);
+  }, 2300);
 }
 
 $("intervalSelect").addEventListener("change", async (event) => {
@@ -550,49 +653,49 @@ $("intervalSelect").addEventListener("change", async (event) => {
   await loadCandles();
 });
 
-$("refreshButton").addEventListener("click", async () => {
-  await Promise.all([loadTickers(), loadCandles()]);
-  showToast("Данные обновлены");
-});
-
 $("searchInput").addEventListener("input", renderSymbols);
-$("savePlanButton").addEventListener("click", savePlan);
-$("clearJournal").addEventListener("click", clearJournal);
 
-["balanceInput", "riskInput", "calcEntry", "calcStop"].forEach((id) => {
-  $(id).addEventListener("input", calculateRisk);
+$("refreshButton").addEventListener("click", async () => {
+  try {
+    await Promise.all([refreshTickers(), loadCandles()]);
+    showToast("Данные обновлены");
+  } catch (error) {
+    showToast(error.message);
+  }
 });
 
-$("chart").addEventListener("mousemove", handleChartMove);
-$("chart").addEventListener("mouseleave", () => {
-  state.hoveredIndex = null;
-  updateOHLC(state.candles.at(-1));
-  drawChart();
+$("resetChartButton").addEventListener("click", () => {
+  state.chart?.timeScale().fitContent();
 });
 
-window.addEventListener("resize", () => {
-  clearTimeout(drawChart.resizeTimer);
-  drawChart.resizeTimer = setTimeout(drawChart, 100);
+$("fullscreenButton").addEventListener("click", toggleChartFullscreen);
+
+$("loginButton").addEventListener("click", () => {
+  showToast("Вход будет добавлен следующим этапом");
 });
 
+$("registerButton").addEventListener("click", () => {
+  showToast("Регистрация будет добавлена следующим этапом");
+});
+
+window.addEventListener("resize", resizeInteractiveChart);
 window.addEventListener("beforeunload", closeSocket);
 
 async function start() {
-  calculateRisk();
-  renderJournal();
+  setupChartResize();
 
   try {
-    await loadTickers();
+    await loadMarketUniverse();
     await loadCandles();
 
     setInterval(() => {
-      loadTickers().catch(console.error);
-    }, 30000);
+      refreshTickers().catch(console.error);
+    }, 60000);
   } catch (error) {
     console.error(error);
     setConnection("offline", "Ошибка подключения");
     showToast(
-      "Не удалось подключиться к Binance. Проверьте интернет или доступность сервиса."
+      "Не удалось подключиться к рыночным данным. Проверьте интернет."
     );
   }
 }
