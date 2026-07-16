@@ -20,6 +20,7 @@ const state = {
   prices: {},
   chart: null,
   candleSeries: null,
+  volumeSeries: null,
   tradeSocket: null,
   currentSymbol: "BTCUSDT",
   orderSide: "BUY",
@@ -57,6 +58,7 @@ function openSection(id) {
   document.querySelectorAll(".nav-item[data-section]").forEach((el) => el.classList.toggle("active", el.dataset.section === id));
   $("pageTitle").textContent = titles[id] || "FASTBOOT";
   $("sidebar").classList.remove("open");
+  document.body.classList.toggle("trading-mode", id === "trading");
   if (id === "trading") loadTradingTerminal();
   if (id === "market-analysis") loadMarketAnalysis();
   if (id === "journal") renderJournal();
@@ -222,77 +224,501 @@ function formatPrice(value) {
     n >= 1 ? n.toFixed(4) : n.toFixed(8);
 }
 
+
+const COIN_DISPLAY_NAMES = {
+  BTCUSDT: "Bitcoin / Tether",
+  ETHUSDT: "Ethereum / Tether",
+  SOLUSDT: "Solana / Tether",
+  BNBUSDT: "BNB / Tether",
+  XRPUSDT: "XRP / Tether",
+};
+
 async function loadTradingTerminal() {
   const symbol = $("tradeSymbolSelect").value;
-  const interval = $("tradeIntervalSelect").value;
+  const activeInterval =
+    document.querySelector("[data-chart-interval].active")?.dataset.chartInterval || "15m";
+
   state.currentSymbol = symbol;
 
-  const [klines, ticker, depth, trades] = await Promise.all([
-    fetchJson(`${REST_BASE}/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=300`),
-    fetchJson(`${REST_BASE}/api/v3/ticker/24hr?symbol=${symbol}`),
-    fetchJson(`${REST_BASE}/api/v3/depth?symbol=${symbol}&limit=10`),
-    fetchJson(`${REST_BASE}/api/v3/trades?symbol=${symbol}&limit=20`)
-  ]);
+  try {
+    const [klines, ticker, depth, trades] = await Promise.all([
+      fetchJson(`${REST_BASE}/api/v3/klines?symbol=${symbol}&interval=${activeInterval}&limit=500`),
+      fetchJson(`${REST_BASE}/api/v3/ticker/24hr?symbol=${symbol}`),
+      fetchJson(`${REST_BASE}/api/v3/depth?symbol=${symbol}&limit=20`),
+      fetchJson(`${REST_BASE}/api/v3/trades?symbol=${symbol}&limit=50`)
+    ]);
 
-  $("terminalSymbolLabel").textContent = symbol;
-  $("baseAssetSuffix").textContent = symbol.replace("USDT", "");
-  $("terminalPrice").textContent = formatPrice(ticker.lastPrice);
-  $("terminalHigh").textContent = formatPrice(ticker.highPrice);
-  $("terminalLow").textContent = formatPrice(ticker.lowPrice);
-  $("terminalVolume").textContent = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 }).format(Number(ticker.quoteVolume));
-  const usdt = state.portfolio.find((item) => item.asset === "USDT");
-  $("availableUsdt").textContent = `${(usdt?.amount || 0).toFixed(2)} USDT`;
-  const change = Number(ticker.priceChangePercent);
-  $("terminalChange").textContent = `${change>=0?"+":""}${change.toFixed(2)}%`;
-  $("terminalChange").className = change>=0?"positive":"negative";
-  $("orderPrice").placeholder = formatPrice(ticker.lastPrice);
-  $("orderbookMid").textContent = formatPrice(ticker.lastPrice);
+    const lastPrice = Number(ticker.lastPrice);
+    const change = Number(ticker.priceChangePercent);
+    const base = symbol.replace("USDT", "");
 
-  renderOrderbook(depth); renderRecentTrades(trades); renderChart(klines);
+    $("terminalSymbolLabel").textContent = symbol;
+    $("terminalBaseName").textContent = COIN_DISPLAY_NAMES[symbol] || `${base} / Tether`;
+    $("terminalPrice").textContent = formatPrice(lastPrice);
+    $("terminalOpen").textContent = formatPrice(ticker.openPrice);
+    $("terminalHigh").textContent = formatPrice(ticker.highPrice);
+    $("terminalLow").textContent = formatPrice(ticker.lowPrice);
+    $("terminalVolume").textContent =
+      new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 })
+        .format(Number(ticker.quoteVolume));
+    $("terminalTradeCount").textContent = Number(ticker.count).toLocaleString("en-US");
+    $("terminalChange").textContent = `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`;
+    $("terminalChange").className = change >= 0 ? "positive" : "negative";
+    $("orderPrice").value = formatRawNumber(lastPrice);
+    $("baseAssetSuffix").textContent = base;
+    $("orderbookMid").textContent = formatPrice(lastPrice);
+    $("orderbookDirection").textContent =
+      `${change >= 0 ? "↑" : "↓"} ${formatPrice(ticker.weightedAvgPrice)}`;
+    $("orderbookDirection").className = change >= 0 ? "positive" : "negative";
+
+    updateTerminalBalances();
+    renderProOrderbook(depth);
+    renderProRecentTrades(trades);
+    renderProfessionalChart(klines);
+    renderOrders();
+    renderTerminalAssets();
+    renderTerminalTradeHistory();
+    updateOrderCalculation();
+  } catch (error) {
+    console.error(error);
+    showToast("Не удалось загрузить данные торгового терминала");
+  }
 }
 
-function renderChart(rows) {
+function formatRawNumber(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "";
+  if (number >= 1000) return number.toFixed(2);
+  if (number >= 1) return number.toFixed(4);
+  return number.toFixed(8);
+}
+
+function renderProfessionalChart(rows) {
   const container = $("terminalChart");
+
   if (!state.chart) {
-    state.chart = LightweightCharts.createChart(container,{width:container.clientWidth,height:container.clientHeight,layout:{background:{type:"solid",color:"#080c12"},textColor:"#8894a7",attributionLogo:false},grid:{vertLines:{color:"rgba(128,140,160,.1)"},horzLines:{color:"rgba(128,140,160,.1)"}},timeScale:{timeVisible:true},handleScroll:true,handleScale:true});
-    state.candleSeries = state.chart.addSeries(LightweightCharts.CandlestickSeries,{upColor:"#20c987",downColor:"#ff5f78",borderVisible:false,wickUpColor:"#20c987",wickDownColor:"#ff5f78"});
-    new ResizeObserver(()=>state.chart.resize(container.clientWidth,container.clientHeight)).observe(container);
+    state.chart = LightweightCharts.createChart(container, {
+      width: container.clientWidth,
+      height: container.clientHeight,
+      layout: {
+        background: { type: "solid", color: "#0d1219" },
+        textColor: "#748095",
+        attributionLogo: false,
+      },
+      grid: {
+        vertLines: { color: "rgba(116,128,149,.10)" },
+        horzLines: { color: "rgba(116,128,149,.10)" },
+      },
+      crosshair: {
+        mode: LightweightCharts.CrosshairMode.Normal,
+      },
+      rightPriceScale: {
+        borderColor: "#242b36",
+        scaleMargins: { top: .06, bottom: .24 },
+      },
+      timeScale: {
+        borderColor: "#242b36",
+        timeVisible: true,
+        secondsVisible: false,
+        rightOffset: 7,
+        barSpacing: 7,
+        minBarSpacing: 1.5,
+      },
+      handleScroll: {
+        mouseWheel: true,
+        pressedMouseMove: true,
+        horzTouchDrag: true,
+        vertTouchDrag: true,
+      },
+      handleScale: {
+        axisPressedMouseMove: { time: true, price: true },
+        mouseWheel: true,
+        pinch: true,
+      },
+    });
+
+    state.candleSeries = state.chart.addSeries(
+      LightweightCharts.CandlestickSeries,
+      {
+        upColor: "#20c987",
+        downColor: "#ff5f78",
+        borderVisible: false,
+        wickUpColor: "#20c987",
+        wickDownColor: "#ff5f78",
+        priceLineVisible: true,
+        lastValueVisible: true,
+      }
+    );
+
+    state.volumeSeries = state.chart.addSeries(
+      LightweightCharts.HistogramSeries,
+      {
+        priceFormat: { type: "volume" },
+        priceScaleId: "volume",
+        priceLineVisible: false,
+        lastValueVisible: false,
+      }
+    );
+
+    state.volumeSeries.priceScale().applyOptions({
+      scaleMargins: { top: .78, bottom: 0 },
+    });
+
+    state.chart.subscribeCrosshairMove((param) => {
+      if (!param?.time || !param.seriesData) {
+        updateChartOhlc(rows.at(-1));
+        return;
+      }
+
+      const candle = param.seriesData.get(state.candleSeries);
+      const volume = param.seriesData.get(state.volumeSeries);
+      if (candle) {
+        updateChartOhlc([
+          0,
+          candle.open,
+          candle.high,
+          candle.low,
+          candle.close,
+          volume?.value || 0,
+        ]);
+      }
+    });
+
+    new ResizeObserver(() => {
+      if (state.chart) {
+        state.chart.resize(container.clientWidth, container.clientHeight);
+      }
+    }).observe(container);
   }
-  state.candleSeries.setData(rows.map(r=>({time:Math.floor(r[0]/1000),open:+r[1],high:+r[2],low:+r[3],close:+r[4]})));
+
+  state.candleSeries.setData(
+    rows.map((row) => ({
+      time: Math.floor(Number(row[0]) / 1000),
+      open: Number(row[1]),
+      high: Number(row[2]),
+      low: Number(row[3]),
+      close: Number(row[4]),
+    }))
+  );
+
+  state.volumeSeries.setData(
+    rows.map((row) => ({
+      time: Math.floor(Number(row[0]) / 1000),
+      value: Number(row[5]),
+      color: Number(row[4]) >= Number(row[1])
+        ? "rgba(32,201,135,.55)"
+        : "rgba(255,95,120,.55)",
+    }))
+  );
+
+  updateChartOhlc(rows.at(-1));
   state.chart.timeScale().fitContent();
 }
 
-function renderOrderbook(depth) {
-  $("asksList").innerHTML = [...depth.asks].reverse().slice(0,8).map(x=>`<div class="orderbook-row"><span>${formatPrice(x[0])}</span><span>${(+x[1]).toFixed(5)}</span></div>`).join("");
-  $("bidsList").innerHTML = depth.bids.slice(0,8).map(x=>`<div class="orderbook-row"><span>${formatPrice(x[0])}</span><span>${(+x[1]).toFixed(5)}</span></div>`).join("");
-}
-function renderRecentTrades(trades) {
-  $("recentTradesList").innerHTML = trades.reverse().map(t=>`<div class="recent-row"><span class="${t.isBuyerMaker?"negative":"positive"}">${formatPrice(t.price)}</span><span>${(+t.qty).toFixed(5)}</span><span>${new Date(t.time).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}</span></div>`).join("");
+function updateChartOhlc(row) {
+  if (!row) return;
+  $("chartOpen").textContent = formatPrice(row[1]);
+  $("chartHigh").textContent = formatPrice(row[2]);
+  $("chartLow").textContent = formatPrice(row[3]);
+  $("chartClose").textContent = formatPrice(row[4]);
+  $("chartVolume").textContent =
+    new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 })
+      .format(Number(row[5]));
 }
 
-$("tradeSymbolSelect").addEventListener("change",loadTradingTerminal);
-$("tradeIntervalSelect").addEventListener("change",loadTradingTerminal);
-document.querySelectorAll(".order-tabs button").forEach(btn=>btn.addEventListener("click",()=>{
-  state.orderSide=btn.dataset.side; document.querySelectorAll(".order-tabs button").forEach(x=>x.classList.toggle("active",x===btn));
-  $("placeOrderButton").textContent=state.orderSide==="BUY"?"Купить":"Продать";
-  $("placeOrderButton").className=state.orderSide==="BUY"?"buy-order-button":"sell-order-button";
-}));
-["orderPrice","orderAmount"].forEach(id=>$(id).addEventListener("input",()=>{
-  const price=Number($("orderPrice").value)||Number($("terminalPrice").textContent.replaceAll(",",""));
-  const amount=Number($("orderAmount").value)||0; $("orderTotal").textContent=`${(price*amount).toFixed(2)} USDT`;
-}));
-$("placeOrderButton").addEventListener("click",()=>{
-  const amount=Number($("orderAmount").value); const type=$("orderType").value;
-  const price=type==="MARKET"?Number($("terminalPrice").textContent.replaceAll(",","")):Number($("orderPrice").value);
-  if (!(amount>0)||!(price>0)) return showToast("Введите цену и количество");
-  state.orders.unshift({date:new Date().toLocaleString("ru-RU"),symbol:state.currentSymbol,type,side:state.orderSide,price,amount,status:"Локально",total:price*amount});
-  saveState(); renderOrders(); $("orderAmount").value=""; showToast("Ордер добавлен в локальную историю");
-});
+function renderProOrderbook(depth) {
+  const precision = Number($("orderbookPrecision").value) || .1;
+
+  const prepareRows = (rows) => {
+    let cumulative = 0;
+    const normalized = rows.map(([price, quantity]) => {
+      cumulative += Number(quantity);
+      return {
+        price: Math.round(Number(price) / precision) * precision,
+        quantity: Number(quantity),
+        total: cumulative,
+      };
+    });
+
+    const maxTotal = Math.max(...normalized.map((item) => item.total), 1);
+    return normalized.map((item) => ({
+      ...item,
+      depth: item.total / maxTotal * 100,
+    }));
+  };
+
+  const asks = prepareRows([...depth.asks].reverse().slice(0, 13));
+  const bids = prepareRows(depth.bids.slice(0, 13));
+
+  $("asksList").innerHTML = asks.map((item) => `
+    <div class="pro-orderbook-row" style="--depth-width:${item.depth}%">
+      <span>${formatPrice(item.price)}</span>
+      <span>${item.quantity.toFixed(5)}</span>
+      <span>${item.total.toFixed(5)}</span>
+    </div>
+  `).join("");
+
+  $("bidsList").innerHTML = bids.map((item) => `
+    <div class="pro-orderbook-row" style="--depth-width:${item.depth}%">
+      <span>${formatPrice(item.price)}</span>
+      <span>${item.quantity.toFixed(5)}</span>
+      <span>${item.total.toFixed(5)}</span>
+    </div>
+  `).join("");
+}
+
+function renderProRecentTrades(trades) {
+  $("recentTradesList").innerHTML = trades.reverse().map((trade) => `
+    <div class="pro-recent-row">
+      <span class="${trade.isBuyerMaker ? "negative" : "positive"}">
+        ${formatPrice(trade.price)}
+      </span>
+      <span>${Number(trade.qty).toFixed(5)}</span>
+      <span>${new Date(trade.time).toLocaleTimeString("ru-RU", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      })}</span>
+    </div>
+  `).join("");
+}
+
+function updateTerminalBalances() {
+  const usdt = state.portfolio.find((item) => item.asset === "USDT");
+  const available = usdt?.amount || 0;
+  const locked = state.orders
+    .filter((order) => order.status === "Открыт")
+    .reduce((sum, order) => sum + (order.side === "BUY" ? order.total : 0), 0);
+
+  $("availableUsdt").textContent = `${available.toFixed(2)} USDT`;
+  $("terminalAvailableBalance").textContent = `${available.toFixed(2)} USDT`;
+  $("terminalLockedBalance").textContent = `${locked.toFixed(2)} USDT`;
+  $("terminalAccountBalance").textContent =
+    `${(available + locked).toFixed(2)} USDT`;
+  $("terminalRealizedPnl").textContent =
+    `${Number(localStorage.getItem("fastboot-realized-pnl") || 0).toFixed(2)} USDT`;
+}
+
+function calculateOrderAmountFromPercent(percent) {
+  const usdt = state.portfolio.find((item) => item.asset === "USDT")?.amount || 0;
+  const price = Number($("orderPrice").value) ||
+    Number(String($("terminalPrice").textContent).replaceAll(",", ""));
+  if (!(price > 0)) return;
+
+  $("orderPercentSlider").value = String(percent);
+
+  if (state.orderSide === "BUY") {
+    $("orderAmount").value = ((usdt * percent / 100) / price).toFixed(8);
+  } else {
+    const asset = state.currentSymbol.replace("USDT", "");
+    const amount = state.portfolio.find((item) => item.asset === asset)?.amount || 0;
+    $("orderAmount").value = (amount * percent / 100).toFixed(8);
+  }
+
+  updateOrderCalculation();
+}
+
+function updateOrderCalculation() {
+  const price = Number($("orderPrice").value) ||
+    Number(String($("terminalPrice").textContent).replaceAll(",", ""));
+  const amount = Number($("orderAmount").value) || 0;
+  const total = price * amount;
+  const fee = total * .001;
+
+  $("orderTotal").textContent = `${total.toFixed(2)} USDT`;
+  $("estimatedFee").textContent = `${fee.toFixed(2)} USDT`;
+}
+
+function placeLocalTerminalOrder(side) {
+  state.orderSide = side;
+
+  const type = $("orderType").value;
+  const amount = Number($("orderAmount").value);
+  const displayedPrice =
+    Number(String($("terminalPrice").textContent).replaceAll(",", ""));
+  const price = type === "MARKET"
+    ? displayedPrice
+    : Number($("orderPrice").value);
+
+  if (!(amount > 0) || !(price > 0)) {
+    showToast("Введите цену и количество");
+    return;
+  }
+
+  const total = price * amount;
+  const order = {
+    date: new Date().toLocaleString("ru-RU"),
+    symbol: state.currentSymbol,
+    type,
+    side,
+    price,
+    amount,
+    total,
+    status: type === "MARKET" ? "Исполнен локально" : "Открыт",
+    stopPrice: Number($("stopPrice")?.value) || null,
+    takeProfit: Number($("takeProfitPrice")?.value) || null,
+    stopLoss: Number($("stopLossPrice")?.value) || null,
+    postOnly: Boolean($("postOnly")?.checked),
+  };
+
+  state.orders.unshift(order);
+  saveState();
+  renderOrders();
+  renderTerminalTradeHistory();
+  updateTerminalBalances();
+  $("orderAmount").value = "";
+  $("orderPercentSlider").value = "0";
+  updateOrderCalculation();
+  showToast(`${side === "BUY" ? "Покупка" : "Продажа"} добавлена в локальную историю`);
+}
 
 function renderOrders() {
-  const html = state.orders.length ? state.orders.map(o=>`<div class="order-history-row"><span>${o.date}</span><strong>${o.symbol}</strong><span>${o.type}</span><span class="${o.side==="BUY"?"positive":"negative"}">${o.side}</span><span>${formatPrice(o.price)}</span><span>${o.amount}</span><span>${o.status}</span></div>`).join("") : "Ордеров пока нет";
-  $("ordersHistory").innerHTML=html; $("ordersHistory").classList.toggle("empty-list",!state.orders.length);
+  const rows = state.orders.length
+    ? state.orders.map((order) => `
+      <div class="terminal-order-row">
+        <span>${order.date}</span>
+        <strong>${order.symbol}</strong>
+        <span>${order.type}</span>
+        <span class="${order.side === "BUY" ? "positive" : "negative"}">${order.side}</span>
+        <span>${formatPrice(order.price)}</span>
+        <span>${order.amount}</span>
+        <span>${order.status}</span>
+      </div>
+    `).join("")
+    : `<div class="terminal-empty-state"><strong>Ордеров пока нет</strong></div>`;
+
+  $("ordersHistory").innerHTML = rows;
+
+  const openCount = state.orders.filter((order) => order.status === "Открыт").length;
+  $("openOrdersTabCount").textContent = `(${openCount})`;
+
+  $("openOrdersContent").innerHTML = openCount
+    ? state.orders
+        .filter((order) => order.status === "Открыт")
+        .map((order) => `
+          <div class="terminal-order-row">
+            <span>${order.date}</span>
+            <strong>${order.symbol}</strong>
+            <span>${order.type}</span>
+            <span class="${order.side === "BUY" ? "positive" : "negative"}">${order.side}</span>
+            <span>${formatPrice(order.price)}</span>
+            <span>${order.amount}</span>
+            <span>${order.status}</span>
+          </div>
+        `).join("")
+    : `<div class="terminal-empty-state"><strong>Открытых ордеров нет</strong></div>`;
 }
+
+function renderTerminalTradeHistory() {
+  const filled = state.orders.filter((order) =>
+    String(order.status).includes("Исполнен")
+  );
+
+  $("terminalTradeHistory").innerHTML = filled.length
+    ? filled.map((order) => `
+      <div class="terminal-order-row">
+        <span>${order.date}</span>
+        <strong>${order.symbol}</strong>
+        <span class="${order.side === "BUY" ? "positive" : "negative"}">${order.side}</span>
+        <span>${formatPrice(order.price)}</span>
+        <span>${order.amount}</span>
+        <span>${order.total.toFixed(2)}</span>
+        <span>${order.status}</span>
+      </div>
+    `).join("")
+    : `<div class="terminal-empty-state"><strong>Исполненных сделок пока нет</strong></div>`;
+}
+
+function renderTerminalAssets() {
+  $("terminalAssetsList").innerHTML = state.portfolio.map((item) => `
+    <article class="terminal-asset-card">
+      <span>${item.name}</span>
+      <strong>${item.asset}: ${item.amount.toFixed(item.asset === "USDT" ? 2 : 8)}</strong>
+    </article>
+  `).join("");
+}
+
+$("tradeSymbolSelect").addEventListener("change", loadTradingTerminal);
+
+document.querySelectorAll("[data-chart-interval]").forEach((button) => {
+  button.addEventListener("click", () => {
+    document.querySelectorAll("[data-chart-interval]").forEach((item) =>
+      item.classList.toggle("active", item === button)
+    );
+    loadTradingTerminal();
+  });
+});
+
+$("fitChartButton").addEventListener("click", () => {
+  state.chart?.timeScale().fitContent();
+});
+
+$("refreshTerminalButton").addEventListener("click", loadTradingTerminal);
+$("orderbookPrecision").addEventListener("change", loadTradingTerminal);
+
+document.querySelectorAll("[data-order-type]").forEach((button) => {
+  button.addEventListener("click", () => {
+    document.querySelectorAll("[data-order-type]").forEach((item) =>
+      item.classList.toggle("active", item === button)
+    );
+
+    const type = button.dataset.orderType;
+    $("orderType").value = type;
+    $("stopPriceField").classList.toggle("hidden", type !== "STOP");
+    $("orderPrice").disabled = type === "MARKET";
+    $("orderPrice").placeholder = type === "MARKET" ? "Рыночная цена" : "";
+    updateOrderCalculation();
+  });
+});
+
+["orderPrice", "orderAmount"].forEach((id) => {
+  $(id).addEventListener("input", updateOrderCalculation);
+});
+
+$("orderPercentSlider").addEventListener("input", (event) => {
+  calculateOrderAmountFromPercent(Number(event.target.value));
+});
+
+document.querySelectorAll("[data-percent]").forEach((button) => {
+  button.addEventListener("click", () => {
+    calculateOrderAmountFromPercent(Number(button.dataset.percent));
+  });
+});
+
+$("takeProfitStopLoss").addEventListener("change", (event) => {
+  $("tpSlFields").classList.toggle("hidden", !event.target.checked);
+});
+
+$("buyOrderButton").addEventListener("click", () => placeLocalTerminalOrder("BUY"));
+$("sellOrderButton").addEventListener("click", () => placeLocalTerminalOrder("SELL"));
+
+$("terminalBottomTabs").querySelectorAll("button").forEach((button) => {
+  button.addEventListener("click", () => {
+    $("terminalBottomTabs").querySelectorAll("button").forEach((item) =>
+      item.classList.toggle("active", item === button)
+    );
+
+    const map = {
+      positions: "positionsContent",
+      "open-orders": "openOrdersContent",
+      "order-history": "orderHistoryContent",
+      "trade-history": "tradeHistoryContent",
+      assets: "assetsContent",
+    };
+
+    document.querySelectorAll(".terminal-bottom-content").forEach((content) =>
+      content.classList.toggle("active", content.id === map[button.dataset.bottomTab])
+    );
+  });
+});
+
+$("terminalAssetsShortcut").addEventListener("click", () => {
+  document.querySelector('[data-bottom-tab="assets"]').click();
+});
+
+$("terminalOrdersShortcut").addEventListener("click", () => {
+  document.querySelector('[data-bottom-tab="order-history"]').click();
+});
 
 async function loadMarketAnalysis() {
   const symbol=$("analysisCoinSelect").value;
