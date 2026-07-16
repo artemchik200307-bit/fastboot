@@ -310,10 +310,6 @@ function showToast(message) {
 
 $("searchInput").addEventListener("input", renderMarketList);
 
-$("loginButton").addEventListener("click", () => {
-  showToast("Вход будет добавлен следующим этапом");
-});
-
 $("registerButton").addEventListener("click", () => {
   showToast("Регистрация будет добавлена следующим этапом");
 });
