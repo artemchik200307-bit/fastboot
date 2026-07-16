@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FASTBOOT — Регистрация</title>
+  <link rel="stylesheet" href="auth.css">
+</head>
+<body>
+  <main class="auth-page">
+    <section class="auth-info">
+      <a class="auth-brand" href="index.html">FASTBOOT</a>
+      <div class="auth-info-main">
+        <span class="auth-kicker">CREATE FASTBOOT ACCOUNT</span>
+        <h1>Создайте единый аккаунт для торговли и AI-бота</h1>
+        <p>
+          После регистрации откроется личный кабинет с портфелем,
+          терминалом и настройками торгового бота.
+        </p>
+      </div>
+      <span class="auth-note">Регистрация в тестовой локальной версии</span>
+    </section>
+
+    <section class="auth-form-wrap">
+      <article class="auth-card">
+        <h2>Регистрация</h2>
+        <p>Создайте аккаунт FASTBOOT.</p>
+
+        <form id="registerForm" class="auth-form">
+          <label>
+            Имя пользователя
+            <input id="registerName" type="text" required minlength="2">
+          </label>
+
+          <label>
+            Email
+            <input id="registerEmail" type="email" required autocomplete="email">
+          </label>
+
+          <label>
+            Пароль
+            <input id="registerPassword" type="password" required minlength="8">
+          </label>
+
+          <label>
+            Повторите пароль
+            <input id="registerPasswordRepeat" type="password" required minlength="8">
+          </label>
+
+          <div id="authError" class="auth-error"></div>
+          <button class="auth-submit" type="submit">Создать аккаунт</button>
+        </form>
+
+        <div class="auth-switch">
+          Уже есть аккаунт? <a href="login.html">Войти</a>
+        </div>
+      </article>
+    </section>
+  </main>
+  <script src="auth.js"></script>
+</body>
+</html>

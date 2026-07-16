@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#080c12">
   <title>FASTBOOT — Личный кабинет</title>
   <link rel="stylesheet" href="dashboard.css">
+  <script src="https://unpkg.com/lightweight-charts@5.2.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
-
 <body>
   <div class="dashboard-shell">
     <aside class="sidebar" id="sidebar">
@@ -15,57 +15,27 @@
 
       <nav class="sidebar-nav">
         <button class="nav-item active" data-section="overview">
-          <span class="nav-icon">⌂</span>
-          <span>Обзор</span>
+          <span class="nav-icon">⌂</span><span>Dashboard</span>
         </button>
-
         <button class="nav-item" data-section="assistant">
-          <span class="nav-icon">AI</span>
-          <span>AI Assistant</span>
+          <span class="nav-icon">AI</span><span>AI Assistant</span>
         </button>
-
+        <button class="nav-item" data-section="trading">
+          <span class="nav-icon">T</span><span>Торговля</span>
+        </button>
         <button class="nav-item" data-section="market-analysis">
-          <span class="nav-icon">⌁</span>
-          <span>Анализ рынка</span>
+          <span class="nav-icon">A</span><span>Анализ рынка</span>
         </button>
-
-        <button class="nav-item" data-section="news">
-          <span class="nav-icon">N</span>
-          <span>Анализ новостей</span>
-        </button>
-
-        <button class="nav-item" data-section="smart-money">
-          <span class="nav-icon">S</span>
-          <span>Smart Money</span>
-        </button>
-
-        <button class="nav-item" data-section="risk">
-          <span class="nav-icon">R</span>
-          <span>Риск-менеджмент</span>
-        </button>
-
-        <button class="nav-item" data-section="favorites">
-          <span class="nav-icon">☆</span>
-          <span>Избранное</span>
-        </button>
-
         <button class="nav-item" data-section="journal">
-          <span class="nav-icon">J</span>
-          <span>Торговый журнал</span>
-        </button>
-
-        <button class="nav-item" data-section="history">
-          <span class="nav-icon">H</span>
-          <span>История анализов</span>
+          <span class="nav-icon">J</span><span>Торговый журнал</span>
         </button>
       </nav>
 
       <div class="sidebar-bottom">
         <button class="nav-item" data-section="settings">
-          <span class="nav-icon">⚙</span>
-          <span>Настройки</span>
+          <span class="nav-icon">⚙</span><span>Настройки</span>
         </button>
-
+        <button id="logoutButton" class="logout-button" type="button">Выйти</button>
         <a class="back-link" href="index.html">← На главную</a>
       </div>
     </aside>
@@ -73,552 +43,370 @@
     <div class="dashboard-main">
       <header class="dashboard-header">
         <button id="menuButton" class="menu-button" type="button">☰</button>
-
         <div>
           <span class="header-label">Личный кабинет</span>
-          <h1 id="pageTitle">Обзор</h1>
+          <h1 id="pageTitle">Dashboard</h1>
+        </div>
+
+        <div class="live-status">
+          <span class="live-dot"></span>
+          <strong>LIVE</strong>
         </div>
 
         <div class="profile-mini">
-          <div class="profile-avatar">A</div>
+          <div id="profileAvatar" class="profile-avatar">A</div>
           <div class="profile-copy">
-            <strong>Artem</strong>
-            <span>Demo account</span>
+            <strong id="profileName">Пользователь</strong>
+            <span id="profileId">ID: —</span>
           </div>
         </div>
       </header>
 
       <main class="dashboard-content">
         <section class="dashboard-section active" id="overview">
-          <div class="welcome-card">
+          <div class="account-hero">
             <div>
-              <span class="section-kicker">FASTBOOT DASHBOARD</span>
-              <h2>Добро пожаловать в личный кабинет</h2>
-              <p>
-                Здесь будут собраны торговые инструменты, AI-анализ,
-                управление рисками, журнал и история работы платформы.
-              </p>
+              <span class="section-kicker">ОСНОВНОЙ СЧЁТ</span>
+              <h2 id="accountOwner">Пользователь FASTBOOT</h2>
+              <p id="accountEmail">—</p>
             </div>
-
-            <div class="demo-badge">
-              <span>Режим</span>
-              <strong>DEMO</strong>
+            <div class="account-id-box">
+              <span>FASTBOOT ID</span>
+              <strong id="accountId">—</strong>
             </div>
           </div>
 
-          <div class="summary-grid">
-            <article class="summary-card">
-              <span>Тариф</span>
-              <strong>Free Demo</strong>
-              <small>Регистрация будет подключена позже</small>
-            </article>
-
-            <article class="summary-card">
-              <span>AI-анализы</span>
-              <strong>0</strong>
-              <small>За текущий месяц</small>
-            </article>
-
-            <article class="summary-card">
-              <span>Избранные монеты</span>
-              <strong id="favoriteCount">3</strong>
-              <small>BTC, ETH, SOL</small>
-            </article>
-
-            <article class="summary-card">
-              <span>Риск на сделку</span>
-              <strong id="overviewRisk">1%</strong>
-              <small>Текущая настройка</small>
-            </article>
+          <div class="balance-card">
+            <div class="balance-main">
+              <span>Общий баланс</span>
+              <strong id="totalBalance">$0.00</strong>
+              <small>Эквивалент портфеля в USDT</small>
+            </div>
+            <div class="account-actions">
+              <button id="depositButton" class="primary-action" type="button">Пополнить</button>
+              <button id="withdrawButton" class="secondary-action" type="button">Вывести</button>
+              <button id="exchangeButton" class="secondary-action" type="button">Обмен</button>
+            </div>
           </div>
 
-          <div class="dashboard-grid">
-            <article class="panel quick-actions-panel">
+          <div class="account-grid">
+            <article class="panel portfolio-panel">
               <div class="panel-head">
                 <div>
-                  <h3>Быстрые действия</h3>
-                  <span>Основные функции платформы</span>
+                  <h3>Портфель</h3>
+                  <span>Активы на основном счёте</span>
                 </div>
               </div>
-
-              <div class="quick-actions">
-                <button data-open-section="assistant">
-                  <strong>AI Assistant</strong>
-                  <span>Открыть чат с помощником</span>
-                </button>
-
-                <button data-open-section="market-analysis">
-                  <strong>Анализ рынка</strong>
-                  <span>Создать новый анализ</span>
-                </button>
-
-                <button data-open-section="risk">
-                  <strong>Риск-калькулятор</strong>
-                  <span>Рассчитать размер позиции</span>
-                </button>
-
-                <button data-open-section="journal">
-                  <strong>Торговый журнал</strong>
-                  <span>Добавить сделку</span>
-                </button>
+              <div class="portfolio-table-head">
+                <span>Актив</span><span>Баланс</span><span>Цена</span><span>Стоимость</span>
               </div>
+              <div id="portfolioList" class="portfolio-list"></div>
             </article>
 
-            <article class="panel activity-panel">
+            <article class="panel allocation-panel">
               <div class="panel-head">
                 <div>
-                  <h3>Последняя активность</h3>
-                  <span>История действий появится после начала работы</span>
+                  <h3>Распределение портфеля</h3>
+                  <span>Доля активов</span>
                 </div>
               </div>
-
-              <div class="empty-state">
-                <div class="empty-icon">◎</div>
-                <strong>Активности пока нет</strong>
-                <p>Запустите первый анализ или добавьте сделку в журнал.</p>
-              </div>
+              <div id="allocationBars" class="allocation-bars"></div>
             </article>
           </div>
 
-          <article class="panel modules-panel">
-            <div class="panel-head">
-              <div>
-                <h3>Модули FASTBOOT</h3>
-                <span>Все функции личного кабинета</span>
+          <div class="history-grid">
+            <article class="panel">
+              <div class="panel-head">
+                <div><h3>История пополнений</h3><span>Последние операции</span></div>
               </div>
-            </div>
-
-            <div class="module-grid">
-              <button class="module-card" data-open-section="assistant">
-                <span class="module-number">01</span>
-                <strong>AI Trading Assistant</strong>
-                <p>Чат, торговые сценарии и объяснение решений.</p>
-              </button>
-
-              <button class="module-card" data-open-section="market-analysis">
-                <span class="module-number">02</span>
-                <strong>AI Market Analysis</strong>
-                <p>Технический и фундаментальный анализ инструмента.</p>
-              </button>
-
-              <button class="module-card" data-open-section="news">
-                <span class="module-number">03</span>
-                <strong>AI News Scanner</strong>
-                <p>Новости и оценка возможного влияния на рынок.</p>
-              </button>
-
-              <button class="module-card" data-open-section="smart-money">
-                <span class="module-number">04</span>
-                <strong>Smart Money</strong>
-                <p>Ликвидность, структура рынка и зоны интереса.</p>
-              </button>
-
-              <button class="module-card" data-open-section="risk">
-                <span class="module-number">05</span>
-                <strong>Risk Management</strong>
-                <p>Размер позиции, риск и Risk/Reward.</p>
-              </button>
-
-              <button class="module-card" data-open-section="journal">
-                <span class="module-number">06</span>
-                <strong>Trading Journal</strong>
-                <p>Сделки, статистика и дисциплина трейдера.</p>
-              </button>
-            </div>
-          </article>
+              <div id="depositHistory" class="operation-list"></div>
+            </article>
+            <article class="panel">
+              <div class="panel-head">
+                <div><h3>История выводов</h3><span>Последние операции</span></div>
+              </div>
+              <div id="withdrawHistory" class="operation-list"></div>
+            </article>
+          </div>
         </section>
 
         <section class="dashboard-section" id="assistant">
           <div class="section-heading">
-            <div>
-              <span class="section-kicker">AI TRADING ASSISTANT</span>
-              <h2>Персональный торговый помощник</h2>
-              <p>Демонстрационный интерфейс. Подключение AI сделаем позже.</p>
+            <span class="section-kicker">AI TRADING BOT</span>
+            <h2>Подключение и управление торговым ботом</h2>
+            <p>Отдельный баланс, риск-менеджмент и статистика автоматической торговли.</p>
+          </div>
+
+          <div class="bot-summary-grid">
+            <article class="bot-balance-card">
+              <span>Баланс счёта бота</span>
+              <strong id="botBalance">$0.00</strong>
+              <small>Средства, выделенные для автоматической торговли</small>
+            </article>
+            <article class="bot-status-card">
+              <span>Статус бота</span>
+              <strong id="botStatus">Остановлен</strong>
+              <small id="botStatusDescription">Торговля не запущена</small>
+            </article>
+            <article class="bot-stat-card">
+              <span>Текущий PnL</span>
+              <strong id="botPnl">$0.00</strong>
+              <small>С момента последнего запуска</small>
+            </article>
+          </div>
+
+          <div class="bot-actions panel">
+            <div class="transfer-box">
+              <label>
+                Перевод с основного счёта на счёт бота
+                <input id="botTransferAmount" type="number" min="1" placeholder="Сумма USDT">
+              </label>
+              <button id="transferToBotButton" class="primary-action" type="button">
+                Перевести
+              </button>
+            </div>
+            <div class="bot-control-buttons">
+              <button id="botRiskSettingsButton" class="secondary-action" type="button">
+                Настройки риск-менеджмента
+              </button>
+              <button id="toggleBotButton" class="primary-action" type="button">
+                Запустить торговлю
+              </button>
             </div>
           </div>
 
-          <div class="assistant-layout">
-            <div class="panel chat-panel">
-              <div class="chat-history" id="chatHistory">
-                <div class="chat-message assistant-message">
-                  <span>FASTBOOT AI</span>
-                  <p>
-                    Выберите инструмент и задайте вопрос. Например:
-                    «Проанализируй BTCUSDT на 4H».
-                  </p>
-                </div>
+          <div class="period-tabs" id="botPeriodTabs">
+            <button class="active" data-period="day">День</button>
+            <button data-period="week">Неделя</button>
+            <button data-period="month">Месяц</button>
+            <button data-period="quarter">Квартал</button>
+          </div>
+
+          <div class="bot-performance-grid">
+            <article class="panel performance-card">
+              <span>Доходность</span><strong id="periodReturn">0.00%</strong>
+            </article>
+            <article class="panel performance-card">
+              <span>Сделки</span><strong id="periodTrades">0</strong>
+            </article>
+            <article class="panel performance-card">
+              <span>Win rate</span><strong id="periodWinRate">0%</strong>
+            </article>
+            <article class="panel performance-card">
+              <span>Макс. просадка</span><strong id="periodDrawdown">0.00%</strong>
+            </article>
+          </div>
+
+          <article class="panel">
+            <div class="panel-head">
+              <div><h3>История сделок бота</h3><span>Автоматические сделки</span></div>
+            </div>
+            <div class="trade-table-head">
+              <span>Время</span><span>Пара</span><span>Сторона</span><span>Объём</span><span>PnL</span>
+            </div>
+            <div id="botTrades" class="trade-list empty-list">Сделок пока нет</div>
+          </article>
+        </section>
+
+        <section class="dashboard-section" id="trading">
+          <div class="section-heading">
+            <span class="section-kicker">SPOT TRADING TERMINAL</span>
+            <h2>Ручная торговля</h2>
+            <p>График, стакан, лента сделок и размещение ордеров.</p>
+          </div>
+
+          <div class="terminal-toolbar">
+            <select id="tradeSymbolSelect">
+              <option value="BTCUSDT">BTC/USDT</option>
+              <option value="ETHUSDT">ETH/USDT</option>
+              <option value="SOLUSDT">SOL/USDT</option>
+              <option value="BNBUSDT">BNB/USDT</option>
+              <option value="XRPUSDT">XRP/USDT</option>
+            </select>
+            <select id="tradeIntervalSelect">
+              <option value="1m">1m</option>
+              <option value="5m">5m</option>
+              <option value="15m" selected>15m</option>
+              <option value="1h">1H</option>
+              <option value="4h">4H</option>
+            </select>
+            <strong id="terminalPrice">—</strong>
+            <span id="terminalChange">—</span>
+          </div>
+
+          <div class="terminal-grid">
+            <article class="panel chart-terminal-panel">
+              <div id="terminalChart" class="terminal-chart"></div>
+            </article>
+
+            <article class="panel orderbook-panel">
+              <div class="panel-head">
+                <div><h3>Стакан</h3><span>Цена / количество</span></div>
               </div>
+              <div class="orderbook-head"><span>Цена</span><span>Количество</span></div>
+              <div id="asksList" class="orderbook-list asks"></div>
+              <div class="orderbook-mid" id="orderbookMid">—</div>
+              <div id="bidsList" class="orderbook-list bids"></div>
+            </article>
 
-              <form id="chatForm" class="chat-form">
-                <input id="chatInput" type="text"
-                  placeholder="Напишите сообщение…" autocomplete="off">
-                <button type="submit">Отправить</button>
-              </form>
-            </div>
+            <article class="panel recent-trades-panel">
+              <div class="panel-head">
+                <div><h3>Последние сделки</h3><span>Рыночная лента</span></div>
+              </div>
+              <div class="recent-head"><span>Цена</span><span>Количество</span><span>Время</span></div>
+              <div id="recentTradesList" class="recent-trades-list"></div>
+            </article>
 
-            <aside class="panel assistant-tools">
-              <h3>Быстрые запросы</h3>
-
-              <button class="prompt-button">
-                Анализ BTCUSDT
+            <article class="panel order-form-panel">
+              <div class="order-tabs">
+                <button class="active buy-tab" data-side="BUY">Купить</button>
+                <button class="sell-tab" data-side="SELL">Продать</button>
+              </div>
+              <label>
+                Тип ордера
+                <select id="orderType">
+                  <option value="MARKET">Market</option>
+                  <option value="LIMIT">Limit</option>
+                </select>
+              </label>
+              <label>
+                Цена
+                <input id="orderPrice" type="number" step="any" placeholder="Рыночная">
+              </label>
+              <label>
+                Количество
+                <input id="orderAmount" type="number" step="any" placeholder="Количество монет">
+              </label>
+              <div class="order-total">
+                <span>Сумма</span><strong id="orderTotal">0.00 USDT</strong>
+              </div>
+              <button id="placeOrderButton" class="buy-order-button" type="button">
+                Купить
               </button>
-              <button class="prompt-button">
-                Рыночный сценарий ETH
-              </button>
-              <button class="prompt-button">
-                Рассчитать риск
-              </button>
-              <button class="prompt-button">
-                Объяснить структуру рынка
-              </button>
-            </aside>
+              <small class="terminal-warning">
+                Биржевой API пока не подключён. Ордер сохраняется локально в истории.
+              </small>
+            </article>
           </div>
+
+          <article class="panel orders-panel">
+            <div class="panel-head">
+              <div><h3>История ордеров</h3><span>Ручные операции терминала</span></div>
+            </div>
+            <div class="orders-table-head">
+              <span>Дата</span><span>Пара</span><span>Тип</span><span>Сторона</span>
+              <span>Цена</span><span>Количество</span><span>Статус</span>
+            </div>
+            <div id="ordersHistory" class="orders-history empty-list">Ордеров пока нет</div>
+          </article>
         </section>
 
         <section class="dashboard-section" id="market-analysis">
           <div class="section-heading">
-            <div>
-              <span class="section-kicker">AI MARKET ANALYSIS</span>
-              <h2>Анализ рынка</h2>
-              <p>Выберите инструмент и параметры анализа.</p>
-            </div>
+            <span class="section-kicker">MARKET ANALYSIS</span>
+            <h2>Анализ выбранной монеты</h2>
+            <p>Без свечного графика: рыночные показатели, спрос, импульс и волатильность.</p>
           </div>
 
-          <article class="panel analysis-form-panel">
-            <div class="form-grid">
-              <label>
-                Инструмент
-                <select id="analysisSymbol">
-                  <option>BTCUSDT</option>
-                  <option>ETHUSDT</option>
-                  <option>SOLUSDT</option>
-                  <option>BNBUSDT</option>
-                  <option>XRPUSDT</option>
-                </select>
-              </label>
-
-              <label>
-                Таймфрейм
-                <select id="analysisTimeframe">
-                  <option>15m</option>
-                  <option>1H</option>
-                  <option selected>4H</option>
-                  <option>1D</option>
-                </select>
-              </label>
-
-              <label>
-                Тип анализа
-                <select id="analysisType">
-                  <option>Комплексный анализ</option>
-                  <option>Технический анализ</option>
-                  <option>Smart Money</option>
-                  <option>Фундаментальный анализ</option>
-                </select>
-              </label>
-            </div>
-
-            <button id="runAnalysisButton" class="primary-action" type="button">
-              Запустить анализ
+          <article class="panel analysis-controls">
+            <select id="analysisCoinSelect">
+              <option value="BTCUSDT">BTC/USDT</option>
+              <option value="ETHUSDT">ETH/USDT</option>
+              <option value="SOLUSDT">SOL/USDT</option>
+              <option value="BNBUSDT">BNB/USDT</option>
+              <option value="XRPUSDT">XRP/USDT</option>
+            </select>
+            <button id="refreshAnalysisButton" class="primary-action" type="button">
+              Обновить анализ
             </button>
           </article>
 
-          <article class="panel result-placeholder">
-            <div class="empty-state" id="analysisResult">
-              <div class="empty-icon">⌁</div>
-              <strong>Результат анализа появится здесь</strong>
-              <p>Сейчас это интерфейс будущего AI-модуля.</p>
-            </div>
+          <div class="analysis-stats-grid">
+            <article class="panel"><span>Изменение 24ч</span><strong id="analysisChange">—</strong></article>
+            <article class="panel"><span>Волатильность</span><strong id="analysisVolatility">—</strong></article>
+            <article class="panel"><span>Объём USDT</span><strong id="analysisVolume">—</strong></article>
+            <article class="panel"><span>Позиция в диапазоне</span><strong id="analysisRange">—</strong></article>
+          </div>
+
+          <div class="analysis-visual-grid">
+            <article class="panel">
+              <div class="panel-head"><div><h3>Спрос и предложение</h3><span>Оценка по стакану</span></div></div>
+              <div class="demand-supply">
+                <div class="demand-bar-wrap">
+                  <div id="demandBar" class="demand-bar"></div>
+                </div>
+                <div class="demand-labels">
+                  <span>Спрос <strong id="demandValue">—</strong></span>
+                  <span>Предложение <strong id="supplyValue">—</strong></span>
+                </div>
+              </div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-head"><div><h3>Рыночные индикаторы</h3><span>Нормализованная оценка</span></div></div>
+              <div class="indicator-bars">
+                <div><span>Импульс</span><div><i id="momentumBar"></i></div><strong id="momentumValue">—</strong></div>
+                <div><span>Объём</span><div><i id="volumeBar"></i></div><strong id="volumeValue">—</strong></div>
+                <div><span>Волатильность</span><div><i id="volatilityBar"></i></div><strong id="volatilityValue">—</strong></div>
+              </div>
+            </article>
+          </div>
+
+          <article class="panel analysis-text-card">
+            <div class="panel-head"><div><h3>Краткий анализ</h3><span>Автоматическое описание данных</span></div></div>
+            <p id="analysisNarrative">Выберите монету и обновите анализ.</p>
           </article>
-        </section>
-
-        <section class="dashboard-section" id="news">
-          <div class="section-heading">
-            <div>
-              <span class="section-kicker">AI NEWS ANALYSIS</span>
-              <h2>Анализ новостей</h2>
-              <p>Будущий новостной сканер и оценка влияния событий.</p>
-            </div>
-          </div>
-
-          <div class="news-grid">
-            <article class="panel news-card">
-              <span class="news-label">CRYPTO</span>
-              <h3>Криптовалютные новости</h3>
-              <p>Мониторинг новостей по рынку и выбранным активам.</p>
-              <span class="coming-soon">Скоро</span>
-            </article>
-
-            <article class="panel news-card">
-              <span class="news-label">MACRO</span>
-              <h3>Экономический календарь</h3>
-              <p>Важные макроэкономические события и публикации.</p>
-              <span class="coming-soon">Скоро</span>
-            </article>
-
-            <article class="panel news-card">
-              <span class="news-label">SENTIMENT</span>
-              <h3>Рыночные настроения</h3>
-              <p>AI-оценка позитивного и негативного новостного фона.</p>
-              <span class="coming-soon">Скоро</span>
-            </article>
-          </div>
-        </section>
-
-        <section class="dashboard-section" id="smart-money">
-          <div class="section-heading">
-            <div>
-              <span class="section-kicker">SMART MONEY</span>
-              <h2>Smart Money Analysis</h2>
-              <p>Модули анализа структуры, ликвидности и зон интереса.</p>
-            </div>
-          </div>
-
-          <div class="smart-grid">
-            <article class="panel smart-card">
-              <strong>Market Structure</strong>
-              <p>Определение тренда, HH/HL и LH/LL.</p>
-            </article>
-            <article class="panel smart-card">
-              <strong>Liquidity</strong>
-              <p>Поиск скоплений ликвидности и возможных sweep.</p>
-            </article>
-            <article class="panel smart-card">
-              <strong>Order Blocks</strong>
-              <p>Определение зон потенциального институционального интереса.</p>
-            </article>
-            <article class="panel smart-card">
-              <strong>Fair Value Gaps</strong>
-              <p>Поиск дисбалансов и незаполненных ценовых зон.</p>
-            </article>
-          </div>
-        </section>
-
-        <section class="dashboard-section" id="risk">
-          <div class="section-heading">
-            <div>
-              <span class="section-kicker">RISK MANAGEMENT</span>
-              <h2>Риск-калькулятор</h2>
-              <p>Расчёт риска и размера позиции.</p>
-            </div>
-          </div>
-
-          <article class="panel risk-panel">
-            <div class="form-grid risk-form-grid">
-              <label>
-                Баланс, USDT
-                <input id="balanceInput" type="number" value="10000" min="1">
-              </label>
-
-              <label>
-                Риск, %
-                <input id="riskInput" type="number" value="1" min="0.1" max="10" step="0.1">
-              </label>
-
-              <label>
-                Цена входа
-                <input id="entryInput" type="number" placeholder="Например 65000" step="any">
-              </label>
-
-              <label>
-                Stop Loss
-                <input id="stopInput" type="number" placeholder="Например 64000" step="any">
-              </label>
-            </div>
-
-            <div class="risk-results">
-              <div>
-                <span>Риск деньгами</span>
-                <strong id="riskMoney">100.00 USDT</strong>
-              </div>
-
-              <div>
-                <span>Размер позиции</span>
-                <strong id="positionSize">—</strong>
-              </div>
-
-              <div>
-                <span>Расстояние до стопа</span>
-                <strong id="stopDistance">—</strong>
-              </div>
-            </div>
-          </article>
-        </section>
-
-        <section class="dashboard-section" id="favorites">
-          <div class="section-heading">
-            <div>
-              <span class="section-kicker">WATCHLIST</span>
-              <h2>Избранные монеты</h2>
-              <p>Список активов для быстрого доступа.</p>
-            </div>
-          </div>
-
-          <div class="favorites-grid" id="favoritesGrid">
-            <article class="panel favorite-card">
-              <strong>BTC/USDT</strong>
-              <span>Bitcoin</span>
-              <button class="remove-favorite" type="button">Удалить</button>
-            </article>
-
-            <article class="panel favorite-card">
-              <strong>ETH/USDT</strong>
-              <span>Ethereum</span>
-              <button class="remove-favorite" type="button">Удалить</button>
-            </article>
-
-            <article class="panel favorite-card">
-              <strong>SOL/USDT</strong>
-              <span>Solana</span>
-              <button class="remove-favorite" type="button">Удалить</button>
-            </article>
-          </div>
         </section>
 
         <section class="dashboard-section" id="journal">
-          <div class="section-heading section-heading-row">
-            <div>
-              <span class="section-kicker">TRADING JOURNAL</span>
-              <h2>Торговый журнал</h2>
-              <p>Добавляйте сделки и сохраняйте комментарии.</p>
-            </div>
-
-            <button id="addTradeButton" class="primary-action" type="button">
-              Добавить сделку
-            </button>
+          <div class="section-heading">
+            <span class="section-kicker">MANUAL TRADING JOURNAL</span>
+            <h2>Торговый журнал</h2>
+            <p>Здесь отображаются сделки, совершённые вручную через терминал.</p>
           </div>
 
-          <article class="panel journal-panel">
-            <div class="journal-table-head">
-              <span>Дата</span>
-              <span>Инструмент</span>
-              <span>Направление</span>
-              <span>Риск</span>
-              <span>Результат</span>
-            </div>
-
-            <div id="journalEntries" class="journal-entries">
-              <div class="empty-state">
-                <div class="empty-icon">J</div>
-                <strong>Сделок пока нет</strong>
-                <p>Нажмите «Добавить сделку», чтобы создать первую запись.</p>
-              </div>
-            </div>
-          </article>
-        </section>
-
-        <section class="dashboard-section" id="history">
-          <div class="section-heading">
-            <div>
-              <span class="section-kicker">ANALYSIS HISTORY</span>
-              <h2>История анализов</h2>
-              <p>Здесь будут храниться предыдущие результаты AI.</p>
-            </div>
+          <div class="journal-summary-grid">
+            <article class="panel"><span>Всего ордеров</span><strong id="journalOrdersCount">0</strong></article>
+            <article class="panel"><span>Покупки</span><strong id="journalBuyCount">0</strong></article>
+            <article class="panel"><span>Продажи</span><strong id="journalSellCount">0</strong></article>
+            <article class="panel"><span>Оборот</span><strong id="journalTurnover">0.00 USDT</strong></article>
           </div>
 
           <article class="panel">
-            <div class="empty-state">
-              <div class="empty-icon">H</div>
-              <strong>История пока пуста</strong>
-              <p>После подключения AI здесь появятся сохранённые анализы.</p>
+            <div class="orders-table-head">
+              <span>Дата</span><span>Пара</span><span>Тип</span><span>Сторона</span>
+              <span>Цена</span><span>Количество</span><span>Сумма</span>
             </div>
+            <div id="journalOrders" class="orders-history empty-list">Сделок пока нет</div>
           </article>
         </section>
 
         <section class="dashboard-section" id="settings">
           <div class="section-heading">
-            <div>
-              <span class="section-kicker">SETTINGS</span>
-              <h2>Настройки профиля</h2>
-              <p>Демонстрационные настройки личного кабинета.</p>
-            </div>
+            <span class="section-kicker">ACCOUNT SETTINGS</span>
+            <h2>Настройки аккаунта</h2>
           </div>
-
           <article class="panel settings-panel">
-            <div class="form-grid">
-              <label>
-                Имя
-                <input id="profileName" type="text" value="Artem">
-              </label>
-
-              <label>
-                Язык
-                <select>
-                  <option>Русский</option>
-                  <option>Українська</option>
-                  <option>Deutsch</option>
-                  <option>English</option>
-                </select>
-              </label>
-
-              <label>
-                Риск по умолчанию, %
-                <input id="defaultRisk" type="number" value="1" min="0.1" max="10" step="0.1">
-              </label>
-
-              <label>
-                Основная валюта
-                <select>
-                  <option>USDT</option>
-                  <option>USD</option>
-                  <option>EUR</option>
-                </select>
-              </label>
-            </div>
-
-            <button id="saveSettingsButton" class="primary-action" type="button">
-              Сохранить настройки
-            </button>
+            <label>Имя пользователя<input id="settingsName" type="text"></label>
+            <label>Email<input id="settingsEmail" type="email" disabled></label>
+            <button id="saveProfileButton" class="primary-action" type="button">Сохранить</button>
           </article>
         </section>
       </main>
     </div>
   </div>
 
-  <div id="tradeModal" class="modal hidden">
+  <div id="actionModal" class="modal hidden">
     <div class="modal-card">
       <div class="modal-head">
-        <h3>Добавить сделку</h3>
-        <button id="closeTradeModal" type="button">✕</button>
+        <h3 id="modalTitle">Операция</h3>
+        <button id="closeModalButton" type="button">✕</button>
       </div>
-
-      <div class="form-grid">
-        <label>
-          Инструмент
-          <input id="tradeSymbol" type="text" value="BTCUSDT">
-        </label>
-
-        <label>
-          Направление
-          <select id="tradeDirection">
-            <option>LONG</option>
-            <option>SHORT</option>
-          </select>
-        </label>
-
-        <label>
-          Риск, %
-          <input id="tradeRisk" type="number" value="1" step="0.1">
-        </label>
-
-        <label>
-          Результат
-          <select id="tradeResult">
-            <option>Открыта</option>
-            <option>TP</option>
-            <option>SL</option>
-            <option>BE</option>
-          </select>
-        </label>
-      </div>
-
-      <button id="saveTradeButton" class="primary-action" type="button">
-        Сохранить сделку
-      </button>
+      <div id="modalBody"></div>
     </div>
   </div>
 
-  <div id="toast" class="toast hidden" role="status"></div>
+  <div id="toast" class="toast hidden"></div>
   <script src="dashboard.js"></script>
 </body>
 </html>

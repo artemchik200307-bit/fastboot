@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FASTBOOT — Вход</title>
+  <link rel="stylesheet" href="auth.css">
+</head>
+<body>
+  <main class="auth-page">
+    <section class="auth-info">
+      <a class="auth-brand" href="index.html">FASTBOOT</a>
+      <div class="auth-info-main">
+        <span class="auth-kicker">LIVE TRADING ECOSYSTEM</span>
+        <h1>Управляйте счётом и торговлей в одном кабинете</h1>
+        <p>
+          Баланс, портфель, торговый терминал, AI-бот и история операций
+          собраны в едином интерфейсе.
+        </p>
+        <div class="auth-features">
+          <span>Личный счёт и портфель</span>
+          <span>AI Trading Bot</span>
+          <span>Ручной торговый терминал</span>
+        </div>
+      </div>
+      <span class="auth-note">FASTBOOT · защищённый вход в аккаунт</span>
+    </section>
+
+    <section class="auth-form-wrap">
+      <article class="auth-card">
+        <h2>Вход</h2>
+        <p>Введите данные своего аккаунта FASTBOOT.</p>
+
+        <form id="loginForm" class="auth-form">
+          <label>
+            Email
+            <input id="loginEmail" type="email" required autocomplete="email">
+          </label>
+
+          <label>
+            Пароль
+            <input id="loginPassword" type="password" required autocomplete="current-password">
+          </label>
+
+          <div id="authError" class="auth-error"></div>
+          <button class="auth-submit" type="submit">Войти</button>
+        </form>
+
+        <div class="auth-switch">
+          Нет аккаунта? <a href="register.html">Зарегистрироваться</a>
+        </div>
+
+        <div class="admin-box">
+          Тестовый администратор:<br>
+          <strong>admin@fastboot.local</strong><br>
+          Пароль: <strong>FastbootAdmin2026!</strong>
+        </div>
+      </article>
+    </section>
+  </main>
+  <script src="auth.js"></script>
+</body>
+</html>

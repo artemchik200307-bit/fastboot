@@ -310,10 +310,6 @@ function showToast(message) {
 
 $("searchInput").addEventListener("input", renderMarketList);
 
-$("registerButton").addEventListener("click", () => {
-  showToast("Регистрация будет добавлена следующим этапом");
-});
-
 async function start() {
   try {
     await loadMarketData();
