@@ -429,6 +429,10 @@ const FASTBOOT_TRC20_ADDRESS = "TVwAj44gxbPFTDH3KifsmqjfCtF54tj4DC";
 const FASTBOOT_MIN_DEPOSIT = 10;
 const FASTBOOT_MIN_WITHDRAW = 10;
 
+function setModalOpenState(isOpen) {
+  document.body.classList.toggle("modal-open", Boolean(isOpen));
+}
+
 function copyText(value, successMessage = "Скопировано") {
   navigator.clipboard.writeText(value)
     .then(() => showToast(successMessage))
@@ -553,6 +557,7 @@ function openMoneyModal(type) {
   }
 
   $("actionModal").classList.remove("hidden");
+  setModalOpenState(true);
   $("confirmModalAction").addEventListener(
     "click",
     () => processMoneyAction(type),
@@ -632,6 +637,7 @@ async function processMoneyAction(type) {
     }
 
     $("actionModal").classList.add("hidden");
+    setModalOpenState(false);
     await loadSupabaseAccountData();
   } catch (error) {
     console.error("Ошибка финансовой операции:", error);
@@ -644,10 +650,10 @@ async function processMoneyAction(type) {
 $("depositButton").addEventListener("click", () => openMoneyModal("deposit"));
 $("withdrawButton").addEventListener("click", () => openMoneyModal("withdraw"));
 $("exchangeButton").addEventListener("click", () => openMoneyModal("exchange"));
-$("closeModalButton").addEventListener(
-  "click",
-  () => $("actionModal").classList.add("hidden")
-);
+$("closeModalButton").addEventListener("click", () => {
+  $("actionModal").classList.add("hidden");
+  setModalOpenState(false);
+});
 
 
 function getCombinedOperations() {

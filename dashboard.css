@@ -4684,3 +4684,57 @@ body.trading-mode .dashboard-main {
     min-height: 760px;
   }
 }
+
+
+/* ===== MOBILE MODAL SCROLL FIX ===== */
+.modal {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  align-items: start;
+  padding-top: max(16px, env(safe-area-inset-top));
+  padding-right: max(16px, env(safe-area-inset-right));
+  padding-bottom: max(32px, calc(env(safe-area-inset-bottom) + 96px));
+  padding-left: max(16px, env(safe-area-inset-left));
+}
+
+.modal-card {
+  width: min(620px, 100%);
+  max-height: none;
+  margin: auto;
+  overflow: visible;
+}
+
+body.modal-open {
+  overflow: hidden !important;
+  touch-action: none;
+}
+
+body.modal-open .modal {
+  touch-action: pan-y;
+}
+
+@media (max-width: 760px) {
+  .modal {
+    display: block;
+    padding-top: max(14px, env(safe-area-inset-top));
+    padding-bottom: max(120px, calc(env(safe-area-inset-bottom) + 110px));
+  }
+
+  .modal-card {
+    width: 100%;
+    min-height: min-content;
+    margin: 0 auto;
+    border-radius: 18px;
+  }
+
+  .crypto-funding-card {
+    padding-bottom: 12px;
+  }
+
+  .crypto-qr-wrap img {
+    max-width: min(72vw, 260px);
+    height: auto;
+  }
+}
