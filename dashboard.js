@@ -308,12 +308,8 @@ function renderReferralProgram() {
         </div>
 
         <span>${formatDateTime(user.registered_at)}</span>
-<span>
-          ${(
-            Number(user.spot_balance || 0) +
-            Number(user.bot_balance || 0) +
-            Number(user.trading_balance || 0)
-          ).toFixed(2)} USDT
+<span class="${aiClass(Number(user.referral_income || 0))}">
+          ${Number(user.referral_income || 0).toFixed(2)} USDT
         </span>
 
         <strong class="positive">

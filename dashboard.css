@@ -5322,3 +5322,6 @@ body.modal-open .modal {
 #admin.dashboard-section.active {
   display: block;
 }
+
+/* ===== ADMIN + REFERRAL INCOME FIX 2.3 ===== */
+#admin.dashboard-section.active { display: block !important; }

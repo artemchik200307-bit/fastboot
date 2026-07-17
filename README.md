@@ -805,3 +805,8 @@ SQL выполнять не нужно.
 - обновлены версии файлов против кэша.
 
 SQL выполнять не нужно.
+
+## Admin + Referral Income Fix 2.3
+- Admin Panel restored.
+- Referral active balance replaced with referral income.
+- Added SQL migration for referral income.
