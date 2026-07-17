@@ -394,3 +394,22 @@ SQL повторно выполнять не нужно, если `supabase-ai-a
 - Admin Panel проверяет нормализованную роль admin.
 
 SQL выполнять не нужно.
+
+
+## Terminal and Account Fix 1.3
+
+Исправлена ошибка:
+
+`ReferenceError: loadTradingTerminal is not defined`
+
+Также восстановлены:
+
+- `formatPrice`;
+- `formatQuantity`;
+- загрузка графика терминала;
+- загрузка стакана;
+- 8 заявок на компьютере;
+- 5 заявок на телефоне;
+- новый номер версии JS/CSS против кэша.
+
+SQL выполнять не нужно.

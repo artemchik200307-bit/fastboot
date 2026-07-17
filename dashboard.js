@@ -41,6 +41,7 @@ const state = {
   tradeSocket: null,
   terminalSocketReconnectTimer: null,
   terminalSocketGeneration: 0,
+  terminalResizeObserver: null,
   mobileChart: null,
   mobileChartSeries: null,
   mobileChartVolumeSeries: null,
@@ -823,6 +824,286 @@ $("transferFromBotButton").addEventListener(
 
 
 
+
+function formatPrice(value) {
+  const number = Number(value || 0);
+
+  if (!Number.isFinite(number)) return "—";
+
+  if (Math.abs(number) >= 1000) {
+    return number.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
+
+  if (Math.abs(number) >= 1) {
+    return number.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 6,
+    });
+  }
+
+  return number.toLocaleString("en-US", {
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 8,
+  });
+}
+
+function formatQuantity(value) {
+  const number = Number(value || 0);
+
+  if (!Number.isFinite(number)) return "0";
+
+  if (Math.abs(number) >= 1000000) {
+    return `${(number / 1000000).toFixed(2)}M`;
+  }
+
+  if (Math.abs(number) >= 1000) {
+    return `${(number / 1000).toFixed(2)}K`;
+  }
+
+  if (Math.abs(number) >= 1) {
+    return number.toFixed(5).replace(/0+$/, "").replace(/\.$/, "");
+  }
+
+  return number.toFixed(8).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+async function loadTradingTerminal() {
+  const symbol = state.currentSymbol || "BTCUSDT";
+  const activeInterval =
+    document.querySelector("[data-chart-interval].active")?.dataset
+      .chartInterval || "15m";
+
+  const chartContainer = $("terminalChart");
+
+  try {
+    const [ticker, depth, klines] = await Promise.all([
+      fetchJson(
+        `${REST_BASE}/api/v3/ticker/24hr?symbol=${encodeURIComponent(symbol)}`
+      ),
+      fetchJson(
+        `${REST_BASE}/api/v3/depth?symbol=${encodeURIComponent(symbol)}&limit=50`
+      ),
+      fetchJson(
+        `${REST_BASE}/api/v3/klines?symbol=${encodeURIComponent(symbol)}` +
+        `&interval=${encodeURIComponent(activeInterval)}&limit=300`
+      ),
+    ]);
+
+    const lastPrice = Number(ticker.lastPrice || 0);
+    const change = Number(ticker.priceChangePercent || 0);
+
+    $("terminalSymbolLabel").textContent = symbol;
+    $("terminalPrice").textContent = formatPrice(lastPrice);
+    $("terminalChange").textContent =
+      `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`;
+    $("terminalChange").className = change >= 0 ? "positive" : "negative";
+
+    $("terminalOpen").textContent = formatPrice(Number(ticker.openPrice || 0));
+    $("terminalHigh").textContent = formatPrice(Number(ticker.highPrice || 0));
+    $("terminalLow").textContent = formatPrice(Number(ticker.lowPrice || 0));
+    $("terminalVolume").textContent = new Intl.NumberFormat("en-US", {
+      notation: "compact",
+      maximumFractionDigits: 2,
+    }).format(Number(ticker.quoteVolume || 0));
+    $("terminalTradeCount").textContent = Number(
+      ticker.count || 0
+    ).toLocaleString("en-US");
+
+    const lastCandle = Array.isArray(klines) ? klines.at(-1) : null;
+
+    if (lastCandle) {
+      $("chartOpen").textContent = formatPrice(Number(lastCandle[1]));
+      $("chartHigh").textContent = formatPrice(Number(lastCandle[2]));
+      $("chartLow").textContent = formatPrice(Number(lastCandle[3]));
+      $("chartClose").textContent = formatPrice(Number(lastCandle[4]));
+      $("chartVolume").textContent = formatQuantity(Number(lastCandle[5]));
+    }
+
+    if (
+      chartContainer &&
+      window.LightweightCharts &&
+      Array.isArray(klines)
+    ) {
+      if (!state.chart) {
+        state.chart = LightweightCharts.createChart(chartContainer, {
+          width: Math.max(chartContainer.clientWidth, 320),
+          height: Math.max(chartContainer.clientHeight, 360),
+          layout: {
+            background: { type: "solid", color: "#0f151f" },
+            textColor: "#8793a5",
+            attributionLogo: false,
+          },
+          grid: {
+            vertLines: { color: "rgba(135,147,165,.09)" },
+            horzLines: { color: "rgba(135,147,165,.09)" },
+          },
+          rightPriceScale: {
+            borderColor: "#2c3544",
+            scaleMargins: { top: 0.06, bottom: 0.22 },
+          },
+          timeScale: {
+            borderColor: "#2c3544",
+            timeVisible: true,
+            secondsVisible: false,
+          },
+        });
+
+        state.candleSeries = state.chart.addSeries(
+          LightweightCharts.CandlestickSeries,
+          {
+            upColor: "#20c987",
+            downColor: "#ff5f78",
+            borderVisible: false,
+            wickUpColor: "#20c987",
+            wickDownColor: "#ff5f78",
+          }
+        );
+
+        state.volumeSeries = state.chart.addSeries(
+          LightweightCharts.HistogramSeries,
+          {
+            priceFormat: { type: "volume" },
+            priceScaleId: "terminal-volume",
+            priceLineVisible: false,
+            lastValueVisible: false,
+          }
+        );
+
+        state.volumeSeries.priceScale().applyOptions({
+          scaleMargins: { top: 0.82, bottom: 0 },
+        });
+
+        if (!state.terminalResizeObserver) {
+          state.terminalResizeObserver = new ResizeObserver(() => {
+            if (!state.chart || !chartContainer.isConnected) return;
+
+            state.chart.resize(
+              Math.max(chartContainer.clientWidth, 320),
+              Math.max(chartContainer.clientHeight, 360)
+            );
+          });
+
+          state.terminalResizeObserver.observe(chartContainer);
+        }
+      }
+
+      state.candleSeries.setData(
+        klines.map((row) => ({
+          time: Math.floor(Number(row[0]) / 1000),
+          open: Number(row[1]),
+          high: Number(row[2]),
+          low: Number(row[3]),
+          close: Number(row[4]),
+        }))
+      );
+
+      state.volumeSeries.setData(
+        klines.map((row) => ({
+          time: Math.floor(Number(row[0]) / 1000),
+          value: Number(row[5]),
+          color:
+            Number(row[4]) >= Number(row[1])
+              ? "rgba(32,201,135,.45)"
+              : "rgba(255,95,120,.45)",
+        }))
+      );
+
+      state.chart.timeScale().fitContent();
+    }
+
+    const precision = Number($("orderbookPrecision")?.value || 0.1);
+    const limit = window.matchMedia("(max-width: 760px)").matches ? 5 : 8;
+
+    const normalizePrice = (value) =>
+      Math.round(Number(value) / precision) * precision;
+
+    const asks = (depth.asks || []).slice(0, limit).reverse();
+    const bids = (depth.bids || []).slice(0, limit);
+
+    const maxAskSize = Math.max(...asks.map((row) => Number(row[1])), 1);
+    const maxBidSize = Math.max(...bids.map((row) => Number(row[1])), 1);
+
+    $("asksList").innerHTML = asks.map((row) => {
+      const price = normalizePrice(row[0]);
+      const size = Number(row[1]);
+      const total = price * size;
+      const width = Math.min((size / maxAskSize) * 100, 100);
+
+      return `
+        <div class="pro-orderbook-row ask">
+          <i style="width:${width.toFixed(2)}%"></i>
+          <span>${formatPrice(price)}</span>
+          <span>${formatQuantity(size)}</span>
+          <span>${formatQuantity(total)}</span>
+        </div>
+      `;
+    }).join("");
+
+    $("bidsList").innerHTML = bids.map((row) => {
+      const price = normalizePrice(row[0]);
+      const size = Number(row[1]);
+      const total = price * size;
+      const width = Math.min((size / maxBidSize) * 100, 100);
+
+      return `
+        <div class="pro-orderbook-row bid">
+          <i style="width:${width.toFixed(2)}%"></i>
+          <span>${formatPrice(price)}</span>
+          <span>${formatQuantity(size)}</span>
+          <span>${formatQuantity(total)}</span>
+        </div>
+      `;
+    }).join("");
+
+    $("orderbookMid").textContent = formatPrice(lastPrice);
+    $("orderbookDirection").textContent =
+      `${change >= 0 ? "↑" : "↓"} ${formatPrice(
+        Number(ticker.prevClosePrice || lastPrice)
+      )}`;
+    $("orderbookDirection").className =
+      change >= 0 ? "positive" : "negative";
+
+    const bidVolume = bids.reduce(
+      (sum, row) => sum + Number(row[1]),
+      0
+    );
+    const askVolume = asks.reduce(
+      (sum, row) => sum + Number(row[1]),
+      0
+    );
+    const totalVolume = Math.max(bidVolume + askVolume, 1);
+    const bidRatio = (bidVolume / totalVolume) * 100;
+    const askRatio = 100 - bidRatio;
+
+    $("mobileBidRatio").textContent = `${bidRatio.toFixed(2)}%`;
+    $("mobileAskRatio").textContent = `${askRatio.toFixed(2)}%`;
+    $("mobileBidRatioBar").style.width = `${bidRatio}%`;
+    $("mobileAskRatioBar").style.width = `${askRatio}%`;
+
+    if ($("orderPrice") && !$("orderPrice").value) {
+      $("orderPrice").value = lastPrice.toFixed(
+        lastPrice >= 100 ? 2 : 6
+      );
+    }
+
+    updateOrderCalculation();
+  } catch (error) {
+    console.error("Trading terminal load error:", error);
+
+    if (chartContainer && !state.chart) {
+      chartContainer.innerHTML = `
+        <div class="terminal-empty-state">
+          <strong>Не удалось загрузить график</strong>
+          <span>Нажмите кнопку обновления терминала.</span>
+        </div>
+      `;
+    }
+  }
+}
+
 document.querySelectorAll("[data-chart-interval]").forEach((button) => {
   button.addEventListener("click", () => {
     document.querySelectorAll("[data-chart-interval]").forEach((item) =>
@@ -832,7 +1113,7 @@ document.querySelectorAll("[data-chart-interval]").forEach((button) => {
   });
 });
 
-$("fitChartButton").addEventListener("click", () => {
+$("fitChartButton")?.addEventListener("click", () => {
   if (!state.chart) {
     loadTradingTerminal();
     return;
@@ -841,8 +1122,8 @@ $("fitChartButton").addEventListener("click", () => {
   state.chart.timeScale().fitContent();
 });
 
-$("refreshTerminalButton").addEventListener("click", loadTradingTerminal);
-$("orderbookPrecision").addEventListener("change", loadTradingTerminal);
+$("refreshTerminalButton")?.addEventListener("click", loadTradingTerminal);
+$("orderbookPrecision")?.addEventListener("change", loadTradingTerminal);
 
 document.querySelectorAll("[data-order-type]").forEach((button) => {
   button.addEventListener("click", () => {
@@ -899,11 +1180,11 @@ $("terminalBottomTabs").querySelectorAll("button").forEach((button) => {
   });
 });
 
-$("terminalAssetsShortcut").addEventListener("click", () => {
+$("terminalAssetsShortcut")?.addEventListener("click", () => {
   document.querySelector('[data-bottom-tab="assets"]').click();
 });
 
-$("terminalOrdersShortcut").addEventListener("click", () => {
+$("terminalOrdersShortcut")?.addEventListener("click", () => {
   document.querySelector('[data-bottom-tab="order-history"]').click();
 });
 
