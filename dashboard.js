@@ -23,6 +23,8 @@ const state = {
   volumeSeries: null,
   chartResizeObserver: null,
   tradeSocket: null,
+  terminalSocketReconnectTimer: null,
+  terminalSocketGeneration: 0,
   currentSymbol: "BTCUSDT",
   orderSide: "BUY",
   marketUniverse: [],
@@ -65,6 +67,9 @@ function openSection(id) {
     requestAnimationFrame(() => {
       requestAnimationFrame(loadTradingTerminal);
     });
+  }
+  if (id !== "trading") {
+    stopTerminalRealtimeStream();
   }
   if (id === "market-analysis") loadMarketAnalysis();
   if (id === "journal") renderJournal();
@@ -456,6 +461,7 @@ async function loadTradingTerminal() {
     renderTerminalAssets();
     renderTerminalTradeHistory();
     updateOrderCalculation();
+    startTerminalRealtimeStream(symbol, activeInterval);
   } catch (error) {
     console.error("Ошибка торгового терминала:", error);
 
@@ -479,6 +485,217 @@ function formatRawNumber(value) {
   if (number >= 1000) return number.toFixed(2);
   if (number >= 1) return number.toFixed(4);
   return number.toFixed(8);
+}
+
+
+function stopTerminalRealtimeStream() {
+  state.terminalSocketGeneration += 1;
+
+  if (state.terminalSocketReconnectTimer) {
+    clearTimeout(state.terminalSocketReconnectTimer);
+    state.terminalSocketReconnectTimer = null;
+  }
+
+  if (state.tradeSocket) {
+    state.tradeSocket.onopen = null;
+    state.tradeSocket.onmessage = null;
+    state.tradeSocket.onerror = null;
+    state.tradeSocket.onclose = null;
+
+    try {
+      state.tradeSocket.close(1000, "Terminal stream changed");
+    } catch {
+      // Socket may already be closed.
+    }
+
+    state.tradeSocket = null;
+  }
+}
+
+function startTerminalRealtimeStream(symbol, interval) {
+  stopTerminalRealtimeStream();
+
+  if (state.section !== "trading") return;
+
+  const generation = state.terminalSocketGeneration;
+  const streamSymbol = symbol.toLowerCase();
+  const streams = [
+    `${streamSymbol}@kline_${interval}`,
+    `${streamSymbol}@ticker`,
+    `${streamSymbol}@depth20@1000ms`,
+  ].join("/");
+
+  const socket = new WebSocket(
+    `wss://stream.binance.com:9443/stream?streams=${streams}`
+  );
+
+  state.tradeSocket = socket;
+
+  socket.onopen = () => {
+    const live = document.querySelector(".terminal-live-status");
+    live?.classList.remove("connection-error");
+    live?.classList.add("connection-live");
+
+    const text = live?.querySelector("span");
+    if (text) text.textContent = "LIVE";
+  };
+
+  socket.onmessage = (event) => {
+    if (
+      generation !== state.terminalSocketGeneration ||
+      state.section !== "trading" ||
+      state.currentSymbol !== symbol
+    ) {
+      return;
+    }
+
+    let payload;
+
+    try {
+      payload = JSON.parse(event.data);
+    } catch {
+      return;
+    }
+
+    const stream = payload.stream || "";
+    const data = payload.data || {};
+
+    if (stream.includes("@kline_")) {
+      updateRealtimeCandle(data.k);
+      return;
+    }
+
+    if (stream.endsWith("@ticker")) {
+      updateRealtimeTicker(data);
+      return;
+    }
+
+    if (stream.includes("@depth20")) {
+      renderProOrderbook({
+        asks: data.asks || data.a || [],
+        bids: data.bids || data.b || [],
+      });
+    }
+  };
+
+  socket.onerror = () => {
+    const live = document.querySelector(".terminal-live-status");
+    live?.classList.remove("connection-live");
+    live?.classList.add("connection-error");
+
+    const text = live?.querySelector("span");
+    if (text) text.textContent = "RECONNECT";
+  };
+
+  socket.onclose = () => {
+    if (
+      generation !== state.terminalSocketGeneration ||
+      state.section !== "trading" ||
+      state.currentSymbol !== symbol
+    ) {
+      return;
+    }
+
+    const live = document.querySelector(".terminal-live-status");
+    live?.classList.remove("connection-live");
+    live?.classList.add("connection-error");
+
+    const text = live?.querySelector("span");
+    if (text) text.textContent = "RECONNECT";
+
+    state.terminalSocketReconnectTimer = setTimeout(() => {
+      if (
+        generation === state.terminalSocketGeneration &&
+        state.section === "trading" &&
+        state.currentSymbol === symbol
+      ) {
+        startTerminalRealtimeStream(symbol, interval);
+      }
+    }, 2000);
+  };
+}
+
+function updateRealtimeCandle(kline) {
+  if (!kline || !state.candleSeries || !state.volumeSeries) return;
+
+  const time = Math.floor(Number(kline.t) / 1000);
+  const open = Number(kline.o);
+  const high = Number(kline.h);
+  const low = Number(kline.l);
+  const close = Number(kline.c);
+  const volume = Number(kline.v);
+
+  state.candleSeries.update({
+    time,
+    open,
+    high,
+    low,
+    close,
+  });
+
+  state.volumeSeries.update({
+    time,
+    value: volume,
+    color:
+      close >= open
+        ? "rgba(32,201,135,.52)"
+        : "rgba(255,95,120,.52)",
+  });
+
+  updateChartOhlc([0, open, high, low, close, volume]);
+}
+
+function updateRealtimeTicker(ticker) {
+  if (!ticker) return;
+
+  const lastPrice = Number(ticker.c);
+  const change = Number(ticker.P);
+  const base = state.currentSymbol.replace("USDT", "");
+
+  if (Number.isFinite(lastPrice)) {
+    $("terminalPrice").textContent = formatPrice(lastPrice);
+    $("orderbookMid").textContent = formatPrice(lastPrice);
+
+    if ($("orderType")?.value === "MARKET" || !$("orderPrice")?.value) {
+      $("orderPrice").value = formatRawNumber(lastPrice);
+    }
+  }
+
+  if (Number.isFinite(change)) {
+    $("terminalChange").textContent =
+      `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`;
+    $("terminalChange").className =
+      change >= 0 ? "positive" : "negative";
+  }
+
+  $("terminalOpen").textContent = formatPrice(ticker.o);
+  $("terminalHigh").textContent = formatPrice(ticker.h);
+  $("terminalLow").textContent = formatPrice(ticker.l);
+  $("terminalVolume").textContent =
+    new Intl.NumberFormat("en-US", {
+      notation: "compact",
+      maximumFractionDigits: 2,
+    }).format(Number(ticker.q));
+  $("terminalTradeCount").textContent =
+    Number(ticker.n || 0).toLocaleString("en-US");
+
+  const weightedPrice = Number(ticker.w);
+  $("orderbookDirection").textContent =
+    `${change >= 0 ? "↑" : "↓"} ${formatPrice(weightedPrice)}`;
+  $("orderbookDirection").className =
+    change >= 0 ? "positive" : "negative";
+
+  const marketItem = state.marketUniverse.find(
+    (item) => item.symbol === state.currentSymbol
+  );
+
+  if (marketItem) {
+    marketItem.price = lastPrice;
+    marketItem.change = change;
+  }
+
+  state.prices[base] = lastPrice;
+  updateOrderCalculation();
 }
 
 function renderProfessionalChart(rows) {
@@ -686,8 +903,9 @@ function renderProOrderbook(depth) {
     }));
   };
 
-  const asks = prepareRows([...depth.asks].reverse().slice(0, 10));
-  const bids = prepareRows(depth.bids.slice(0, 10));
+  const visibleOrderbookRows = window.matchMedia("(max-width: 760px)").matches ? 5 : 8;
+  const asks = prepareRows([...depth.asks].reverse().slice(0, visibleOrderbookRows));
+  const bids = prepareRows(depth.bids.slice(0, visibleOrderbookRows));
 
   $("asksList").innerHTML = asks.map((item) => `
     <div class="pro-orderbook-row" style="--depth-width:${item.depth}%">
@@ -1129,3 +1347,15 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
+
+
+let terminalViewportMode = window.matchMedia("(max-width: 760px)").matches;
+window.addEventListener("resize", () => {
+  const nextMode = window.matchMedia("(max-width: 760px)").matches;
+  if (nextMode !== terminalViewportMode) {
+    terminalViewportMode = nextMode;
+    if (state.section === "trading") {
+      loadTradingTerminal();
+    }
+  }
+});

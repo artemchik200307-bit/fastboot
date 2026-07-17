@@ -2653,3 +2653,612 @@ body.trading-mode .sidebar.open {
     margin-top: 8px;
   }
 }
+
+
+/* ===== MOBILE TERMINAL V10: 5+5 ORDERBOOK, SIDE-BY-SIDE FORM ===== */
+@media (max-width: 760px) {
+  html,
+  body {
+    height: 100%;
+  }
+
+  body.trading-mode {
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: hidden !important;
+    background: #202632;
+  }
+
+  body.trading-mode .dashboard-main,
+  body.trading-mode .dashboard-content,
+  .trading-section,
+  .pro-terminal {
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: hidden !important;
+  }
+
+  /* Make only the searchable market picker from the desktop header visible */
+  .pro-terminal-header {
+    display: contents !important;
+  }
+
+  .pro-terminal-header > *:not(.terminal-market-select) {
+    display: none !important;
+  }
+
+  .terminal-market-select {
+    position: fixed !important;
+    top: max(9px, env(safe-area-inset-top));
+    right: 82px;
+    left: 58px;
+    z-index: 140;
+    display: block !important;
+    width: auto !important;
+  }
+
+  .market-picker-button {
+    width: 100% !important;
+    min-height: 42px !important;
+    border-color: #354052;
+    background: #293241;
+  }
+
+  .market-picker-button strong {
+    font-size: 13px;
+  }
+
+  .market-picker-button small {
+    font-size: 9px;
+  }
+
+  .market-picker-dropdown {
+    position: fixed !important;
+    top: calc(max(9px, env(safe-area-inset-top)) + 50px) !important;
+    right: 10px !important;
+    left: 10px !important;
+    width: auto !important;
+    max-height: calc(100dvh - 72px) !important;
+  }
+
+  .market-picker-list {
+    max-height: calc(100dvh - 165px) !important;
+  }
+
+  /* Compact top bar: home, searchable coin, 24h change */
+  .terminal-market-strip {
+    position: relative;
+    display: grid !important;
+    grid-template-columns: 42px minmax(0, 1fr) 72px !important;
+    min-height: 60px !important;
+    height: 60px;
+    align-items: center;
+    gap: 8px;
+    padding: max(8px, env(safe-area-inset-top)) 9px 8px !important;
+    background: #202632;
+  }
+
+  .mobile-trading-home-button {
+    display: grid !important;
+    width: 42px;
+    height: 42px;
+    place-items: center;
+    border: 1px solid #354052;
+    border-radius: 10px;
+    background: #293241;
+    color: #f4f7fb;
+  }
+
+  .mobile-trading-home-button svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+  }
+
+  .terminal-pair {
+    display: none !important;
+  }
+
+  .terminal-price-box {
+    grid-column: 3;
+    align-self: center !important;
+    padding: 0 !important;
+    text-align: right;
+  }
+
+  .terminal-price-box strong {
+    display: none !important;
+  }
+
+  .terminal-price-box span {
+    display: block !important;
+    margin: 0 !important;
+    font-size: 13px !important;
+    font-weight: 800;
+  }
+
+  .terminal-stat {
+    display: none !important;
+  }
+
+  /* Bottom drawer is fixed; page itself never scrolls */
+  .terminal-center-column {
+    display: contents !important;
+  }
+
+  .chart-module {
+    display: none !important;
+  }
+
+  .terminal-bottom-module {
+    position: fixed !important;
+    right: 0;
+    bottom: 56px;
+    left: 0;
+    z-index: 90;
+    display: block !important;
+    width: 100%;
+    height: 138px !important;
+    min-height: 138px !important;
+    border-top: 1px solid #313947;
+    background: #202632;
+  }
+
+  .terminal-bottom-tabs {
+    display: none !important;
+  }
+
+  .terminal-bottom-content {
+    display: none !important;
+    height: 138px !important;
+    overflow: auto;
+  }
+
+  .terminal-bottom-content.active {
+    display: block !important;
+  }
+
+  .terminal-empty-state {
+    min-height: 138px;
+    height: 138px;
+    gap: 4px;
+    padding: 16px;
+    font-size: 12px;
+  }
+
+  .terminal-empty-state strong {
+    font-size: 14px;
+  }
+
+  /* Main working area: orderbook left, order form right */
+  .terminal-layout {
+    display: grid !important;
+    grid-template-columns: 43% 57% !important;
+    width: 100%;
+    height: calc(100dvh - 60px - 56px - 138px) !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    background: #202632;
+  }
+
+  .terminal-market-data-column,
+  .terminal-order-column {
+    display: block !important;
+    width: auto !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    background: #202632;
+  }
+
+  .terminal-market-data-column {
+    grid-column: 1;
+    border-right: 1px solid #313947 !important;
+  }
+
+  .terminal-order-column {
+    grid-column: 2;
+    border: 0 !important;
+  }
+
+  .terminal-market-data-column .trades-module,
+  .terminal-order-column .account-module {
+    display: none !important;
+  }
+
+  /* Exactly 5 sells + mid price + 5 buys */
+  .orderbook-module {
+    display: flex !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    flex-direction: column;
+    overflow: hidden !important;
+    padding: 8px 8px 6px !important;
+  }
+
+  .orderbook-columns {
+    grid-template-columns: 1fr 1fr !important;
+    min-height: 22px;
+    padding: 0 1px 5px !important;
+    font-size: 9px !important;
+  }
+
+  .orderbook-columns span:nth-child(2) {
+    display: none !important;
+  }
+
+  .pro-orderbook-list {
+    display: grid !important;
+    flex: 0 0 auto !important;
+    overflow: hidden !important;
+  }
+
+  .pro-orderbook-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, .9fr) !important;
+    min-height: 25px !important;
+    padding: 3px 1px !important;
+    font-size: 11px !important;
+    line-height: 1.15;
+  }
+
+  .pro-orderbook-row span:nth-child(2) {
+    display: none !important;
+  }
+
+  .pro-orderbook-row span:nth-child(3) {
+    display: block !important;
+    overflow: hidden;
+    font-size: 10px !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pro-orderbook-mid {
+    display: grid !important;
+    min-height: 46px !important;
+    flex: 0 0 46px !important;
+    place-items: center;
+    align-content: center;
+    gap: 1px;
+    margin: 3px 0 !important;
+    padding: 2px 0 !important;
+  }
+
+  .pro-orderbook-mid strong {
+    font-size: 19px !important;
+    line-height: 1.05;
+  }
+
+  .pro-orderbook-mid span {
+    margin: 0 !important;
+    font-size: 9px !important;
+  }
+
+  .mobile-orderbook-ratio {
+    grid-template-columns: auto 1fr auto !important;
+    gap: 4px !important;
+    margin-top: 6px !important;
+    font-size: 9px !important;
+  }
+
+  /* Compact order form stays to the right */
+  .order-entry-module {
+    display: block !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    padding: 8px 9px 10px !important;
+    background: #202632;
+    scrollbar-width: thin;
+  }
+
+  .terminal-order-type-tabs {
+    min-height: 34px !important;
+    height: 34px;
+    gap: 18px !important;
+    margin: 0 !important;
+  }
+
+  .terminal-order-type-tabs button {
+    font-size: 12px !important;
+  }
+
+  .available-balance-row {
+    min-height: 25px !important;
+    margin: 5px 0 1px !important;
+    font-size: 10px !important;
+  }
+
+  .terminal-field {
+    margin-top: 5px !important;
+    font-size: 10px !important;
+  }
+
+  .terminal-field > div {
+    min-height: 38px !important;
+    margin-top: 3px !important;
+    border-radius: 7px !important;
+  }
+
+  .terminal-field input {
+    padding: 7px !important;
+    font-size: 12px !important;
+  }
+
+  .terminal-field strong {
+    padding-right: 7px !important;
+    font-size: 10px !important;
+  }
+
+  .order-percentage-slider {
+    margin-top: 6px !important;
+  }
+
+  .order-percentage-slider input[type="range"] {
+    height: 16px !important;
+  }
+
+  .order-percentage-slider > div {
+    gap: 1px !important;
+    margin-top: 0 !important;
+  }
+
+  .order-percentage-slider button {
+    padding: 2px 0 !important;
+    font-size: 8px !important;
+  }
+
+  .order-options {
+    display: block !important;
+    margin-top: 6px !important;
+    font-size: 11px !important;
+  }
+
+  .order-options label {
+    gap: 6px !important;
+  }
+
+  .order-options input {
+    width: 17px !important;
+    height: 17px !important;
+  }
+
+  .tp-sl-fields {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 4px !important;
+  }
+
+  .order-summary-list {
+    gap: 3px !important;
+    margin-top: 6px !important;
+    font-size: 9px !important;
+  }
+
+  .order-summary-list div {
+    padding-bottom: 3px !important;
+  }
+
+  .mobile-order-limits {
+    grid-template-columns: 1fr !important;
+    gap: 2px !important;
+    margin-top: 6px !important;
+    font-size: 9px !important;
+  }
+
+  .mobile-order-limits div {
+    gap: 4px !important;
+  }
+
+  .dual-order-buttons {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 5px !important;
+    margin-top: 7px !important;
+  }
+
+  .buy-order-button,
+  .sell-order-button {
+    min-height: 40px !important;
+    padding: 7px 3px !important;
+    border-radius: 8px !important;
+    font-size: 11px !important;
+    line-height: 1.1;
+  }
+
+  .mobile-sell-limits {
+    margin-top: 5px !important;
+  }
+
+  .terminal-disclaimer {
+    display: none !important;
+  }
+
+  /* Only two tabs at the bottom */
+  .mobile-terminal-bottom-nav {
+    position: fixed !important;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 100;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    min-height: 56px !important;
+    height: 56px;
+    padding-bottom: env(safe-area-inset-bottom);
+    border-top: 1px solid #313947;
+    background: #202632;
+  }
+
+  .mobile-terminal-bottom-nav button {
+    min-width: 0;
+    border: 0;
+    border-bottom: 3px solid transparent;
+    padding: 0 7px;
+    background: transparent;
+    color: #98a2b2;
+    font-size: 12px !important;
+    font-weight: 750;
+    white-space: nowrap;
+  }
+
+  .mobile-terminal-bottom-nav button.active {
+    border-bottom-color: #ffcc33;
+    color: #f4f7fb;
+  }
+
+  .terminal-orders-head {
+    display: none !important;
+  }
+
+  .terminal-order-row {
+    grid-template-columns: 1fr 1fr !important;
+    min-height: 32px !important;
+    padding: 6px 9px !important;
+    font-size: 9px !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .terminal-market-select {
+    right: 74px;
+    left: 52px;
+  }
+
+  .terminal-layout {
+    grid-template-columns: 44% 56% !important;
+  }
+
+  .pro-orderbook-row {
+    min-height: 23px !important;
+    font-size: 10px !important;
+  }
+
+  .pro-orderbook-row span:nth-child(3) {
+    font-size: 9px !important;
+  }
+
+  .order-entry-module {
+    padding: 7px 7px 9px !important;
+  }
+
+  .buy-order-button,
+  .sell-order-button {
+    min-height: 38px !important;
+    font-size: 10px !important;
+  }
+}
+
+
+/* ===== DESKTOP TERMINAL V11: REALTIME LAYOUT ===== */
+.mobile-trading-home-button {
+  display: none;
+}
+
+@media (min-width: 761px) {
+  /* Remove the accidental oversized mobile home block from desktop */
+  .terminal-market-strip > .mobile-trading-home-button {
+    display: none !important;
+  }
+
+  /* Smaller and denser asset-information strip */
+  .terminal-market-strip {
+    grid-template-columns: 150px 150px repeat(5, minmax(82px, 1fr)) !important;
+    min-height: 48px !important;
+    height: 48px;
+  }
+
+  .terminal-market-strip > div {
+    padding: 5px 10px !important;
+  }
+
+  .terminal-pair strong {
+    font-size: 15px !important;
+  }
+
+  .terminal-price-box strong {
+    font-size: 20px !important;
+  }
+
+  /* Wider chart, slightly narrower order form; no gaps between columns */
+  .terminal-layout {
+    grid-template-columns: minmax(760px, 1fr) 270px 292px !important;
+    column-gap: 0 !important;
+  }
+
+  .terminal-center-column {
+    min-width: 0;
+  }
+
+  .terminal-market-data-column {
+    width: 270px;
+    min-width: 270px;
+  }
+
+  .terminal-order-column {
+    width: 292px;
+    min-width: 292px;
+  }
+
+  /* Orderbook height equals chart module height */
+  .terminal-center-column {
+    grid-template-rows: 590px 220px !important;
+  }
+
+  .chart-module,
+  .terminal-market-data-column,
+  .terminal-market-data-column .orderbook-module {
+    height: 590px !important;
+    min-height: 590px !important;
+    max-height: 590px !important;
+  }
+
+  .terminal-chart {
+    height: 518px !important;
+    min-height: 518px !important;
+  }
+
+  .terminal-order-column {
+    grid-template-rows: 590px 220px !important;
+  }
+
+  .order-entry-module {
+    height: 590px !important;
+  }
+
+  /* Eight asks and eight bids fit without clipping */
+  .pro-orderbook-row {
+    min-height: 25px !important;
+    padding: 2px 3px !important;
+    font-size: 10px !important;
+  }
+
+  .pro-orderbook-mid {
+    min-height: 40px !important;
+    height: 40px;
+    flex: 0 0 40px !important;
+  }
+
+  .terminal-live-status.connection-error {
+    color: #ffbd66;
+  }
+
+  .terminal-live-status.connection-error i {
+    background: #ffbd66;
+    box-shadow: 0 0 0 4px rgba(255,189,102,.10);
+  }
+}
+
+@media (min-width: 761px) and (max-width: 1380px) {
+  .terminal-layout {
+    grid-template-columns: minmax(650px, 1fr) 250px 278px !important;
+  }
+
+  .terminal-market-data-column {
+    width: 250px;
+    min-width: 250px;
+  }
+
+  .terminal-order-column {
+    width: 278px;
+    min-width: 278px;
+  }
+}
