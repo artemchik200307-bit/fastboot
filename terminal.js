@@ -16,6 +16,13 @@
   let candleSeries = null;
   let volumeSeries = null;
   let refreshTimer = null;
+  let volumeVisible = true;
+  let activeDrawingTool = "cursor";
+  let drawingStart = null;
+  let drawingPreview = null;
+  let drawings = [];
+  let drawingContext = null;
+
 
   const state = {
     positions: [],
@@ -206,6 +213,9 @@
         borderColor: "#263247",
         timeVisible: true,
         secondsVisible: false,
+        rightOffset: 18,
+        barSpacing: 8,
+        minBarSpacing: 3,
       },
     });
 
@@ -239,6 +249,8 @@
         Math.max(container.clientWidth, 320),
         Math.max(container.clientHeight, 300)
       );
+      resizeDrawingCanvas();
+      renderDrawings();
     }).observe(container);
   }
 
@@ -302,6 +314,8 @@
     );
 
     chart.timeScale().fitContent();
+    chart.timeScale().applyOptions({ rightOffset: 18 });
+    renderDrawings();
 
     if (!$("orderPrice").value || $("priceField").hidden) {
       $("orderPrice").value = currentPrice.toFixed(
@@ -361,6 +375,247 @@
     $("askRatio").textContent = `${askRatio.toFixed(2)}%`;
     $("bidRatioBar").style.width = `${bidRatio}%`;
     $("askRatioBar").style.width = `${askRatio}%`;
+  }
+
+  function drawingStorageKey() {
+    return `fastboot-terminal-drawings-${currentSymbol}-${currentInterval}`;
+  }
+
+  function loadDrawings() {
+    try {
+      drawings = JSON.parse(localStorage.getItem(drawingStorageKey()) || "[]");
+    } catch {
+      drawings = [];
+    }
+
+    renderDrawings();
+  }
+
+  function saveDrawings() {
+    localStorage.setItem(drawingStorageKey(), JSON.stringify(drawings));
+  }
+
+  function resizeDrawingCanvas() {
+    const canvas = $("drawingCanvas");
+    const stage = canvas?.parentElement;
+
+    if (!canvas || !stage) return;
+
+    const ratio = window.devicePixelRatio || 1;
+    const width = Math.max(stage.clientWidth, 1);
+    const height = Math.max(stage.clientHeight, 1);
+
+    canvas.width = Math.round(width * ratio);
+    canvas.height = Math.round(height * ratio);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+
+    drawingContext = canvas.getContext("2d");
+    drawingContext.setTransform(ratio, 0, 0, ratio, 0, 0);
+    drawingContext.lineWidth = 1.5;
+    drawingContext.font = '12px Inter, sans-serif';
+  }
+
+  function pointFromEvent(event) {
+    const canvas = $("drawingCanvas");
+    const rect = canvas.getBoundingClientRect();
+
+    return {
+      x: Math.max(0, Math.min(event.clientX - rect.left, rect.width)),
+      y: Math.max(0, Math.min(event.clientY - rect.top, rect.height)),
+    };
+  }
+
+  function renderDrawings() {
+    const canvas = $("drawingCanvas");
+    if (!canvas) return;
+
+    if (!drawingContext) resizeDrawingCanvas();
+    if (!drawingContext) return;
+
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+
+    drawingContext.clearRect(0, 0, width, height);
+
+    const all = drawingPreview ? [...drawings, drawingPreview] : drawings;
+
+    all.forEach((item) => {
+      drawingContext.save();
+      drawingContext.strokeStyle = item.color || "#8fa8ff";
+      drawingContext.fillStyle = item.color || "#8fa8ff";
+      drawingContext.lineWidth = item.width || 1.5;
+
+      if (item.type === "trend") {
+        drawingContext.beginPath();
+        drawingContext.moveTo(item.x1, item.y1);
+        drawingContext.lineTo(item.x2, item.y2);
+        drawingContext.stroke();
+      }
+
+      if (item.type === "horizontal") {
+        drawingContext.beginPath();
+        drawingContext.moveTo(0, item.y1);
+        drawingContext.lineTo(width, item.y1);
+        drawingContext.stroke();
+      }
+
+      if (item.type === "vertical") {
+        drawingContext.beginPath();
+        drawingContext.moveTo(item.x1, 0);
+        drawingContext.lineTo(item.x1, height);
+        drawingContext.stroke();
+      }
+
+      if (item.type === "rectangle") {
+        const x = Math.min(item.x1, item.x2);
+        const y = Math.min(item.y1, item.y2);
+        const w = Math.abs(item.x2 - item.x1);
+        const h = Math.abs(item.y2 - item.y1);
+
+        drawingContext.fillStyle = "rgba(111,145,255,.10)";
+        drawingContext.fillRect(x, y, w, h);
+        drawingContext.strokeRect(x, y, w, h);
+      }
+
+      if (item.type === "text") {
+        drawingContext.fillText(item.text || "Текст", item.x1, item.y1);
+      }
+
+      drawingContext.restore();
+    });
+  }
+
+  function setDrawingTool(tool) {
+    activeDrawingTool = tool;
+    drawingStart = null;
+    drawingPreview = null;
+
+    document.querySelectorAll("[data-drawing-tool]").forEach((button) => {
+      button.classList.toggle("active", button.dataset.drawingTool === tool);
+    });
+
+    const canvas = $("drawingCanvas");
+    canvas.classList.toggle("active", tool !== "cursor");
+
+    const hint = $("drawingHint");
+
+    if (tool === "cursor") {
+      hint.classList.add("hidden");
+    } else {
+      const messages = {
+        trend: "Проведите линию между двумя точками",
+        horizontal: "Нажмите в месте горизонтального уровня",
+        vertical: "Нажмите в месте вертикального уровня",
+        rectangle: "Выделите прямоугольную область",
+        text: "Нажмите в месте для текста",
+      };
+
+      hint.textContent = messages[tool] || "";
+      hint.classList.remove("hidden");
+    }
+
+    renderDrawings();
+  }
+
+  function beginDrawing(event) {
+    if (activeDrawingTool === "cursor") return;
+
+    const point = pointFromEvent(event);
+
+    if (activeDrawingTool === "horizontal") {
+      drawings.push({
+        type: "horizontal",
+        y1: point.y,
+      });
+      saveDrawings();
+      renderDrawings();
+      return;
+    }
+
+    if (activeDrawingTool === "vertical") {
+      drawings.push({
+        type: "vertical",
+        x1: point.x,
+      });
+      saveDrawings();
+      renderDrawings();
+      return;
+    }
+
+    if (activeDrawingTool === "text") {
+      const text = window.prompt("Введите текст:");
+      if (text?.trim()) {
+        drawings.push({
+          type: "text",
+          x1: point.x,
+          y1: point.y,
+          text: text.trim().slice(0, 80),
+        });
+        saveDrawings();
+        renderDrawings();
+      }
+      return;
+    }
+
+    drawingStart = point;
+    drawingPreview = {
+      type: activeDrawingTool,
+      x1: point.x,
+      y1: point.y,
+      x2: point.x,
+      y2: point.y,
+    };
+
+    $("drawingCanvas").setPointerCapture?.(event.pointerId);
+    renderDrawings();
+  }
+
+  function moveDrawing(event) {
+    if (!drawingStart || !drawingPreview) return;
+
+    const point = pointFromEvent(event);
+    drawingPreview.x2 = point.x;
+    drawingPreview.y2 = point.y;
+    renderDrawings();
+  }
+
+  function finishDrawing(event) {
+    if (!drawingStart || !drawingPreview) return;
+
+    const point = pointFromEvent(event);
+    drawingPreview.x2 = point.x;
+    drawingPreview.y2 = point.y;
+
+    const distance = Math.hypot(
+      drawingPreview.x2 - drawingPreview.x1,
+      drawingPreview.y2 - drawingPreview.y1
+    );
+
+    if (distance >= 4) {
+      drawings.push({ ...drawingPreview });
+      saveDrawings();
+    }
+
+    drawingStart = null;
+    drawingPreview = null;
+    renderDrawings();
+  }
+
+  function undoDrawing() {
+    drawings.pop();
+    saveDrawings();
+    renderDrawings();
+  }
+
+  function clearDrawings() {
+    if (!drawings.length) return;
+
+    if (window.confirm("Удалить все графические объекты на этом графике?")) {
+      drawings = [];
+      saveDrawings();
+      renderDrawings();
+    }
   }
 
   function updateOrderCalculation() {
@@ -645,6 +900,9 @@
       );
 
       chart.timeScale().fitContent();
+      chart.timeScale().applyOptions({ rightOffset: 18 });
+      resizeDrawingCanvas();
+      renderDrawings();
     });
   }
 
@@ -671,6 +929,39 @@
   }
 
   function bindEvents() {
+    document.querySelectorAll("[data-drawing-tool]").forEach((button) => {
+      button.addEventListener("click", () => {
+        setDrawingTool(button.dataset.drawingTool);
+      });
+    });
+
+    document.querySelector('[data-drawing-action="undo"]')?.addEventListener(
+      "click",
+      undoDrawing
+    );
+
+    document.querySelector('[data-drawing-action="clear"]')?.addEventListener(
+      "click",
+      clearDrawings
+    );
+
+    $("drawingCanvas")?.addEventListener("pointerdown", beginDrawing);
+    $("drawingCanvas")?.addEventListener("pointermove", moveDrawing);
+    $("drawingCanvas")?.addEventListener("pointerup", finishDrawing);
+    $("drawingCanvas")?.addEventListener("pointercancel", finishDrawing);
+
+    $("toggleVolumeButton")?.addEventListener("click", () => {
+      volumeVisible = !volumeVisible;
+      volumeSeries?.applyOptions({ visible: volumeVisible });
+      $("toggleVolumeButton").classList.toggle("active", volumeVisible);
+    });
+
+    $("resetChartButton")?.addEventListener("click", () => {
+      chart.timeScale().fitContent();
+      chart.timeScale().applyOptions({ rightOffset: 18 });
+      renderDrawings();
+    });
+
     $("desktopTerminalHomeButton")?.addEventListener("click", () => {
       try {
         if (
@@ -729,6 +1020,7 @@
         $("mobileChartSymbol").textContent = currentSymbol;
       }
 
+      loadDrawings();
       await loadMarket();
     };
 
@@ -738,6 +1030,7 @@
           item.classList.toggle("active", item === button)
         );
         currentInterval = button.dataset.interval;
+        loadDrawings();
         await loadMarket();
       };
     });
@@ -849,6 +1142,9 @@
       await initializeSupabase();
       createChart();
       bindEvents();
+      resizeDrawingCanvas();
+      loadDrawings();
+      setDrawingTool("cursor");
 
       $("baseAssetLabel").textContent = currentSymbol.replace("USDT", "");
 

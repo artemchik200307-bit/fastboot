@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
   <meta name="theme-color" content="#0b1018">
   <title>FASTBOOT Terminal</title>
-  <link rel="stylesheet" href="terminal.css?v=2-4">
+  <link rel="stylesheet" href="terminal.css?v=2-6">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://unpkg.com/lightweight-charts@5.0.8/dist/lightweight-charts.standalone.production.js"></script>
 </head>
@@ -92,17 +92,40 @@
         </div>
 
         <div class="panel-toolbar">
-          <div class="interval-tabs">
+          <div class="chart-toolbar-left">
+            <div class="interval-tabs">
             <button data-interval="1m">1м</button>
             <button data-interval="5m">5м</button>
             <button data-interval="15m" class="active">15м</button>
             <button data-interval="1h">1ч</button>
             <button data-interval="4h">4ч</button>
             <button data-interval="1d">1д</button>
+            </div>
+
+            <div class="drawing-toolbar" id="drawingToolbar">
+              <button type="button" data-drawing-tool="cursor" class="active" title="Курсор">↖</button>
+              <button type="button" data-drawing-tool="trend" title="Трендовая линия">╱</button>
+              <button type="button" data-drawing-tool="horizontal" title="Горизонтальная линия">━</button>
+              <button type="button" data-drawing-tool="vertical" title="Вертикальная линия">┃</button>
+              <button type="button" data-drawing-tool="rectangle" title="Прямоугольник">▭</button>
+              <button type="button" data-drawing-tool="text" title="Текст">T</button>
+              <button type="button" data-drawing-action="undo" title="Отменить">↶</button>
+              <button type="button" data-drawing-action="clear" title="Удалить всё">⌫</button>
+            </div>
           </div>
-          <button id="refreshChartButton" class="icon-button" type="button">↻</button>
+
+          <div class="chart-toolbar-actions">
+            <button id="toggleVolumeButton" class="icon-button" type="button" title="Показать или скрыть объём">V</button>
+            <button id="resetChartButton" class="icon-button" type="button" title="Сбросить масштаб">◎</button>
+            <button id="refreshChartButton" class="icon-button" type="button" title="Обновить">↻</button>
+          </div>
         </div>
-        <div id="terminalChart" class="terminal-chart"></div>
+
+        <div class="terminal-chart-stage">
+          <div id="terminalChart" class="terminal-chart"></div>
+          <canvas id="drawingCanvas" class="drawing-canvas"></canvas>
+          <div id="drawingHint" class="drawing-hint hidden"></div>
+        </div>
       </article>
 
       <article class="orderbook-panel terminal-panel mobile-main-panel">
@@ -264,6 +287,6 @@
   <div id="toast" class="toast hidden"></div>
 
   <script src="supabase-config.js"></script>
-  <script src="terminal.js?v=2-4"></script>
+  <script src="terminal.js?v=2-6"></script>
 </body>
 </html>
