@@ -35,6 +35,7 @@ const state = {
   referralUsers: [],
   adminReferralOverview: null,
   adminReferralPartners: [],
+  selectedReferralPartner: null,
   terminalJournalTrades: [],
   botBalance: Number(userWallet?.bot_balance || 0),
   botRunning: localStorage.getItem(storageKey("bot-running")) === "true",
@@ -197,6 +198,17 @@ function referralTier(activeCount) {
   return "START";
 }
 
+function referralPercent(activeCount) {
+  const tier = referralTier(activeCount);
+
+  return {
+    START: 5,
+    SILVER: 15,
+    GOLD: 25,
+    PLATINUM: 40,
+  }[tier];
+}
+
 async function ensureReferralAccount() {
   const metadataCode =
     authUser.user_metadata?.referral_code ||
@@ -280,7 +292,8 @@ function renderReferralProgram() {
     `${Number(data.paid_out || 0).toFixed(2)} USDT`;
 
   const tier = referralTier(data.active_referrals);
-  $("referralTierBadge").textContent = tier;
+  $("referralTierBadge").textContent =
+    `${tier} · ${referralPercent(data.active_referrals)}%`;
   $("referralTierBadge").dataset.tier = tier.toLowerCase();
 
   $("transferReferralBalanceButton").disabled =
@@ -290,8 +303,8 @@ function renderReferralProgram() {
     ? state.referralUsers.map((user) => `
       <div class="referral-user-row">
         <div>
-          <strong>${escapeHtml(user.username || "User")}</strong>
-          <small>${escapeHtml(user.fastboot_id || "")}</small>
+          <strong>${escapeHtml(user.fastboot_id || "—")}</strong>
+          <small>${escapeHtml(user.username || "User")}</small>
         </div>
 
         <span>${formatDateTime(user.registered_at)}</span>
@@ -303,8 +316,11 @@ function renderReferralProgram() {
         </span>
 
         <span>
-          ${Number(user.spot_balance || 0).toFixed(2)} /
-          ${Number(user.bot_balance || 0).toFixed(2)} USDT
+          ${(
+            Number(user.spot_balance || 0) +
+            Number(user.bot_balance || 0) +
+            Number(user.trading_balance || 0)
+          ).toFixed(2)} USDT
         </span>
 
         <strong class="positive">
@@ -430,7 +446,7 @@ async function loadSupabaseAccountData() {
 
       supabaseClient
         .from("user_ai_trade_results")
-        .select("id, pair, side, entry_price, exit_price, opened_at, closed_at, pnl_percent, balance_before, pnl_amount, balance_after, created_at")
+        .select("id, pair, side, entry_price, exit_price, opened_at, closed_at, pnl_percent, balance_before, pnl_amount, balance_after, gross_pnl_amount, platform_fee_amount, net_pnl_amount, commission_percent, created_at")
         .eq("user_id", authUser.id)
         .order("closed_at", { ascending: false })
         .limit(200),
@@ -1146,6 +1162,10 @@ function renderAdminUsers() {
 
         <strong>${Number(user.spot_balance || 0).toFixed(2)}</strong>
         <strong>${Number(user.bot_balance || 0).toFixed(2)}</strong>
+        <strong class="${aiClass(Number(user.ai_total_earned || 0))}">
+          ${Number(user.ai_total_earned || 0).toFixed(2)}
+        </strong>
+        <strong>${Number(user.ai_total_fees || 0).toFixed(2)}</strong>
         <span>${formatDateTime(user.created_at)}</span>
 
         <div class="admin-row-actions">
@@ -1186,18 +1206,76 @@ function renderAdminReferral() {
 
   $("adminReferralPartners").innerHTML =
     state.adminReferralPartners.length
-      ? state.adminReferralPartners.map((partner, index) => `
-        <div class="admin-referral-partner-row">
-          <span>${index + 1}</span>
+      ? state.adminReferralPartners.map((partner) => `
+        <button
+          class="admin-referral-partner-row"
+          type="button"
+          data-referral-partner="${partner.user_id}"
+        >
           <div>
-            <strong>${escapeHtml(partner.username || "User")}</strong>
-            <small>${escapeHtml(partner.fastboot_id || "")}</small>
+            <strong>${escapeHtml(partner.fastboot_id || "—")}</strong>
+            <small>${escapeHtml(partner.username || "User")}</small>
           </div>
+          <span>${escapeHtml(partner.partner_level || "START")}</span>
           <span>${Number(partner.referrals_count || 0)} реф.</span>
           <strong>${Number(partner.total_earned || 0).toFixed(2)} USDT</strong>
-        </div>
+        </button>
       `).join("")
       : '<div class="admin-empty">Партнёров пока нет</div>';
+
+  document.querySelectorAll("[data-referral-partner]").forEach((button) => {
+    button.onclick = () =>
+      openReferralPartnerDetails(button.dataset.referralPartner);
+  });
+}
+
+async function openReferralPartnerDetails(partnerId) {
+  const partner = state.adminReferralPartners.find(
+    (item) => item.user_id === partnerId
+  );
+
+  if (!partner) return;
+
+  state.selectedReferralPartner = partner;
+
+  $("partnerDetailsTitle").textContent =
+    `${partner.fastboot_id || "Партнёр"} · ${partner.partner_level || "START"}`;
+
+  $("partnerDetailsSummary").innerHTML = `
+    <div><span>Уровень</span><strong>${escapeHtml(partner.partner_level || "START")}</strong></div>
+    <div><span>Ставка</span><strong>${Number(partner.reward_percent || 5)}%</strong></div>
+    <div><span>Рефералов</span><strong>${Number(partner.referrals_count || 0)}</strong></div>
+    <div><span>Доход</span><strong>${Number(partner.total_earned || 0).toFixed(2)} USDT</strong></div>
+  `;
+
+  $("partnerDetailsReferrals").innerHTML =
+    '<div class="admin-empty">Загрузка…</div>';
+
+  $("partnerDetailsModal").classList.remove("hidden");
+
+  try {
+    const { data, error } = await supabaseClient.rpc(
+      "admin_list_referral_partner_members",
+      { p_partner_user_id: partnerId }
+    );
+
+    if (error) throw error;
+
+    $("partnerDetailsReferrals").innerHTML = data?.length
+      ? data.map((user) => `
+        <div class="partner-referral-row">
+          <strong>${escapeHtml(user.fastboot_id || "—")}</strong>
+          <span>${formatDateTime(user.registered_at)}</span>
+          <span>${Number(user.active_balance || 0).toFixed(2)} USDT</span>
+          <strong>${Number(user.partner_income || 0).toFixed(2)} USDT</strong>
+        </div>
+      `).join("")
+      : '<div class="admin-empty">У партнёра пока нет рефералов</div>';
+  } catch (error) {
+    console.error(error);
+    $("partnerDetailsReferrals").innerHTML =
+      '<div class="admin-empty">Не удалось загрузить рефералов</div>';
+  }
 }
 
 function renderAdminFunding(){
@@ -1268,7 +1346,7 @@ function aiPeriod(days) {
 
   return {
     percent: rows.reduce((sum, item) => sum + Number(item.pnl_percent || 0), 0),
-    amount: rows.reduce((sum, item) => sum + Number(item.pnl_amount || 0), 0),
+    amount: rows.reduce((sum, item) => sum + Number(item.net_pnl_amount ?? item.pnl_amount ?? 0), 0),
   };
 }
 
@@ -1279,7 +1357,8 @@ function renderAiAssistant() {
   const initial = Number(state.aiBotAccount?.initial_balance || bot || 0);
 
   const totalPnl = state.aiTradeResults.reduce(
-    (sum, item) => sum + Number(item.pnl_amount || 0),
+    (sum, item) =>
+      sum + Number(item.net_pnl_amount ?? item.pnl_amount ?? 0),
     0
   );
   const totalPercent = initial > 0 ? (totalPnl / initial) * 100 : 0;
@@ -1335,27 +1414,47 @@ function renderAiAssistant() {
 
 function renderAiHistory() {
   $("botHistory").innerHTML = state.aiTradeResults.length
-    ? state.aiTradeResults.map((trade) => `
-      <div class="ai-history-row">
-        <strong>${escapeHtml(trade.pair)}</strong>
-        <span class="ai-side-badge ${trade.side.toLowerCase()}">${escapeHtml(trade.side)}</span>
-        <span>${formatDateTime(trade.opened_at)}</span>
-        <span>${formatDateTime(trade.closed_at)}</span>
-        <span class="ai-price-pair">
-          ${safeFormatPrice(Number(trade.entry_price))}
-          <small>→</small>
-          ${safeFormatPrice(Number(trade.exit_price))}
-        </span>
-        <div class="ai-result-cell">
-          <strong class="${aiClass(trade.pnl_percent)}">
-            ${Number(trade.pnl_percent) >= 0 ? "+" : ""}${Number(trade.pnl_percent).toFixed(2)}%
-          </strong>
-          <span class="${aiClass(trade.pnl_amount)}">
-            ${Number(trade.pnl_amount) >= 0 ? "+" : ""}${Number(trade.pnl_amount).toFixed(2)} USDT
-          </span>
-        </div>
-      </div>
-    `).join("")
+    ? state.aiTradeResults.map((trade) => {
+        const gross = Number(
+          trade.gross_pnl_amount ?? trade.pnl_amount ?? 0
+        );
+
+        const fee = Number(trade.platform_fee_amount || 0);
+        const net = Number(
+          trade.net_pnl_amount ?? trade.pnl_amount ?? 0
+        );
+
+        return `
+          <div class="ai-history-row ai-history-row-fees">
+            <strong>${escapeHtml(trade.pair)}</strong>
+            <span class="ai-side-badge ${trade.side.toLowerCase()}">
+              ${escapeHtml(trade.side)}
+            </span>
+            <span>${formatDateTime(trade.opened_at)}</span>
+            <span>${formatDateTime(trade.closed_at)}</span>
+            <span class="ai-price-pair">
+              ${safeFormatPrice(Number(trade.entry_price))}
+              <small>→</small>
+              ${safeFormatPrice(Number(trade.exit_price))}
+            </span>
+            <strong class="${aiClass(gross)}">
+              ${gross >= 0 ? "+" : ""}${gross.toFixed(2)} USDT
+            </strong>
+            <span class="ai-fee-cell">
+              ${fee > 0 ? `−${fee.toFixed(2)}` : "0.00"} USDT
+            </span>
+            <div class="ai-result-cell">
+              <strong class="${aiClass(net)}">
+                ${net >= 0 ? "+" : ""}${net.toFixed(2)} USDT
+              </strong>
+              <span>
+                ${Number(trade.pnl_percent) >= 0 ? "+" : ""}
+                ${Number(trade.pnl_percent).toFixed(2)}%
+              </span>
+            </div>
+          </div>
+        `;
+      }).join("")
     : '<div class="admin-empty">История сделок пока пуста</div>';
 }
 
@@ -1616,6 +1715,11 @@ async function renderJournal() {
 }
 
 
+
+$("closePartnerDetailsModal")?.addEventListener("click", () => {
+  $("partnerDetailsModal").classList.add("hidden");
+  state.selectedReferralPartner = null;
+});
 
 $("copyReferralCodeButton")?.addEventListener("click", async () => {
   const code = $("referralCode")?.textContent || "";

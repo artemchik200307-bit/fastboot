@@ -5123,3 +5123,178 @@ body.modal-open .modal {
     font-size: 20px;
   }
 }
+
+
+/* ===== AI FEES + REFERRAL LEVELS V2 ===== */
+.cabinet-detail-grid {
+  grid-template-columns: 1fr;
+}
+
+.ai-fee-notice {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+  padding: 16px;
+  border-color: rgba(111,145,255,.35);
+  background: linear-gradient(135deg, rgba(111,145,255,.10), rgba(16,23,34,.96));
+}
+
+.ai-fee-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(111,145,255,.16);
+  color: #b9c7ff;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.ai-fee-notice strong,
+.ai-fee-notice p,
+.ai-fee-notice small {
+  display: block;
+}
+
+.ai-fee-notice p {
+  margin: 6px 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.ai-fee-notice small {
+  color: #8390a5;
+}
+
+.ai-history-head,
+.ai-history-row-fees {
+  grid-template-columns:
+    minmax(70px,.65fr)
+    minmax(75px,.65fr)
+    minmax(110px,.9fr)
+    minmax(110px,.9fr)
+    minmax(120px,1fr)
+    minmax(100px,.8fr)
+    minmax(85px,.7fr)
+    minmax(110px,.9fr);
+  min-width: 1040px;
+}
+
+.ai-history-table {
+  overflow-x: auto;
+}
+
+.ai-fee-cell {
+  color: #f0b85d;
+}
+
+.referral-bonus-note {
+  margin: 5px 0 0;
+  border: 1px dashed rgba(111,145,255,.35);
+  border-radius: 8px;
+  padding: 10px;
+  color: #aebbe2;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.admin-user-row,
+.admin-table-head {
+  grid-template-columns:
+    minmax(190px,1.5fr)
+    minmax(65px,.55fr)
+    minmax(95px,.75fr)
+    minmax(70px,.6fr)
+    minmax(70px,.6fr)
+    minmax(80px,.65fr)
+    minmax(80px,.65fr)
+    minmax(100px,.8fr)
+    auto;
+}
+
+.admin-referral-partner-row {
+  width: 100%;
+  grid-template-columns: minmax(150px,1fr) 90px 80px 110px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-referral-partner-row:hover {
+  background: rgba(111,145,255,.07);
+}
+
+.partner-details-card {
+  width: min(920px, 96vw);
+  max-height: 86vh;
+  overflow: auto;
+}
+
+.partner-details-summary {
+  display: grid;
+  grid-template-columns: repeat(4,1fr);
+  gap: 9px;
+  margin-bottom: 16px;
+}
+
+.partner-details-summary > div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 11px;
+  background: var(--panel2);
+}
+
+.partner-details-summary span,
+.partner-details-summary strong {
+  display: block;
+}
+
+.partner-details-summary span {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.partner-details-summary strong {
+  margin-top: 5px;
+}
+
+.partner-referrals-head,
+.partner-referral-row {
+  display: grid;
+  grid-template-columns: minmax(110px,.8fr) minmax(150px,1fr) minmax(120px,.8fr) minmax(120px,.8fr);
+  gap: 10px;
+  align-items: center;
+  padding: 11px 12px;
+}
+
+.partner-referrals-head {
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.partner-referral-row {
+  border-bottom: 1px solid rgba(39,50,68,.75);
+  font-size: 10px;
+}
+
+@media (max-width: 760px) {
+  .partner-details-summary {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .partner-referrals-table {
+    overflow-x: auto;
+  }
+
+  .partner-referrals-head,
+  .partner-referral-row {
+    min-width: 650px;
+  }
+}

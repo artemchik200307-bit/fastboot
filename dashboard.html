@@ -10,7 +10,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#080c12">
   <title>FASTBOOT — Личный кабинет</title>
-  <link rel="stylesheet" href="dashboard.css?v=referral-v1">
+  <link rel="stylesheet" href="dashboard.css?v=ai-fees-referral-v2">
   <script src="https://unpkg.com/lightweight-charts@5.2.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
@@ -164,23 +164,6 @@
           </div>
 
           <div class="cabinet-detail-grid">
-            <article class="panel account-details-panel">
-              <div class="panel-head">
-                <div>
-                  <h3>Данные аккаунта</h3>
-                  <span>Информация профиля FASTBOOT</span>
-                </div>
-              </div>
-
-              <div class="account-details-list">
-                <div><span>Username</span><strong id="detailUsername">—</strong></div>
-                <div><span>Email</span><strong id="detailEmail">—</strong></div>
-                <div><span>FASTBOOT ID</span><strong id="detailFastbootId">—</strong></div>
-                <div><span>Роль</span><strong id="detailRole">user</strong></div>
-                <div><span>Дата регистрации</span><strong id="detailCreatedAt">—</strong></div>
-                <div><span>Последнее обновление</span><strong id="detailUpdatedAt">—</strong></div>
-              </div>
-            </article>
 
             <article class="panel complete-history-panel">
               <div class="panel-head cabinet-history-head">
@@ -287,6 +270,22 @@
             </article>
           </div>
 
+          <article class="panel ai-fee-notice">
+            <div class="ai-fee-icon">%</div>
+            <div>
+              <strong>Комиссия платформы — 10% от прибыли</strong>
+              <p>
+                Комиссия автоматически рассчитывается при закрытии прибыльной сделки.
+                С убыточных сделок комиссия не удерживается. В истории показываются
+                валовая прибыль, комиссия и чистый результат.
+              </p>
+              <small>
+                AI Assistant работает в режиме demo / paper trading, пока не подключено
+                реальное исполнение ордеров через биржевой API.
+              </small>
+            </div>
+          </article>
+
           <div class="ai-stat-grid">
             <article><span>Сегодня</span><strong id="botDayPnl">0.00%</strong><small id="botDayAmount">0.00 USDT</small></article>
             <article><span>7 дней</span><strong id="botWeekPnl">0.00%</strong><small id="botWeekAmount">0.00 USDT</small></article>
@@ -312,7 +311,8 @@
             <div class="ai-history-table">
               <div class="ai-history-head">
                 <span>Пара</span><span>Направление</span><span>Открытие</span>
-                <span>Закрытие</span><span>Вход / выход</span><span>Результат</span>
+                <span>Закрытие</span><span>Вход / выход</span>
+                <span>Валовая прибыль</span><span>Комиссия 10%</span><span>Чистый результат</span>
               </div>
               <div id="botHistory" class="ai-history-body">
                 <div class="admin-empty">История сделок пока пуста</div>
@@ -394,7 +394,7 @@
             <div>
               <span class="section-kicker">FASTBOOT PARTNER PROGRAM</span>
               <h2>Реферальная программа</h2>
-              <p>Получайте 5% от комиссии платформы по приглашённым пользователям.</p>
+              <p>Получайте от 5% до 40% от комиссии платформы в зависимости от партнёрского уровня.</p>
             </div>
             <span id="referralTierBadge" class="referral-tier-badge">START</span>
           </div>
@@ -466,11 +466,11 @@
 
               <div class="referral-table">
                 <div class="referral-table-head">
-                  <span>Пользователь</span>
+                  <span>ID пользователя</span>
                   <span>Регистрация</span>
-                  <span>AI</span>
-                  <span>Баланс</span>
-                  <span>Ваш доход</span>
+                  <span>Статус</span>
+                  <span>Активный баланс</span>
+                  <span>Мой доход</span>
                 </div>
                 <div id="referralUsersList">
                   <div class="admin-empty">Загрузка…</div>
@@ -487,10 +487,13 @@
               </div>
 
               <div class="referral-level-list">
-                <div><strong>START</strong><span>0–4 активных</span></div>
-                <div><strong>SILVER</strong><span>5–19 активных</span></div>
-                <div><strong>GOLD</strong><span>20–49 активных</span></div>
-                <div><strong>PLATINUM</strong><span>50+ активных</span></div>
+                <div><strong>START · 5%</strong><span>0–4 активных</span></div>
+                <div><strong>SILVER · 15%</strong><span>5–19 активных</span></div>
+                <div><strong>GOLD · 25%</strong><span>20–49 активных</span></div>
+                <div><strong>PLATINUM · 40%</strong><span>50+ активных</span></div>
+                <p class="referral-bonus-note">
+                  При переходе на новый уровень партнёру будут доступны дополнительные бонусы.
+                </p>
               </div>
             </article>
           </div>
@@ -507,7 +510,7 @@
     <article class="admin-stat-card"><span>Партнёрам</span><strong id="adminReferralRewards">—</strong><small>Начислено USDT</small></article>
   </div>
   <div class="admin-layout">
-    <article class="panel admin-users-panel"><div class="panel-head admin-head"><div><h3>Пользователи</h3><p>Поиск по email, username или FASTBOOT ID</p></div><div class="admin-search"><input id="adminUserSearch" type="search" placeholder="Поиск"><button id="adminSearchButton" class="secondary-action" type="button">Найти</button></div></div><div class="admin-table"><div class="admin-table-head"><span>Пользователь</span><span>Роль</span><span>Статус AI</span><span>Spot</span><span>AI Bot</span><span>Дата</span><span>Действия</span></div><div id="adminUsersList"><div class="admin-empty">Загрузка…</div></div></div></article>
+    <article class="panel admin-users-panel"><div class="panel-head admin-head"><div><h3>Пользователи</h3><p>Поиск по email, username или FASTBOOT ID</p></div><div class="admin-search"><input id="adminUserSearch" type="search" placeholder="Поиск"><button id="adminSearchButton" class="secondary-action" type="button">Найти</button></div></div><div class="admin-table"><div class="admin-table-head"><span>Пользователь</span><span>Роль</span><span>Статус AI</span><span>Spot</span><span>AI Bot</span><span>Заработал</span><span>Комиссия</span><span>Дата</span><span>Действия</span></div><div id="adminUsersList"><div class="admin-empty">Загрузка…</div></div></div></article>
     <article class="panel admin-funding-panel"><div class="panel-head"><div><h3>Финансовые заявки</h3><p>Пополнения и выводы</p></div></div><div id="adminFundingList" class="admin-funding-list"><div class="admin-empty">Загрузка…</div></div></article>
   </div>
 
@@ -683,6 +686,23 @@
         <button id="closeModalButton" type="button">✕</button>
       </div>
       <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <div id="partnerDetailsModal" class="modal hidden">
+    <div class="modal-card partner-details-card">
+      <button id="closePartnerDetailsModal" class="close-modal" type="button">×</button>
+      <h2 id="partnerDetailsTitle">Партнёр</h2>
+      <div id="partnerDetailsSummary" class="partner-details-summary"></div>
+
+      <div class="partner-referrals-table">
+        <div class="partner-referrals-head">
+          <span>ID</span><span>Регистрация</span><span>Активный баланс</span><span>Доход партнёра</span>
+        </div>
+        <div id="partnerDetailsReferrals">
+          <div class="admin-empty">Загрузка…</div>
+        </div>
+      </div>
     </div>
   </div>
 
