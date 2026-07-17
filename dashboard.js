@@ -1153,12 +1153,16 @@ $("adminAiCompletedTradeForm")?.addEventListener("submit", async (event) => {
     $("adminAiSide").value = "LONG";
     $("adminAiTradeDate").value = localDateValue();
 
-    showToast("Сделка добавлена в историю AI Assistant");
+    showToast("Сделка добавлена. История AI Assistant обновляется…");
 
-    await Promise.all([
-      loadSupabaseAccountData(),
-      loadAdminPanel($("adminUserSearch")?.value.trim() || ""),
-    ]);
+    await loadSupabaseAccountData();
+
+    if (String(userProfile.role || "").toLowerCase() === "admin") {
+      await loadAdminPanel($("adminUserSearch")?.value.trim() || "");
+    }
+
+    renderAiAssistant();
+    showToast("Сделка добавлена в историю AI Assistant");
   } catch (error) {
     console.error("Ошибка публикации AI-сделки:", error);
     showToast(error?.message || "Не удалось добавить сделку");
