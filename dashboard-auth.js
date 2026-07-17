@@ -76,6 +76,8 @@
 
     document.documentElement.classList.add("auth-ready");
 
+    if (window.fastbootProfile?.role === "admin") document.documentElement.classList.add("is-admin");
+
     const script = document.createElement("script");
     script.src = "dashboard.js?v=supabase-clean-1";
     script.async = false;

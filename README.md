@@ -304,3 +304,9 @@ AI-экосистеме:
 2. Выполните `supabase-dashboard-wallets.sql`.
 3. Загрузите остальные файлы в GitHub с заменой.
 4. Не удаляйте существующий `supabase-config.js`.
+
+
+## Admin Panel v1
+1. Выполните `supabase-admin-panel.sql` в Supabase SQL Editor.
+2. Загрузите остальные файлы в GitHub с заменой.
+3. Выйдите и войдите в аккаунт снова.

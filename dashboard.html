@@ -37,6 +37,9 @@
       </nav>
 
       <div class="sidebar-bottom">
+        <button id="adminNavButton" class="nav-item hidden" data-section="admin">
+          <span class="nav-icon">A</span><span>Admin Panel</span><small>ADMIN</small>
+        </button>
         <button class="nav-item" data-section="settings">
           <span class="nav-icon">⚙</span><span>Настройки</span>
         </button>
@@ -628,6 +631,20 @@
           </article>
         </section>
 
+        <section class="dashboard-section admin-section" id="admin">
+  <div class="section-heading"><div><span class="section-kicker">FASTBOOT CONTROL CENTER</span><h2>Admin Panel</h2><p>Управление пользователями, балансами и финансовыми заявками.</p></div><button id="adminRefreshButton" class="secondary-action" type="button">Обновить</button></div>
+  <div class="admin-stat-grid">
+    <article class="admin-stat-card"><span>Пользователей</span><strong id="adminUsersCount">—</strong><small>Всего зарегистрировано</small></article>
+    <article class="admin-stat-card"><span>Средства</span><strong id="adminTotalBalance">—</strong><small>Spot + AI Bot</small></article>
+    <article class="admin-stat-card"><span>Ожидают</span><strong id="adminPendingCount">—</strong><small>Финансовые заявки</small></article>
+    <article class="admin-stat-card"><span>Администраторов</span><strong id="adminAdminsCount">—</strong><small>Роль admin</small></article>
+  </div>
+  <div class="admin-layout">
+    <article class="panel admin-users-panel"><div class="panel-head admin-head"><div><h3>Пользователи</h3><p>Поиск по email, username или FASTBOOT ID</p></div><div class="admin-search"><input id="adminUserSearch" type="search" placeholder="Поиск"><button id="adminSearchButton" class="secondary-action" type="button">Найти</button></div></div><div class="admin-table"><div class="admin-table-head"><span>Пользователь</span><span>Роль</span><span>Spot</span><span>AI Bot</span><span>Дата</span><span>Действия</span></div><div id="adminUsersList"><div class="admin-empty">Загрузка…</div></div></div></article>
+    <article class="panel admin-funding-panel"><div class="panel-head"><div><h3>Финансовые заявки</h3><p>Пополнения и выводы</p></div></div><div id="adminFundingList" class="admin-funding-list"><div class="admin-empty">Загрузка…</div></div></article>
+  </div>
+</section>
+
         <section class="dashboard-section" id="settings">
           <div class="section-heading">
             <span class="section-kicker">ACCOUNT SETTINGS</span>
@@ -664,6 +681,8 @@
       <div id="mobileChartContainer" class="mobile-chart-container"></div>
     </div>
   </div>
+
+  <div id="adminModal" class="modal hidden"><div class="modal-card admin-modal-card"><button id="closeAdminModalButton" class="modal-close" type="button">×</button><h2 id="adminModalTitle">Действие администратора</h2><div id="adminModalBody"></div></div></div>
 
   <div id="actionModal" class="modal hidden">
     <div class="modal-card">

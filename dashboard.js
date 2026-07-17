@@ -23,6 +23,9 @@ const state = {
   transfers: [],
   transactions: [],
   fundingRequests: [],
+  adminUsers: [],
+  adminFundingRequests: [],
+  adminOverview: null,
   botBalance: Number(userWallet?.bot_balance || 0),
   botRunning: localStorage.getItem(storageKey("bot-running")) === "true",
   orders: JSON.parse(localStorage.getItem(storageKey("orders")) || "[]"),
@@ -89,6 +92,7 @@ function openSection(id) {
   }
   if (id === "market-analysis") loadMarketAnalysis();
   if (id === "journal") renderJournal();
+  if (id === "admin") { if (userProfile.role !== "admin") { showToast("Нет доступа"); openSection("overview"); return; } loadAdminPanel(); }
   const dashboardScroller = document.querySelector(".dashboard-main");
 
   if (id !== "trading" && dashboardScroller) {
@@ -135,6 +139,7 @@ function initializeUser() {
 
   $("settingsName").value = username;
   $("settingsEmail").value = email;
+  $("adminNavButton")?.classList.toggle("hidden", userProfile.role !== "admin");
 }
 
 function applySupabaseWalletToPortfolio() {
@@ -1494,6 +1499,20 @@ $("terminalAssetsShortcut").addEventListener("click", () => {
 $("terminalOrdersShortcut").addEventListener("click", () => {
   document.querySelector('[data-bottom-tab="order-history"]').click();
 });
+
+
+function assertAdmin(){if(userProfile.role!=="admin")throw new Error("Недостаточно прав администратора");}
+async function loadAdminPanel(search=""){
+ assertAdmin(); $("adminUsersList").innerHTML='<div class="admin-empty">Загрузка…</div>'; $("adminFundingList").innerHTML='<div class="admin-empty">Загрузка…</div>';
+ try{const [o,u,f]=await Promise.all([supabaseClient.rpc("admin_platform_overview"),supabaseClient.rpc("admin_list_users",{p_search:search||null,p_limit:100,p_offset:0}),supabaseClient.rpc("admin_list_funding_requests",{p_status:"pending",p_limit:100})]); if(o.error)throw o.error;if(u.error)throw u.error;if(f.error)throw f.error; state.adminOverview=o.data?.[0]||o.data||{};state.adminUsers=u.data||[];state.adminFundingRequests=f.data||[];renderAdminOverview();renderAdminUsers();renderAdminFunding();}catch(e){console.error(e);showToast(e.message||"Ошибка Admin Panel");}
+}
+function renderAdminOverview(){const d=state.adminOverview||{};$("adminUsersCount").textContent=Number(d.users_count||0).toLocaleString("ru-RU");$("adminTotalBalance").textContent=`${Number(d.total_platform_balance||0).toFixed(2)} USDT`;$("adminPendingCount").textContent=Number(d.pending_requests_count||0);$("adminAdminsCount").textContent=Number(d.admins_count||0);}
+function renderAdminUsers(){const r=state.adminUsers;$("adminUsersList").innerHTML=r.length?r.map(u=>`<div class="admin-user-row"><div class="admin-user-identity"><strong>${escapeHtml(u.username||"User")}</strong><span>${escapeHtml(u.email||"")}</span><small>${escapeHtml(u.fastboot_id||"")}</small></div><span class="admin-role-badge ${u.role==="admin"?"admin":""}">${escapeHtml(u.role||"user")}</span><strong>${Number(u.spot_balance||0).toFixed(2)}</strong><strong>${Number(u.bot_balance||0).toFixed(2)}</strong><span>${formatDateTime(u.created_at)}</span><div class="admin-row-actions"><button class="secondary-action compact" data-admin-balance="${u.id}">Баланс</button><button class="secondary-action compact" data-admin-role="${u.id}">Роль</button></div></div>`).join(""):'<div class="admin-empty">Пользователи не найдены</div>';document.querySelectorAll("[data-admin-balance]").forEach(b=>b.onclick=()=>openAdminBalanceModal(r.find(x=>x.id===b.dataset.adminBalance)));document.querySelectorAll("[data-admin-role]").forEach(b=>b.onclick=()=>openAdminRoleModal(r.find(x=>x.id===b.dataset.adminRole)));}
+function renderAdminFunding(){const a=state.adminFundingRequests;$("adminFundingList").innerHTML=a.length?a.map(x=>`<article class="admin-funding-item"><div><span class="admin-funding-type ${x.type}">${x.type==="deposit"?"Пополнение":"Вывод"}</span><strong>${Number(x.amount).toFixed(2)} ${escapeHtml(x.asset||"USDT")}</strong><span>${escapeHtml(x.username||x.email||"")}</span><small>${formatDateTime(x.created_at)}</small>${x.details?`<p>${escapeHtml(x.details)}</p>`:""}</div><div class="admin-funding-actions"><button class="primary-action compact" data-fa="approve" data-fid="${x.id}">Одобрить</button><button class="danger-action compact" data-fa="reject" data-fid="${x.id}">Отклонить</button></div></article>`).join(""):'<div class="admin-empty">Ожидающих заявок нет</div>';document.querySelectorAll("[data-fa]").forEach(b=>b.onclick=()=>processAdminFunding(b.dataset.fid,b.dataset.fa));}
+function openAdminBalanceModal(u){if(!u)return;$("adminModalTitle").textContent="Изменение баланса";$("adminModalBody").innerHTML=`<div class="admin-modal-user"><strong>${escapeHtml(u.username||"User")}</strong><span>${escapeHtml(u.email||"")}</span></div><div class="modal-form"><label>Счёт<select id="adminWalletType"><option value="spot">Основной</option><option value="bot">AI Bot</option></select></label><label>Операция<select id="adminBalanceOperation"><option value="credit">Начислить</option><option value="debit">Списать</option></select></label><label>Сумма USDT<input id="adminBalanceAmount" type="number" min="0.01" step="0.01"></label><label>Причина<input id="adminBalanceReason" maxlength="300"></label><button id="confirmAdminBalanceButton" class="primary-action">Применить</button></div>`;$("adminModal").classList.remove("hidden");$("confirmAdminBalanceButton").onclick=async()=>{const amount=Number($("adminBalanceAmount").value);if(!(amount>0))return showToast("Введите сумму");try{const {error}=await supabaseClient.rpc("admin_adjust_user_balance",{p_user_id:u.id,p_wallet:$("adminWalletType").value,p_operation:$("adminBalanceOperation").value,p_amount:amount,p_reason:$("adminBalanceReason").value.trim()||null});if(error)throw error;$("adminModal").classList.add("hidden");showToast("Баланс обновлён");await loadAdminPanel($("adminUserSearch").value.trim());}catch(e){showToast(e.message||"Ошибка");}};}
+function openAdminRoleModal(u){if(!u)return;$("adminModalTitle").textContent="Изменение роли";$("adminModalBody").innerHTML=`<div class="admin-modal-user"><strong>${escapeHtml(u.username||"User")}</strong><span>${escapeHtml(u.email||"")}</span></div><div class="modal-form"><label>Роль<select id="adminNewRole"><option value="user" ${u.role==="user"?"selected":""}>user</option><option value="admin" ${u.role==="admin"?"selected":""}>admin</option></select></label><button id="confirmAdminRoleButton" class="primary-action">Сохранить</button></div>`;$("adminModal").classList.remove("hidden");$("confirmAdminRoleButton").onclick=async()=>{try{const {error}=await supabaseClient.rpc("admin_set_user_role",{p_user_id:u.id,p_role:$("adminNewRole").value});if(error)throw error;$("adminModal").classList.add("hidden");showToast("Роль изменена");await loadAdminPanel($("adminUserSearch").value.trim());}catch(e){showToast(e.message||"Ошибка");}};}
+async function processAdminFunding(id,action){if(!confirm(action==="approve"?"Одобрить заявку?":"Отклонить заявку?"))return;try{const {error}=await supabaseClient.rpc("admin_process_funding_request",{p_request_id:id,p_action:action,p_note:null});if(error)throw error;showToast(action==="approve"?"Заявка одобрена":"Заявка отклонена");await loadAdminPanel($("adminUserSearch").value.trim());}catch(e){showToast(e.message||"Ошибка");}}
+$("adminRefreshButton")?.addEventListener("click",()=>loadAdminPanel($("adminUserSearch").value.trim()));$("adminSearchButton")?.addEventListener("click",()=>loadAdminPanel($("adminUserSearch").value.trim()));$("adminUserSearch")?.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();loadAdminPanel(e.target.value.trim());}});$("closeAdminModalButton")?.addEventListener("click",()=>$("adminModal").classList.add("hidden"));
 
 async function loadMarketAnalysis() {
   const symbol=$("analysisCoinSelect").value;
