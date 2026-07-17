@@ -5325,3 +5325,14 @@ body.modal-open .modal {
 
 /* ===== ADMIN + REFERRAL INCOME FIX 2.3 ===== */
 #admin.dashboard-section.active { display: block !important; }
+
+
+/* ===== ADMIN VISIBILITY FIX 2.4 ===== */
+html.is-admin #adminNavButton,
+#adminNavButton.admin-visible {
+  display: flex !important;
+}
+
+#admin.dashboard-section.active {
+  display: block !important;
+}

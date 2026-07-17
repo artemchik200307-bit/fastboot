@@ -110,7 +110,7 @@ function openSection(id) {
   if (id === "referral") loadReferralProgram();
 
   if (id === "admin") {
-    if (String(userProfile.role || "").toLowerCase() !== "admin") {
+    if (String(userProfile.role || "").trim().toLowerCase() !== "admin") {
       showToast("Нет доступа");
       openSection("overview");
       return;
@@ -172,8 +172,14 @@ function initializeUser() {
   $("detailCreatedAt").textContent = formatDateTime(
     userProfile.created_at || authUser.created_at
   );
-  const isAdmin = String(userProfile.role || "").toLowerCase() === "admin";
-  $("adminNavButton")?.classList.toggle("hidden", !isAdmin);
+  const isAdmin = String(userProfile.role || "").trim().toLowerCase() === "admin";
+  const adminButton = $("adminNavButton");
+
+  if (adminButton) {
+    adminButton.classList.toggle("hidden", !isAdmin);
+    adminButton.style.display = isAdmin ? "flex" : "none";
+    adminButton.classList.toggle("admin-visible", isAdmin);
+  }
   document.documentElement.classList.toggle("is-admin", isAdmin);
 }
 
@@ -1584,7 +1590,7 @@ $("adminAiCompletedTradeForm")?.addEventListener("submit", async (event) => {
 
     await loadSupabaseAccountData();
 
-    if (String(userProfile.role || "").toLowerCase() === "admin") {
+    if (String(userProfile.role || "").trim().toLowerCase() === "admin") {
       await loadAdminPanel($("adminUserSearch")?.value.trim() || "");
     }
 

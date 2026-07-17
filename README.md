@@ -810,3 +810,15 @@ SQL выполнять не нужно.
 - Admin Panel restored.
 - Referral active balance replaced with referral income.
 - Added SQL migration for referral income.
+
+
+## Admin Visible Fix 2.4
+
+Исправлено:
+
+- устранён конфликт `.hidden { display:none!important }`;
+- кнопка Admin Panel показывается через inline style и CSS `!important`;
+- роль очищается через trim и приводится к нижнему регистру;
+- раздел Admin Panel принудительно отображается при открытии;
+- добавлен совместимый SQL дохода рефералов без net_pnl_amount;
+- добавлен файл проверки роли администратора.
