@@ -2,7 +2,10 @@
   "use strict";
 
   const $ = (id) => document.getElementById(id);
-  const REST_BASES = ["https://api.binance.com", "https://data-api.binance.vision"];
+  const REST_BASES = [
+    "https://api.binance.com",
+    "https://data-api.binance.vision",
+  ];
   const REFRESH_MS = 3000;
 
   let supabaseClient = null;
@@ -10,19 +13,18 @@
   let currentSymbol = "BTCUSDT";
   let currentInterval = "15m";
   let currentPrice = 0;
-  let currentTicker = null;
   let tradingBalance = 0;
+
   let chart = null;
   let candleSeries = null;
   let volumeSeries = null;
-  let refreshTimer = null;
   let volumeVisible = true;
-  let activeDrawingTool = "cursor";
+
+  let drawingTool = "cursor";
   let drawingStart = null;
   let drawingPreview = null;
   let drawings = [];
   let drawingContext = null;
-
 
   const state = {
     positions: [],
@@ -35,7 +37,7 @@
     toast.textContent = message;
     toast.classList.remove("hidden");
     clearTimeout(showToast.timer);
-    showToast.timer = setTimeout(() => toast.classList.add("hidden"), 3200);
+    showToast.timer = setTimeout(() => toast.classList.add("hidden"), 3000);
   }
 
   function escapeHtml(value) {
@@ -79,8 +81,7 @@
   }
 
   function formatDate(value) {
-    if (!value) return "—";
-    return new Date(value).toLocaleString("ru-RU");
+    return value ? new Date(value).toLocaleString("ru-RU") : "—";
   }
 
   async function fetchJson(path) {
@@ -88,14 +89,8 @@
 
     for (const base of REST_BASES) {
       try {
-        const response = await fetch(`${base}${path}`, {
-          cache: "no-store",
-        });
-
-        if (!response.ok) {
-          throw new Error(`Market API ${response.status}`);
-        }
-
+        const response = await fetch(`${base}${path}`, { cache: "no-store" });
+        if (!response.ok) throw new Error(`Market API ${response.status}`);
         return await response.json();
       } catch (error) {
         lastError = error;
@@ -134,7 +129,7 @@
     }
   }
 
-  async function loadWalletAndAccountData() {
+  async function loadAccountData() {
     const [walletResult, positionsResult, ordersResult, tradesResult] =
       await Promise.all([
         supabaseClient
@@ -185,48 +180,49 @@
   }
 
   function createChart() {
-    const container = $("terminalChart");
-
     if (!window.LightweightCharts) {
-      container.innerHTML =
-        '<div class="terminal-chart-error">Не удалось загрузить библиотеку графика</div>';
-      throw new Error("Lightweight Charts не загружен");
+      throw new Error("Библиотека графика не загрузилась");
     }
+
+    const container = $("terminalChart");
 
     chart = LightweightCharts.createChart(container, {
       width: Math.max(container.clientWidth, 320),
       height: Math.max(container.clientHeight, 300),
       layout: {
         background: { type: "solid", color: "#101722" },
-        textColor: "#8290a6",
+        textColor: "#8290a5",
         attributionLogo: false,
       },
       grid: {
-        vertLines: { color: "rgba(130,144,166,.08)" },
-        horzLines: { color: "rgba(130,144,166,.08)" },
+        vertLines: { color: "rgba(130,144,165,.08)" },
+        horzLines: { color: "rgba(130,144,165,.08)" },
       },
       rightPriceScale: {
-        borderColor: "#263247",
+        borderColor: "#253248",
         scaleMargins: { top: .06, bottom: .22 },
       },
       timeScale: {
-        borderColor: "#263247",
+        borderColor: "#253248",
         timeVisible: true,
         secondsVisible: false,
         rightOffset: 18,
         barSpacing: 8,
         minBarSpacing: 3,
       },
+      crosshair: {
+        mode: LightweightCharts.CrosshairMode.Normal,
+      },
     });
 
     candleSeries = chart.addSeries(
       LightweightCharts.CandlestickSeries,
       {
-        upColor: "#20c987",
-        downColor: "#ff5571",
+        upColor: "#22c98a",
+        downColor: "#ff5572",
         borderVisible: false,
-        wickUpColor: "#20c987",
-        wickDownColor: "#ff5571",
+        wickUpColor: "#22c98a",
+        wickDownColor: "#ff5572",
       }
     );
 
@@ -235,8 +231,8 @@
       {
         priceFormat: { type: "volume" },
         priceScaleId: "volume",
-        lastValueVisible: false,
         priceLineVisible: false,
+        lastValueVisible: false,
       }
     );
 
@@ -256,22 +252,17 @@
 
   async function loadMarket() {
     const [ticker, depth, klines] = await Promise.all([
-      fetchJson(
-        `/api/v3/ticker/24hr?symbol=${encodeURIComponent(currentSymbol)}`
-      ),
-      fetchJson(
-        `/api/v3/depth?symbol=${encodeURIComponent(currentSymbol)}&limit=50`
-      ),
+      fetchJson(`/api/v3/ticker/24hr?symbol=${encodeURIComponent(currentSymbol)}`),
+      fetchJson(`/api/v3/depth?symbol=${encodeURIComponent(currentSymbol)}&limit=50`),
       fetchJson(
         `/api/v3/klines?symbol=${encodeURIComponent(currentSymbol)}` +
         `&interval=${encodeURIComponent(currentInterval)}&limit=300`
       ),
     ]);
 
-    currentTicker = ticker;
     currentPrice = Number(ticker.lastPrice || 0);
-
     const change = Number(ticker.priceChangePercent || 0);
+
     $("marketPrice").textContent = formatPrice(currentPrice);
     $("marketChange").textContent =
       `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`;
@@ -289,8 +280,7 @@
     $("orderbookReference").textContent =
       `${change >= 0 ? "↑" : "↓"} ${formatPrice(ticker.prevClosePrice)}`;
 
-    const limit = matchMedia("(max-width: 760px)").matches ? 5 : 8;
-    renderOrderbook(depth, limit);
+    renderOrderbook(depth);
 
     candleSeries.setData(
       klines.map((row) => ({
@@ -308,14 +298,13 @@
         value: Number(row[5]),
         color:
           Number(row[4]) >= Number(row[1])
-            ? "rgba(32,201,135,.4)"
-            : "rgba(255,85,113,.4)",
+            ? "rgba(34,201,138,.42)"
+            : "rgba(255,85,114,.42)",
       }))
     );
 
     chart.timeScale().fitContent();
     chart.timeScale().applyOptions({ rightOffset: 18 });
-    renderDrawings();
 
     if (!$("orderPrice").value || $("priceField").hidden) {
       $("orderPrice").value = currentPrice.toFixed(
@@ -326,9 +315,11 @@
     updatePositionsMarketPrice();
     await processLimitOrders();
     updateOrderCalculation();
+    renderDrawings();
   }
 
-  function renderOrderbook(depth, limit) {
+  function renderOrderbook(depth) {
+    const limit = matchMedia("(max-width: 760px)").matches ? 5 : 8;
     const precision = Number($("depthPrecision").value || .1);
     const normalize = (value) =>
       Math.round(Number(value) / precision) * precision;
@@ -342,10 +333,10 @@
     $("asksList").innerHTML = asks.map((row) => {
       const price = normalize(row[0]);
       const quantity = Number(row[1]);
-      const depthPercent = Math.min((quantity / maxAsk) * 100, 100);
+      const width = Math.min((quantity / maxAsk) * 100, 100);
 
       return `
-        <div class="orderbook-row ask" style="--depth:${depthPercent}%">
+        <div class="book-row ask" style="--depth:${width}%">
           <span>${formatPrice(price)}</span>
           <span>${formatNumber(quantity, 5)}</span>
         </div>
@@ -355,10 +346,10 @@
     $("bidsList").innerHTML = bids.map((row) => {
       const price = normalize(row[0]);
       const quantity = Number(row[1]);
-      const depthPercent = Math.min((quantity / maxBid) * 100, 100);
+      const width = Math.min((quantity / maxBid) * 100, 100);
 
       return `
-        <div class="orderbook-row bid" style="--depth:${depthPercent}%">
+        <div class="book-row bid" style="--depth:${width}%">
           <span>${formatPrice(price)}</span>
           <span>${formatNumber(quantity, 5)}</span>
         </div>
@@ -377,49 +368,282 @@
     $("askRatioBar").style.width = `${askRatio}%`;
   }
 
-  function drawingStorageKey() {
-    return `fastboot-terminal-drawings-${currentSymbol}-${currentInterval}`;
+  function currentOrderType() {
+    return (
+      document.querySelector("[data-order-type].active")?.dataset.orderType ||
+      "LIMIT"
+    );
+  }
+
+  function updateOrderCalculation() {
+    const price =
+      currentOrderType() === "MARKET"
+        ? currentPrice
+        : Number($("orderPrice").value || 0);
+
+    const quantity = Number($("orderQuantity").value || 0);
+    const total = Math.max(price * quantity, 0);
+
+    $("orderTotal").textContent = `${total.toFixed(2)} USDT`;
+    $("orderFee").textContent = `${(total * .001).toFixed(2)} USDT`;
+  }
+
+  function setQuantityPercent(percent) {
+    const price =
+      currentOrderType() === "MARKET"
+        ? currentPrice
+        : Number($("orderPrice").value || 0);
+
+    if (!(price > 0)) {
+      showToast("Цена ещё не загружена");
+      return;
+    }
+
+    const quantity = (tradingBalance * (Number(percent) / 100)) / price;
+    $("orderQuantity").value = quantity > 0 ? quantity.toFixed(8) : "";
+    updateOrderCalculation();
+  }
+
+  async function placeOrder(side) {
+    const type = currentOrderType();
+    const quantity = Number($("orderQuantity").value || 0);
+    const price =
+      type === "MARKET"
+        ? currentPrice
+        : Number($("orderPrice").value || 0);
+
+    if (!(price > 0) || !(quantity > 0)) {
+      showToast("Введите цену и количество");
+      return;
+    }
+
+    try {
+      const rpc =
+        type === "MARKET"
+          ? "open_terminal_market_position"
+          : "create_terminal_limit_order";
+
+      const params =
+        type === "MARKET"
+          ? {
+              p_symbol: currentSymbol,
+              p_side: side,
+              p_price: currentPrice,
+              p_quantity: quantity,
+            }
+          : {
+              p_symbol: currentSymbol,
+              p_side: side,
+              p_limit_price: price,
+              p_quantity: quantity,
+            };
+
+      const { error } = await supabaseClient.rpc(rpc, params);
+      if (error) throw error;
+
+      $("orderQuantity").value = "";
+      showToast(type === "MARKET" ? "Позиция открыта" : "Лимитный ордер создан");
+      await loadAccountData();
+    } catch (error) {
+      console.error(error);
+      showToast(error.message || "Не удалось создать ордер");
+    }
+  }
+
+  async function processLimitOrders() {
+    const matching = state.orders.filter((order) => {
+      if (order.symbol !== currentSymbol || order.status !== "open") return false;
+
+      const price = Number(order.price);
+
+      return order.side === "LONG"
+        ? currentPrice <= price
+        : currentPrice >= price;
+    });
+
+    for (const order of matching) {
+      const { error } = await supabaseClient.rpc(
+        "fill_terminal_limit_order",
+        {
+          p_order_id: order.id,
+          p_fill_price: currentPrice,
+        }
+      );
+
+      if (!error) showToast(`${order.symbol}: лимитный ордер исполнен`);
+    }
+
+    if (matching.length) await loadAccountData();
+  }
+
+  function updatePositionsMarketPrice() {
+    state.positions = state.positions.map((position) => {
+      if (position.symbol !== currentSymbol) return position;
+
+      const entry = Number(position.entry_price);
+      const quantity = Number(position.quantity);
+      const pnl =
+        position.side === "LONG"
+          ? (currentPrice - entry) * quantity
+          : (entry - currentPrice) * quantity;
+
+      return { ...position, current_price: currentPrice, live_pnl: pnl };
+    });
+
+    renderPositions();
+  }
+
+  function renderPositions() {
+    $("positionsCount").textContent = `(${state.positions.length})`;
+
+    $("positionsBody").innerHTML = state.positions.length
+      ? state.positions.map((position) => {
+          const livePrice =
+            Number(position.current_price) ||
+            (position.symbol === currentSymbol
+              ? currentPrice
+              : Number(position.entry_price));
+
+          const pnl =
+            Number.isFinite(Number(position.live_pnl))
+              ? Number(position.live_pnl)
+              : position.side === "LONG"
+                ? (livePrice - Number(position.entry_price)) * Number(position.quantity)
+                : (Number(position.entry_price) - livePrice) * Number(position.quantity);
+
+          return `
+            <tr>
+              <td><strong>${escapeHtml(position.symbol)}</strong></td>
+              <td class="${position.side === "LONG" ? "positive" : "negative"}">${escapeHtml(position.side)}</td>
+              <td>${formatPrice(position.entry_price)}</td>
+              <td>${formatPrice(livePrice)}</td>
+              <td>${formatNumber(position.quantity)}</td>
+              <td>${Number(position.margin).toFixed(2)} USDT</td>
+              <td class="${pnl >= 0 ? "positive" : "negative"}">${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USDT</td>
+              <td><button data-close-position="${position.id}">Закрыть</button></td>
+            </tr>
+          `;
+        }).join("")
+      : '<tr><td colspan="8" class="empty-row">Открытых позиций нет</td></tr>';
+
+    document.querySelectorAll("[data-close-position]").forEach((button) => {
+      button.onclick = () => closePosition(button.dataset.closePosition);
+    });
+  }
+
+  function renderOrders() {
+    $("ordersCount").textContent = `(${state.orders.length})`;
+
+    $("ordersBody").innerHTML = state.orders.length
+      ? state.orders.map((order) => `
+          <tr>
+            <td><strong>${escapeHtml(order.symbol)}</strong></td>
+            <td class="${order.side === "LONG" ? "positive" : "negative"}">${escapeHtml(order.side)}</td>
+            <td>${escapeHtml(order.order_type)}</td>
+            <td>${formatPrice(order.price)}</td>
+            <td>${formatNumber(order.quantity)}</td>
+            <td>${Number(order.reserved_amount).toFixed(2)} USDT</td>
+            <td>${formatDate(order.created_at)}</td>
+            <td><button data-cancel-order="${order.id}">Отменить</button></td>
+          </tr>
+        `).join("")
+      : '<tr><td colspan="8" class="empty-row">Открытых ордеров нет</td></tr>';
+
+    document.querySelectorAll("[data-cancel-order]").forEach((button) => {
+      button.onclick = () => cancelOrder(button.dataset.cancelOrder);
+    });
+  }
+
+  function renderTrades() {
+    $("tradesBody").innerHTML = state.trades.length
+      ? state.trades.map((trade) => `
+          <tr>
+            <td><strong>${escapeHtml(trade.symbol)}</strong></td>
+            <td class="${trade.side === "LONG" ? "positive" : "negative"}">${escapeHtml(trade.side)}</td>
+            <td>${formatPrice(trade.entry_price)}</td>
+            <td>${formatPrice(trade.exit_price)}</td>
+            <td>${formatNumber(trade.quantity)}</td>
+            <td class="${Number(trade.pnl) >= 0 ? "positive" : "negative"}">${Number(trade.pnl) >= 0 ? "+" : ""}${Number(trade.pnl).toFixed(2)} USDT</td>
+            <td class="${Number(trade.pnl_percent) >= 0 ? "positive" : "negative"}">${Number(trade.pnl_percent) >= 0 ? "+" : ""}${Number(trade.pnl_percent).toFixed(2)}%</td>
+            <td>${formatDate(trade.closed_at)}</td>
+          </tr>
+        `).join("")
+      : '<tr><td colspan="8" class="empty-row">История сделок пуста</td></tr>';
+  }
+
+  async function closePosition(positionId) {
+    try {
+      const { error } = await supabaseClient.rpc(
+        "close_terminal_position",
+        {
+          p_position_id: positionId,
+          p_exit_price: currentPrice,
+        }
+      );
+
+      if (error) throw error;
+
+      showToast("Позиция закрыта");
+      await loadAccountData();
+    } catch (error) {
+      console.error(error);
+      showToast(error.message || "Не удалось закрыть позицию");
+    }
+  }
+
+  async function cancelOrder(orderId) {
+    try {
+      const { error } = await supabaseClient.rpc(
+        "cancel_terminal_limit_order",
+        { p_order_id: orderId }
+      );
+
+      if (error) throw error;
+
+      showToast("Ордер отменён");
+      await loadAccountData();
+    } catch (error) {
+      console.error(error);
+      showToast(error.message || "Не удалось отменить ордер");
+    }
+  }
+
+  // ---------- drawing tools ----------
+  function drawingKey() {
+    return `fastboot-drawings-${currentSymbol}-${currentInterval}`;
   }
 
   function loadDrawings() {
     try {
-      drawings = JSON.parse(localStorage.getItem(drawingStorageKey()) || "[]");
+      drawings = JSON.parse(localStorage.getItem(drawingKey()) || "[]");
     } catch {
       drawings = [];
     }
-
     renderDrawings();
   }
 
   function saveDrawings() {
-    localStorage.setItem(drawingStorageKey(), JSON.stringify(drawings));
+    localStorage.setItem(drawingKey(), JSON.stringify(drawings));
   }
 
   function resizeDrawingCanvas() {
     const canvas = $("drawingCanvas");
-    const stage = canvas?.parentElement;
-
-    if (!canvas || !stage) return;
-
+    const stage = canvas.parentElement;
     const ratio = window.devicePixelRatio || 1;
-    const width = Math.max(stage.clientWidth, 1);
-    const height = Math.max(stage.clientHeight, 1);
 
-    canvas.width = Math.round(width * ratio);
-    canvas.height = Math.round(height * ratio);
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
+    canvas.width = Math.max(1, Math.round(stage.clientWidth * ratio));
+    canvas.height = Math.max(1, Math.round(stage.clientHeight * ratio));
+    canvas.style.width = `${stage.clientWidth}px`;
+    canvas.style.height = `${stage.clientHeight}px`;
 
     drawingContext = canvas.getContext("2d");
     drawingContext.setTransform(ratio, 0, 0, ratio, 0, 0);
     drawingContext.lineWidth = 1.5;
-    drawingContext.font = '12px Inter, sans-serif';
+    drawingContext.font = "12px Inter, sans-serif";
   }
 
   function pointFromEvent(event) {
-    const canvas = $("drawingCanvas");
-    const rect = canvas.getBoundingClientRect();
-
+    const rect = $("drawingCanvas").getBoundingClientRect();
     return {
       x: Math.max(0, Math.min(event.clientX - rect.left, rect.width)),
       y: Math.max(0, Math.min(event.clientY - rect.top, rect.height)),
@@ -427,24 +651,20 @@
   }
 
   function renderDrawings() {
-    const canvas = $("drawingCanvas");
-    if (!canvas) return;
-
     if (!drawingContext) resizeDrawingCanvas();
-    if (!drawingContext) return;
 
+    const canvas = $("drawingCanvas");
     const width = canvas.clientWidth;
     const height = canvas.clientHeight;
 
     drawingContext.clearRect(0, 0, width, height);
 
-    const all = drawingPreview ? [...drawings, drawingPreview] : drawings;
+    const items = drawingPreview ? [...drawings, drawingPreview] : drawings;
 
-    all.forEach((item) => {
+    items.forEach((item) => {
       drawingContext.save();
-      drawingContext.strokeStyle = item.color || "#8fa8ff";
-      drawingContext.fillStyle = item.color || "#8fa8ff";
-      drawingContext.lineWidth = item.width || 1.5;
+      drawingContext.strokeStyle = "#8fa8ff";
+      drawingContext.fillStyle = "#8fa8ff";
 
       if (item.type === "trend") {
         drawingContext.beginPath();
@@ -487,30 +707,28 @@
   }
 
   function setDrawingTool(tool) {
-    activeDrawingTool = tool;
+    drawingTool = tool;
     drawingStart = null;
     drawingPreview = null;
 
-    document.querySelectorAll("[data-drawing-tool]").forEach((button) => {
-      button.classList.toggle("active", button.dataset.drawingTool === tool);
+    document.querySelectorAll("[data-tool]").forEach((button) => {
+      button.classList.toggle("active", button.dataset.tool === tool);
     });
 
-    const canvas = $("drawingCanvas");
-    canvas.classList.toggle("active", tool !== "cursor");
+    $("drawingCanvas").classList.toggle("active", tool !== "cursor");
 
     const hint = $("drawingHint");
+    const messages = {
+      trend: "Проведите линию между двумя точками",
+      horizontal: "Нажмите в месте уровня",
+      vertical: "Нажмите в месте вертикальной линии",
+      rectangle: "Выделите область",
+      text: "Нажмите в месте текста",
+    };
 
     if (tool === "cursor") {
       hint.classList.add("hidden");
     } else {
-      const messages = {
-        trend: "Проведите линию между двумя точками",
-        horizontal: "Нажмите в месте горизонтального уровня",
-        vertical: "Нажмите в месте вертикального уровня",
-        rectangle: "Выделите прямоугольную область",
-        text: "Нажмите в месте для текста",
-      };
-
       hint.textContent = messages[tool] || "";
       hint.classList.remove("hidden");
     }
@@ -519,31 +737,25 @@
   }
 
   function beginDrawing(event) {
-    if (activeDrawingTool === "cursor") return;
+    if (drawingTool === "cursor") return;
 
     const point = pointFromEvent(event);
 
-    if (activeDrawingTool === "horizontal") {
-      drawings.push({
-        type: "horizontal",
-        y1: point.y,
-      });
+    if (drawingTool === "horizontal") {
+      drawings.push({ type: "horizontal", y1: point.y });
       saveDrawings();
       renderDrawings();
       return;
     }
 
-    if (activeDrawingTool === "vertical") {
-      drawings.push({
-        type: "vertical",
-        x1: point.x,
-      });
+    if (drawingTool === "vertical") {
+      drawings.push({ type: "vertical", x1: point.x });
       saveDrawings();
       renderDrawings();
       return;
     }
 
-    if (activeDrawingTool === "text") {
+    if (drawingTool === "text") {
       const text = window.prompt("Введите текст:");
       if (text?.trim()) {
         drawings.push({
@@ -560,7 +772,7 @@
 
     drawingStart = point;
     drawingPreview = {
-      type: activeDrawingTool,
+      type: drawingTool,
       x1: point.x,
       y1: point.y,
       x2: point.x,
@@ -568,12 +780,10 @@
     };
 
     $("drawingCanvas").setPointerCapture?.(event.pointerId);
-    renderDrawings();
   }
 
   function moveDrawing(event) {
     if (!drawingStart || !drawingPreview) return;
-
     const point = pointFromEvent(event);
     drawingPreview.x2 = point.x;
     drawingPreview.y2 = point.y;
@@ -587,12 +797,12 @@
     drawingPreview.x2 = point.x;
     drawingPreview.y2 = point.y;
 
-    const distance = Math.hypot(
-      drawingPreview.x2 - drawingPreview.x1,
-      drawingPreview.y2 - drawingPreview.y1
-    );
-
-    if (distance >= 4) {
+    if (
+      Math.hypot(
+        drawingPreview.x2 - drawingPreview.x1,
+        drawingPreview.y2 - drawingPreview.y1
+      ) >= 4
+    ) {
       drawings.push({ ...drawingPreview });
       saveDrawings();
     }
@@ -610,359 +820,38 @@
 
   function clearDrawings() {
     if (!drawings.length) return;
-
-    if (window.confirm("Удалить все графические объекты на этом графике?")) {
+    if (window.confirm("Удалить все объекты на графике?")) {
       drawings = [];
       saveDrawings();
       renderDrawings();
     }
   }
 
-  function updateOrderCalculation() {
-    const orderType =
-      document.querySelector("[data-order-type].active")?.dataset.orderType ||
-      "LIMIT";
-
-    const price =
-      orderType === "MARKET"
-        ? currentPrice
-        : Number($("orderPrice").value || 0);
-
-    const quantity = Number($("orderQuantity").value || 0);
-    const total = Math.max(price * quantity, 0);
-
-    $("orderTotal").textContent = `${total.toFixed(2)} USDT`;
-    $("orderFee").textContent = `${(total * .001).toFixed(2)} USDT`;
-  }
-
-  function setQuantityFromPercent(percent) {
-    const orderType =
-      document.querySelector("[data-order-type].active")?.dataset.orderType ||
-      "LIMIT";
-    const price =
-      orderType === "MARKET"
-        ? currentPrice
-        : Number($("orderPrice").value || 0);
-
-    if (!(price > 0)) return;
-
-    const quantity = (tradingBalance * (Number(percent) / 100)) / price;
-    $("orderQuantity").value =
-      quantity > 0 ? quantity.toFixed(8) : "";
-    updateOrderCalculation();
-  }
-
-  async function placeOrder(side) {
-    const orderType =
-      document.querySelector("[data-order-type].active")?.dataset.orderType ||
-      "LIMIT";
-
-    const quantity = Number($("orderQuantity").value || 0);
-    const price =
-      orderType === "MARKET"
-        ? currentPrice
-        : Number($("orderPrice").value || 0);
-
-    if (!(quantity > 0) || !(price > 0)) {
-      showToast("Введите цену и количество");
-      return;
-    }
-
-    try {
-      const rpc =
-        orderType === "MARKET"
-          ? "open_terminal_market_position"
-          : "create_terminal_limit_order";
-
-      const params =
-        orderType === "MARKET"
-          ? {
-              p_symbol: currentSymbol,
-              p_side: side,
-              p_price: currentPrice,
-              p_quantity: quantity,
-            }
-          : {
-              p_symbol: currentSymbol,
-              p_side: side,
-              p_limit_price: price,
-              p_quantity: quantity,
-            };
-
-      const { error } = await supabaseClient.rpc(rpc, params);
-      if (error) throw error;
-
-      $("orderQuantity").value = "";
-      $("orderPercent").value = "0";
-      showToast(
-        orderType === "MARKET"
-          ? "Позиция открыта"
-          : "Лимитный ордер создан"
-      );
-
-      await loadWalletAndAccountData();
-    } catch (error) {
-      console.error(error);
-      showToast(error.message || "Не удалось создать ордер");
-    }
-  }
-
-  async function processLimitOrders() {
-    const matching = state.orders.filter((order) => {
-      if (order.symbol !== currentSymbol || order.status !== "open") return false;
-
-      const limitPrice = Number(order.price);
-      return order.side === "LONG"
-        ? currentPrice <= limitPrice
-        : currentPrice >= limitPrice;
-    });
-
-    for (const order of matching) {
-      const { error } = await supabaseClient.rpc(
-        "fill_terminal_limit_order",
-        {
-          p_order_id: order.id,
-          p_fill_price: currentPrice,
-        }
-      );
-
-      if (!error) {
-        showToast(`${order.symbol}: лимитный ордер исполнен`);
-      }
-    }
-
-    if (matching.length) {
-      await loadWalletAndAccountData();
-    }
-  }
-
-  function updatePositionsMarketPrice() {
-    state.positions = state.positions.map((position) => {
-      if (position.symbol !== currentSymbol) return position;
-
-      const entry = Number(position.entry_price);
-      const quantity = Number(position.quantity);
-      const pnl =
-        position.side === "LONG"
-          ? (currentPrice - entry) * quantity
-          : (entry - currentPrice) * quantity;
-
-      return {
-        ...position,
-        current_price: currentPrice,
-        live_pnl: pnl,
-      };
-    });
-
-    renderPositions();
-  }
-
-  function renderPositions() {
-    $("positionsCount").textContent = `(${state.positions.length})`;
-
-    $("positionsBody").innerHTML = state.positions.length
-      ? state.positions.map((position) => {
-          const livePrice =
-            Number(position.current_price) ||
-            (position.symbol === currentSymbol ? currentPrice : Number(position.entry_price));
-
-          const pnl =
-            Number.isFinite(Number(position.live_pnl))
-              ? Number(position.live_pnl)
-              : position.side === "LONG"
-                ? (livePrice - Number(position.entry_price)) * Number(position.quantity)
-                : (Number(position.entry_price) - livePrice) * Number(position.quantity);
-
-          return `
-            <tr>
-              <td><strong>${escapeHtml(position.symbol)}</strong></td>
-              <td class="${position.side === "LONG" ? "positive" : "negative"}">
-                ${escapeHtml(position.side)}
-              </td>
-              <td>${formatPrice(position.entry_price)}</td>
-              <td>${formatPrice(livePrice)}</td>
-              <td>${formatNumber(position.quantity)}</td>
-              <td>${Number(position.margin).toFixed(2)} USDT</td>
-              <td class="${pnl >= 0 ? "positive" : "negative"}">
-                ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USDT
-              </td>
-              <td>
-                <button data-close-position="${position.id}">Закрыть</button>
-              </td>
-            </tr>
-          `;
-        }).join("")
-      : '<tr><td colspan="8" class="empty-row">Открытых позиций нет</td></tr>';
-
-    document.querySelectorAll("[data-close-position]").forEach((button) => {
-      button.onclick = () => closePosition(button.dataset.closePosition);
-    });
-  }
-
-  function renderOrders() {
-    $("ordersCount").textContent = `(${state.orders.length})`;
-
-    $("ordersBody").innerHTML = state.orders.length
-      ? state.orders.map((order) => `
-          <tr>
-            <td><strong>${escapeHtml(order.symbol)}</strong></td>
-            <td class="${order.side === "LONG" ? "positive" : "negative"}">
-              ${escapeHtml(order.side)}
-            </td>
-            <td>${escapeHtml(order.order_type)}</td>
-            <td>${formatPrice(order.price)}</td>
-            <td>${formatNumber(order.quantity)}</td>
-            <td>${Number(order.reserved_amount).toFixed(2)} USDT</td>
-            <td>${formatDate(order.created_at)}</td>
-            <td><button data-cancel-order="${order.id}">Отменить</button></td>
-          </tr>
-        `).join("")
-      : '<tr><td colspan="8" class="empty-row">Открытых ордеров нет</td></tr>';
-
-    document.querySelectorAll("[data-cancel-order]").forEach((button) => {
-      button.onclick = () => cancelOrder(button.dataset.cancelOrder);
-    });
-  }
-
-  function renderTrades() {
-    $("tradesBody").innerHTML = state.trades.length
-      ? state.trades.map((trade) => `
-          <tr>
-            <td><strong>${escapeHtml(trade.symbol)}</strong></td>
-            <td class="${trade.side === "LONG" ? "positive" : "negative"}">
-              ${escapeHtml(trade.side)}
-            </td>
-            <td>${formatPrice(trade.entry_price)}</td>
-            <td>${formatPrice(trade.exit_price)}</td>
-            <td>${formatNumber(trade.quantity)}</td>
-            <td class="${Number(trade.pnl) >= 0 ? "positive" : "negative"}">
-              ${Number(trade.pnl) >= 0 ? "+" : ""}${Number(trade.pnl).toFixed(2)} USDT
-            </td>
-            <td class="${Number(trade.pnl_percent) >= 0 ? "positive" : "negative"}">
-              ${Number(trade.pnl_percent) >= 0 ? "+" : ""}${Number(trade.pnl_percent).toFixed(2)}%
-            </td>
-            <td>${formatDate(trade.closed_at)}</td>
-          </tr>
-        `).join("")
-      : '<tr><td colspan="8" class="empty-row">История сделок пуста</td></tr>';
-  }
-
-  async function closePosition(positionId) {
-    try {
-      const { error } = await supabaseClient.rpc(
-        "close_terminal_position",
-        {
-          p_position_id: positionId,
-          p_exit_price: currentPrice,
-        }
-      );
-
-      if (error) throw error;
-
-      showToast("Позиция закрыта");
-      await loadWalletAndAccountData();
-    } catch (error) {
-      console.error(error);
-      showToast(error.message || "Не удалось закрыть позицию");
-    }
-  }
-
-  async function cancelOrder(orderId) {
-    try {
-      const { error } = await supabaseClient.rpc(
-        "cancel_terminal_limit_order",
-        { p_order_id: orderId }
-      );
-
-      if (error) throw error;
-
-      showToast("Ордер отменён");
-      await loadWalletAndAccountData();
-    } catch (error) {
-      console.error(error);
-      showToast(error.message || "Не удалось отменить ордер");
-    }
-  }
-
-  function isMobileTerminal() {
-    return window.matchMedia("(max-width: 760px)").matches;
-  }
-
-  function resizeChartToContainer() {
-    if (!chart) return;
-
-    const container = $("terminalChart");
+  function openChartMobile() {
+    document.body.classList.add("chart-open");
+    $("mobileTerminalButton").classList.remove("active");
+    $("mobileChartButton").classList.add("active");
 
     requestAnimationFrame(() => {
       chart.resize(
-        Math.max(container.clientWidth, 320),
-        Math.max(container.clientHeight, 300)
+        Math.max($("terminalChart").clientWidth, 320),
+        Math.max($("terminalChart").clientHeight, 300)
       );
-
+      resizeDrawingCanvas();
       chart.timeScale().fitContent();
       chart.timeScale().applyOptions({ rightOffset: 18 });
-      resizeDrawingCanvas();
       renderDrawings();
     });
   }
 
-  function openMobileChart() {
-    if (!isMobileTerminal()) return;
-
-    document.body.classList.add("mobile-chart-open");
-
-    $("mobileTerminalHomeButton")?.classList.remove("active");
-    $("mobileOpenChartButton")?.classList.add("active");
-
-    if ($("mobileChartSymbol")) {
-      $("mobileChartSymbol").textContent = currentSymbol;
-    }
-
-    resizeChartToContainer();
-  }
-
-  function closeMobileChart() {
-    document.body.classList.remove("mobile-chart-open");
-
-    $("mobileOpenChartButton")?.classList.remove("active");
-    $("mobileTerminalHomeButton")?.classList.add("active");
+  function closeChartMobile() {
+    document.body.classList.remove("chart-open");
+    $("mobileChartButton").classList.remove("active");
+    $("mobileTerminalButton").classList.add("active");
   }
 
   function bindEvents() {
-    document.querySelectorAll("[data-drawing-tool]").forEach((button) => {
-      button.addEventListener("click", () => {
-        setDrawingTool(button.dataset.drawingTool);
-      });
-    });
-
-    document.querySelector('[data-drawing-action="undo"]')?.addEventListener(
-      "click",
-      undoDrawing
-    );
-
-    document.querySelector('[data-drawing-action="clear"]')?.addEventListener(
-      "click",
-      clearDrawings
-    );
-
-    $("drawingCanvas")?.addEventListener("pointerdown", beginDrawing);
-    $("drawingCanvas")?.addEventListener("pointermove", moveDrawing);
-    $("drawingCanvas")?.addEventListener("pointerup", finishDrawing);
-    $("drawingCanvas")?.addEventListener("pointercancel", finishDrawing);
-
-    $("toggleVolumeButton")?.addEventListener("click", () => {
-      volumeVisible = !volumeVisible;
-      volumeSeries?.applyOptions({ visible: volumeVisible });
-      $("toggleVolumeButton").classList.toggle("active", volumeVisible);
-    });
-
-    $("resetChartButton")?.addEventListener("click", () => {
-      chart.timeScale().fitContent();
-      chart.timeScale().applyOptions({ rightOffset: 18 });
-      renderDrawings();
-    });
-
-    $("desktopTerminalHomeButton")?.addEventListener("click", () => {
+    $("dashboardHomeButton").onclick = () => {
       try {
         if (
           window.parent &&
@@ -972,54 +861,18 @@
           window.parent.openSection("overview");
           return;
         }
-      } catch (error) {
-        console.warn("Direct dashboard navigation unavailable:", error);
-      }
+      } catch {}
 
-      try {
-        if (window.parent && window.parent !== window) {
-          window.parent.postMessage(
-            { type: "FASTBOOT_OPEN_SECTION", section: "overview" },
-            window.location.origin
-          );
+      window.top.location.href = "dashboard.html";
+    };
 
-          window.setTimeout(() => {
-            try {
-              window.top.location.href = "dashboard.html";
-            } catch {
-              window.location.href = "dashboard.html";
-            }
-          }, 250);
-
-          return;
-        }
-      } catch (error) {
-        console.warn("Dashboard message navigation unavailable:", error);
-      }
-
-      window.location.href = "dashboard.html";
-    });
-
-    $("mobileOpenChartButton")?.addEventListener("click", openMobileChart);
-    $("mobileChartHomeButton")?.addEventListener("click", closeMobileChart);
-    $("mobileTerminalHomeButton")?.addEventListener("click", closeMobileChart);
-
-    window.addEventListener("resize", () => {
-      if (!isMobileTerminal()) {
-        closeMobileChart();
-      }
-
-      resizeChartToContainer();
-    });
+    $("mobileChartButton").onclick = openChartMobile;
+    $("mobileTerminalButton").onclick = closeChartMobile;
+    $("chartBackButton").onclick = closeChartMobile;
 
     $("symbolSelect").onchange = async (event) => {
       currentSymbol = event.target.value;
       $("baseAssetLabel").textContent = currentSymbol.replace("USDT", "");
-
-      if ($("mobileChartSymbol")) {
-        $("mobileChartSymbol").textContent = currentSymbol;
-      }
-
       loadDrawings();
       await loadMarket();
     };
@@ -1029,11 +882,39 @@
         document.querySelectorAll("[data-interval]").forEach((item) =>
           item.classList.toggle("active", item === button)
         );
+
         currentInterval = button.dataset.interval;
         loadDrawings();
         await loadMarket();
       };
     });
+
+    document.querySelectorAll("[data-tool]").forEach((button) => {
+      button.onclick = () => setDrawingTool(button.dataset.tool);
+    });
+
+    document.querySelector('[data-action="undo"]').onclick = undoDrawing;
+    document.querySelector('[data-action="clear"]').onclick = clearDrawings;
+
+    $("drawingCanvas").addEventListener("pointerdown", beginDrawing);
+    $("drawingCanvas").addEventListener("pointermove", moveDrawing);
+    $("drawingCanvas").addEventListener("pointerup", finishDrawing);
+    $("drawingCanvas").addEventListener("pointercancel", finishDrawing);
+
+    $("toggleVolumeButton").onclick = () => {
+      volumeVisible = !volumeVisible;
+      volumeSeries.applyOptions({ visible: volumeVisible });
+      $("toggleVolumeButton").classList.toggle("active", volumeVisible);
+    };
+
+    $("resetChartButton").onclick = () => {
+      chart.timeScale().fitContent();
+      chart.timeScale().applyOptions({ rightOffset: 18 });
+      renderDrawings();
+    };
+
+    $("refreshChartButton").onclick = loadMarket;
+    $("depthPrecision").onchange = loadMarket;
 
     document.querySelectorAll("[data-order-type]").forEach((button) => {
       button.onclick = () => {
@@ -1044,13 +925,19 @@
         const market = button.dataset.orderType === "MARKET";
         $("priceField").hidden = market;
 
-        if (market) {
-          $("orderPrice").value = currentPrice;
-        }
-
+        if (market) $("orderPrice").value = currentPrice;
         updateOrderCalculation();
       };
     });
+
+    document.querySelectorAll("[data-percent]").forEach((button) => {
+      button.onclick = () => setQuantityPercent(button.dataset.percent);
+    });
+
+    $("orderPrice").oninput = updateOrderCalculation;
+    $("orderQuantity").oninput = updateOrderCalculation;
+    $("buyButton").onclick = () => placeOrder("LONG");
+    $("sellButton").onclick = () => placeOrder("SHORT");
 
     document.querySelectorAll("[data-bottom-tab]").forEach((button) => {
       button.onclick = () => {
@@ -1058,7 +945,7 @@
           item.classList.toggle("active", item === button)
         );
 
-        document.querySelectorAll(".bottom-tab-content").forEach((panel) =>
+        document.querySelectorAll(".tab-content").forEach((panel) =>
           panel.classList.toggle(
             "active",
             panel.id === `${button.dataset.bottomTab}Tab`
@@ -1066,16 +953,6 @@
         );
       };
     });
-
-    $("refreshChartButton").onclick = loadMarket;
-    $("depthPrecision").onchange = loadMarket;
-    $("orderPrice").oninput = updateOrderCalculation;
-    $("orderQuantity").oninput = updateOrderCalculation;
-    $("orderPercent").oninput = (event) =>
-      setQuantityFromPercent(event.target.value);
-
-    $("buyButton").onclick = () => placeOrder("LONG");
-    $("sellButton").onclick = () => placeOrder("SHORT");
 
     $("openTransferButton").onclick = () =>
       $("transferModal").classList.remove("hidden");
@@ -1106,18 +983,30 @@
         $("transferAmount").value = "";
         $("transferModal").classList.add("hidden");
         showToast("Перевод выполнен");
-        await loadWalletAndAccountData();
+        await loadAccountData();
       } catch (error) {
         console.error(error);
         showToast(error.message || "Не удалось выполнить перевод");
       }
     };
 
+    window.addEventListener("resize", () => {
+      if (!matchMedia("(max-width: 760px)").matches) closeChartMobile();
+
+      if (chart) {
+        chart.resize(
+          Math.max($("terminalChart").clientWidth, 320),
+          Math.max($("terminalChart").clientHeight, 300)
+        );
+        resizeDrawingCanvas();
+        renderDrawings();
+      }
+    });
+
     window.addEventListener("message", (event) => {
       if (event.origin !== window.location.origin) return;
-
       if (event.data?.type === "FASTBOOT_TERMINAL_REFRESH") {
-        loadWalletAndAccountData().catch(console.error);
+        loadAccountData().catch(console.error);
       }
     });
   }
@@ -1126,9 +1015,8 @@
     try {
       await loadMarket();
 
-      // Wallet and DB data less frequently than market.
       if (!refreshLoop.counter || refreshLoop.counter % 3 === 0) {
-        await loadWalletAndAccountData();
+        await loadAccountData();
       }
 
       refreshLoop.counter = (refreshLoop.counter || 0) + 1;
@@ -1148,20 +1036,16 @@
 
       $("baseAssetLabel").textContent = currentSymbol.replace("USDT", "");
 
-      if ($("mobileChartSymbol")) {
-        $("mobileChartSymbol").textContent = currentSymbol;
-      }
-
       await loadMarket();
 
       try {
-        await loadWalletAndAccountData();
+        await loadAccountData();
       } catch (accountError) {
         console.error("Terminal account data error:", accountError);
         showToast("График работает, но торговый счёт временно недоступен");
       }
 
-      refreshTimer = setInterval(refreshLoop, REFRESH_MS);
+      setInterval(refreshLoop, REFRESH_MS);
     } catch (error) {
       console.error(error);
       showToast(error.message || "Не удалось запустить терминал");

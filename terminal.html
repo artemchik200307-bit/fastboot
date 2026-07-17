@@ -2,134 +2,109 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-  <meta name="theme-color" content="#0b1018">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <meta name="theme-color" content="#0a1019">
   <title>FASTBOOT Terminal</title>
-  <link rel="stylesheet" href="terminal.css?v=2-6">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="terminal.css?v=3-0">
   <script src="https://unpkg.com/lightweight-charts@5.0.8/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
   <main class="terminal-app">
-    <header class="terminal-topbar">
-      <div class="terminal-brand-wrap">
-        <button
-          id="desktopTerminalHomeButton"
-          class="desktop-terminal-home-button"
-          type="button"
-          aria-label="Вернуться на Dashboard"
-          title="Вернуться на Dashboard"
-        >
-          <span aria-hidden="true">⌂</span>
-          <small>Dashboard</small>
+    <header class="topbar">
+      <div class="topbar-left">
+        <button id="dashboardHomeButton" class="home-button" type="button" title="Dashboard">
+          <span>⌂</span><small>Dashboard</small>
         </button>
 
-        <div class="terminal-brand">
+        <div class="brand">
           <strong>FASTBOOT</strong>
           <span>TERMINAL</span>
         </div>
+
+        <label class="symbol-picker">
+          <small>Пара</small>
+          <select id="symbolSelect">
+            <option>BTCUSDT</option>
+            <option>ETHUSDT</option>
+            <option>SOLUSDT</option>
+            <option>BNBUSDT</option>
+            <option>XRPUSDT</option>
+            <option>DOGEUSDT</option>
+            <option>ADAUSDT</option>
+            <option>AVAXUSDT</option>
+            <option>LINKUSDT</option>
+            <option>TRXUSDT</option>
+          </select>
+        </label>
+
+        <div class="ticker-box">
+          <strong id="marketPrice">—</strong>
+          <span id="marketChange">0.00%</span>
+        </div>
       </div>
 
-      <div class="symbol-select-wrap">
-        <label for="symbolSelect">Пара</label>
-        <select id="symbolSelect">
-          <option>BTCUSDT</option>
-          <option>ETHUSDT</option>
-          <option>SOLUSDT</option>
-          <option>BNBUSDT</option>
-          <option>XRPUSDT</option>
-          <option>DOGEUSDT</option>
-          <option>ADAUSDT</option>
-          <option>AVAXUSDT</option>
-          <option>LINKUSDT</option>
-          <option>TRXUSDT</option>
-        </select>
-      </div>
-
-      <div class="market-price-box">
-        <span id="marketPrice">—</span>
-        <strong id="marketChange">0.00%</strong>
-      </div>
-
-      <div class="terminal-wallet-box">
-        <span>Торговый счёт</span>
+      <div class="wallet-box">
+        <small>Торговый счёт</small>
         <strong id="tradingBalance">0.00 USDT</strong>
         <button id="openTransferButton" type="button">Перевести</button>
       </div>
     </header>
 
-    <nav class="mobile-terminal-navigation" aria-label="Навигация терминала">
-      <button id="mobileTerminalHomeButton" class="mobile-terminal-home active" type="button" aria-label="Главная терминала">
-        <span aria-hidden="true">⌂</span>
-        <small>Терминал</small>
-      </button>
-
-      <button id="mobileOpenChartButton" class="mobile-terminal-chart-button" type="button">
-        <span aria-hidden="true">▥</span>
-        <small>График</small>
-      </button>
-    </nav>
-
-    <section class="terminal-market-stats">
+    <section class="stats-row">
       <div><span>Открытие 24ч</span><strong id="statOpen">—</strong></div>
-      <div><span>Макс. 24ч</span><strong id="statHigh">—</strong></div>
-      <div><span>Мин. 24ч</span><strong id="statLow">—</strong></div>
+      <div><span>Максимум 24ч</span><strong id="statHigh">—</strong></div>
+      <div><span>Минимум 24ч</span><strong id="statLow">—</strong></div>
       <div><span>Объём 24ч</span><strong id="statVolume">—</strong></div>
     </section>
 
-    <section class="terminal-workspace">
-      <article class="chart-panel terminal-panel" id="mobileChartView">
-        <div class="mobile-chart-header">
-          <button id="mobileChartHomeButton" class="mobile-chart-home-button" type="button" aria-label="Вернуться в терминал">
-            <span aria-hidden="true">⌂</span>
-            <strong>Терминал</strong>
-          </button>
+    <nav class="mobile-switcher">
+      <button id="mobileTerminalButton" class="active" type="button">⌂ Терминал</button>
+      <button id="mobileChartButton" type="button">▥ График</button>
+    </nav>
 
-          <div>
-            <span>График</span>
-            <strong id="mobileChartSymbol">BTCUSDT</strong>
-          </div>
-        </div>
+    <section class="workspace">
+      <article class="chart-panel panel" id="chartPanel">
+        <div class="chart-header">
+          <div class="chart-header-left">
+            <button id="chartBackButton" class="chart-back-button" type="button">⌂ Терминал</button>
 
-        <div class="panel-toolbar">
-          <div class="chart-toolbar-left">
-            <div class="interval-tabs">
-            <button data-interval="1m">1м</button>
-            <button data-interval="5m">5м</button>
-            <button data-interval="15m" class="active">15м</button>
-            <button data-interval="1h">1ч</button>
-            <button data-interval="4h">4ч</button>
-            <button data-interval="1d">1д</button>
+            <div class="timeframes">
+              <button data-interval="1m">1м</button>
+              <button data-interval="5m">5м</button>
+              <button data-interval="15m" class="active">15м</button>
+              <button data-interval="1h">1ч</button>
+              <button data-interval="4h">4ч</button>
+              <button data-interval="1d">1д</button>
             </div>
 
-            <div class="drawing-toolbar" id="drawingToolbar">
-              <button type="button" data-drawing-tool="cursor" class="active" title="Курсор">↖</button>
-              <button type="button" data-drawing-tool="trend" title="Трендовая линия">╱</button>
-              <button type="button" data-drawing-tool="horizontal" title="Горизонтальная линия">━</button>
-              <button type="button" data-drawing-tool="vertical" title="Вертикальная линия">┃</button>
-              <button type="button" data-drawing-tool="rectangle" title="Прямоугольник">▭</button>
-              <button type="button" data-drawing-tool="text" title="Текст">T</button>
-              <button type="button" data-drawing-action="undo" title="Отменить">↶</button>
-              <button type="button" data-drawing-action="clear" title="Удалить всё">⌫</button>
+            <div class="drawing-tools">
+              <button data-tool="cursor" class="active" title="Курсор">↖</button>
+              <button data-tool="trend" title="Трендовая линия">╱</button>
+              <button data-tool="horizontal" title="Горизонтальная линия">━</button>
+              <button data-tool="vertical" title="Вертикальная линия">┃</button>
+              <button data-tool="rectangle" title="Прямоугольник">▭</button>
+              <button data-tool="text" title="Текст">T</button>
+              <button data-action="undo" title="Отменить">↶</button>
+              <button data-action="clear" title="Удалить всё">⌫</button>
             </div>
           </div>
 
-          <div class="chart-toolbar-actions">
-            <button id="toggleVolumeButton" class="icon-button" type="button" title="Показать или скрыть объём">V</button>
-            <button id="resetChartButton" class="icon-button" type="button" title="Сбросить масштаб">◎</button>
-            <button id="refreshChartButton" class="icon-button" type="button" title="Обновить">↻</button>
+          <div class="chart-actions">
+            <button id="toggleVolumeButton" type="button" title="Объём">V</button>
+            <button id="resetChartButton" type="button" title="Сбросить масштаб">◎</button>
+            <button id="refreshChartButton" type="button" title="Обновить">↻</button>
           </div>
         </div>
 
-        <div class="terminal-chart-stage">
-          <div id="terminalChart" class="terminal-chart"></div>
+        <div class="chart-stage">
+          <div id="terminalChart" class="chart"></div>
           <canvas id="drawingCanvas" class="drawing-canvas"></canvas>
           <div id="drawingHint" class="drawing-hint hidden"></div>
         </div>
       </article>
 
-      <article class="orderbook-panel terminal-panel mobile-main-panel">
-        <div class="panel-heading">
+      <article class="orderbook-panel panel terminal-main-panel">
+        <div class="panel-head">
           <div>
             <h3>Биржевой стакан</h3>
             <span>Глубина рынка</span>
@@ -141,17 +116,21 @@
           </select>
         </div>
 
-        <div class="orderbook-head">
-          <span>Цена</span><span>Размер</span>
+        <div class="book-head">
+          <span>Цена</span>
+          <span>Размер</span>
         </div>
-        <div id="asksList" class="orderbook-list"></div>
-        <div class="orderbook-mid">
+
+        <div id="asksList" class="book-list"></div>
+
+        <div class="book-mid">
           <strong id="orderbookPrice">—</strong>
           <span id="orderbookReference">—</span>
         </div>
-        <div id="bidsList" class="orderbook-list"></div>
 
-        <div class="orderbook-ratio">
+        <div id="bidsList" class="book-list"></div>
+
+        <div class="book-ratio">
           <span id="bidRatio">50.00%</span>
           <div>
             <i id="bidRatioBar"></i>
@@ -161,20 +140,20 @@
         </div>
       </article>
 
-      <article class="order-panel terminal-panel mobile-main-panel">
-        <div class="order-type-tabs">
+      <article class="order-panel panel terminal-main-panel">
+        <div class="order-tabs">
           <button data-order-type="LIMIT" class="active">Лимит</button>
           <button data-order-type="MARKET">Рынок</button>
         </div>
 
-        <div class="available-line">
+        <div class="available">
           <span>Доступно</span>
           <strong id="availableBalance">0.00 USDT</strong>
         </div>
 
         <label id="priceField">
           Цена
-          <div class="input-shell">
+          <div class="input-box">
             <input id="orderPrice" type="number" min="0" step="any">
             <span>USDT</span>
           </div>
@@ -182,30 +161,32 @@
 
         <label>
           Количество
-          <div class="input-shell">
+          <div class="input-box">
             <input id="orderQuantity" type="number" min="0" step="any">
             <span id="baseAssetLabel">BTC</span>
           </div>
         </label>
 
-        <input id="orderPercent" type="range" min="0" max="100" step="25" value="0">
-        <div class="range-labels">
-          <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+        <div class="percent-buttons">
+          <button data-percent="25" type="button">25%</button>
+          <button data-percent="50" type="button">50%</button>
+          <button data-percent="75" type="button">75%</button>
+          <button data-percent="100" type="button">100%</button>
         </div>
 
-        <div class="order-calculation">
+        <div class="calculation">
           <div><span>Сумма</span><strong id="orderTotal">0.00 USDT</strong></div>
           <div><span>Комиссия</span><strong id="orderFee">0.00 USDT</strong></div>
         </div>
 
         <div class="order-buttons">
-          <button id="buyButton" class="buy-button" type="button">Купить/Лонг</button>
-          <button id="sellButton" class="sell-button" type="button">Продать/Шорт</button>
+          <button id="buyButton" class="buy" type="button">Купить / Лонг</button>
+          <button id="sellButton" class="sell" type="button">Продать / Шорт</button>
         </div>
       </article>
     </section>
 
-    <section class="terminal-bottom terminal-panel">
+    <section class="bottom-panel panel">
       <nav class="bottom-tabs">
         <button data-bottom-tab="positions" class="active">
           Позиции <span id="positionsCount">(0)</span>
@@ -216,7 +197,7 @@
         <button data-bottom-tab="trades">История сделок</button>
       </nav>
 
-      <div id="positionsTab" class="bottom-tab-content active">
+      <div id="positionsTab" class="tab-content active">
         <div class="table-scroll">
           <table>
             <thead>
@@ -230,13 +211,13 @@
         </div>
       </div>
 
-      <div id="ordersTab" class="bottom-tab-content">
+      <div id="ordersTab" class="tab-content">
         <div class="table-scroll">
           <table>
             <thead>
               <tr>
                 <th>Пара</th><th>Сторона</th><th>Тип</th><th>Цена</th>
-                <th>Количество</th><th>Зарезервировано</th><th>Дата</th><th></th>
+                <th>Количество</th><th>Резерв</th><th>Дата</th><th></th>
               </tr>
             </thead>
             <tbody id="ordersBody"></tbody>
@@ -244,7 +225,7 @@
         </div>
       </div>
 
-      <div id="tradesTab" class="bottom-tab-content">
+      <div id="tradesTab" class="tab-content">
         <div class="table-scroll">
           <table>
             <thead>
@@ -262,7 +243,7 @@
 
   <div id="transferModal" class="modal hidden">
     <div class="modal-card">
-      <button id="closeTransferModal" class="modal-close" type="button">×</button>
+      <button id="closeTransferModal" class="close-modal" type="button">×</button>
       <h2>Перевод на торговый счёт</h2>
 
       <label>
@@ -278,15 +259,12 @@
         <input id="transferAmount" type="number" min="0.01" step="0.01">
       </label>
 
-      <button id="confirmTransferButton" class="primary-button" type="button">
-        Выполнить перевод
-      </button>
+      <button id="confirmTransferButton" class="primary" type="button">Перевести</button>
     </div>
   </div>
 
   <div id="toast" class="toast hidden"></div>
 
-  <script src="supabase-config.js"></script>
-  <script src="terminal.js?v=2-6"></script>
+  <script src="terminal.js?v=3-0"></script>
 </body>
 </html>
