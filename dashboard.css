@@ -4519,3 +4519,77 @@ body.trading-mode .sidebar.open {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* ===== AI ASSISTANT V1 ===== */
+.ai-heading{display:flex;align-items:center;justify-content:space-between;gap:18px}
+.ai-status-shell{display:flex;align-items:center;gap:10px;border:1px solid rgba(137,151,174,.16);border-radius:12px;padding:10px 14px;background:rgba(255,255,255,.025)}
+.ai-status-shell small,.ai-status-shell strong{display:block}
+.ai-status-shell small{color:var(--muted);font-size:8px}
+.ai-status-shell strong{margin-top:3px;font-size:11px}
+.ai-status-dot{width:10px;height:10px;border-radius:50%;background:#6b7484;box-shadow:0 0 0 5px rgba(107,116,132,.12)}
+.ai-status-dot.active{background:#20c987;box-shadow:0 0 0 5px rgba(32,201,135,.12),0 0 16px rgba(32,201,135,.42)}
+.ai-hero-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(300px,.85fr);gap:14px}
+.ai-balance-card,.ai-transfer-card{border:1px solid rgba(137,151,174,.16);border-radius:16px;background:radial-gradient(circle at top right,rgba(111,145,255,.13),transparent 42%),var(--panel)}
+.ai-balance-card{padding:21px}
+.ai-card-top{display:flex;justify-content:space-between;gap:16px}
+.ai-card-top span,.ai-card-top strong{display:block}
+.ai-card-top>div>span{color:var(--muted);font-size:10px}
+.ai-card-top>div>strong{margin-top:8px;font-size:clamp(27px,4vw,40px)}
+.ai-return-badge{height:max-content;border-radius:999px;padding:7px 10px;background:rgba(137,151,174,.12);font-size:10px;font-weight:900}
+.ai-return-badge.positive{background:rgba(32,201,135,.13);color:#20c987}
+.ai-return-badge.negative{background:rgba(255,95,120,.13);color:#ff6f87}
+.ai-balance-meta,.ai-transfer-balances{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:19px}
+.ai-balance-meta>div,.ai-transfer-balances>div{border:1px solid rgba(137,151,174,.12);border-radius:10px;padding:11px;background:rgba(255,255,255,.02)}
+.ai-balance-meta span,.ai-balance-meta strong,.ai-transfer-balances span,.ai-transfer-balances strong{display:block}
+.ai-balance-meta span,.ai-transfer-balances span{color:var(--muted);font-size:8px}
+.ai-balance-meta strong,.ai-transfer-balances strong{margin-top:5px;font-size:11px}
+.ai-actions-row,.ai-transfer-actions{display:flex;gap:8px;margin-top:16px}
+.ai-actions-row>*,.ai-transfer-actions>*{flex:1}
+.ai-transfer-card{overflow:hidden;padding-bottom:16px}
+.ai-transfer-balances,.ai-transfer-input,.ai-transfer-actions{margin-right:16px;margin-left:16px}
+.ai-transfer-input{display:block;margin-top:13px}
+.ai-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:10px;margin:14px 0}
+.ai-stat-grid article{border:1px solid rgba(137,151,174,.14);border-radius:12px;padding:14px;background:var(--panel)}
+.ai-stat-grid span,.ai-stat-grid strong,.ai-stat-grid small{display:block}
+.ai-stat-grid span{color:var(--muted);font-size:9px}
+.ai-stat-grid strong{margin-top:7px;font-size:18px}
+.ai-stat-grid small{margin-top:5px;color:#71809a;font-size:8px}
+.positive{color:#20c987!important}.negative{color:#ff6f87!important}.long{color:#20c987!important}.short{color:#ff6f87!important}
+.ai-content-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,.8fr);gap:14px}
+.ai-trades-list{max-height:330px;overflow-y:auto}
+.ai-open-trade-row{display:grid;grid-template-columns:minmax(120px,1fr) 1fr 1fr auto;gap:12px;align-items:center;border-top:1px solid rgba(137,151,174,.12);padding:12px 15px}
+.ai-open-trade-row:first-child{border-top:0}
+.ai-open-trade-row>div span,.ai-open-trade-row>div strong{display:block}
+.ai-open-trade-row>div span{color:var(--muted);font-size:8px}
+.ai-open-trade-row>div strong{margin-top:4px;font-size:10px}
+.ai-equity-chart{min-height:220px;padding:15px;color:#6f91ff}
+.ai-equity-chart svg{width:100%;height:180px}
+.ai-equity-line{fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.ai-equity-range{display:flex;justify-content:space-between;color:var(--muted);font-size:8px}
+.ai-equity-range strong{color:var(--text)}
+.ai-history-panel{margin-top:14px}
+.ai-history-table{overflow-x:auto}
+.ai-history-head,.ai-history-row{display:grid;grid-template-columns:100px 90px 130px 130px minmax(150px,1fr) 120px;gap:10px;align-items:center;min-width:760px}
+.ai-history-head{min-height:38px;padding:0 14px;background:rgba(255,255,255,.025);color:var(--muted);font-size:8px}
+.ai-history-row{min-height:64px;border-top:1px solid rgba(137,151,174,.12);padding:10px 14px;font-size:9px}
+.ai-side-badge{width:max-content;border-radius:999px;padding:5px 8px;font-weight:900}
+.ai-side-badge.long{background:rgba(32,201,135,.13)}
+.ai-side-badge.short{background:rgba(255,95,120,.13)}
+.ai-price-pair small{margin:0 5px;color:var(--muted)}
+.ai-result-cell strong,.ai-result-cell span{display:block;text-align:right}
+.ai-result-cell span{margin-top:4px;font-size:8px}
+.admin-ai-panel{margin-top:16px}
+.admin-ai-grid{display:grid;grid-template-columns:minmax(260px,.65fr) minmax(0,1.35fr);gap:14px;padding:15px}
+.admin-ai-form{display:grid;align-content:start;gap:10px;border:1px solid rgba(137,151,174,.14);border-radius:12px;padding:14px;background:rgba(255,255,255,.02)}
+.admin-ai-trades-wrap{min-width:0;border:1px solid rgba(137,151,174,.14);border-radius:12px;overflow:hidden}
+.admin-ai-subhead{display:flex;justify-content:space-between;border-bottom:1px solid rgba(137,151,174,.14);padding:12px 14px}
+.admin-ai-subhead span{border-radius:999px;padding:3px 7px;background:rgba(111,145,255,.13);color:#8fa8ff;font-size:8px}
+.admin-ai-trade-row{display:grid;grid-template-columns:minmax(110px,1fr) 1fr 1fr auto;gap:10px;align-items:center;border-top:1px solid rgba(137,151,174,.12);padding:11px 13px}
+.admin-ai-trade-row:first-child{border-top:0}
+.admin-ai-trade-row span,.admin-ai-trade-row strong{display:block}
+.admin-ai-trade-row span{color:var(--muted);font-size:8px}
+.admin-ai-trade-row strong{margin-top:4px;font-size:9px}
+@media(max-width:1050px){.ai-hero-grid,.ai-content-grid,.admin-ai-grid{grid-template-columns:1fr}}
+@media(max-width:760px){.ai-heading{display:block}.ai-status-shell{margin-top:12px}.ai-stat-grid{grid-template-columns:1fr 1fr}.ai-open-trade-row{grid-template-columns:1fr 1fr}.ai-actions-row,.ai-transfer-actions{display:grid}}
+@media(max-width:430px){.ai-stat-grid,.ai-balance-meta,.ai-transfer-balances{grid-template-columns:1fr}}

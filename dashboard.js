@@ -27,6 +27,10 @@ const state = {
   adminFundingRequests: [],
   adminOverview: null,
   operationFilter: "all",
+  aiBotAccount: null,
+  aiOpenTrades: [],
+  aiTradeResults: [],
+  adminAiOpenTrades: [],
   botBalance: Number(userWallet?.bot_balance || 0),
   botRunning: localStorage.getItem(storageKey("bot-running")) === "true",
   orders: JSON.parse(localStorage.getItem(storageKey("orders")) || "[]"),
@@ -168,6 +172,9 @@ async function loadSupabaseAccountData() {
     fundingResult,
     transactionResult,
     transferResult,
+    botAccountResult,
+    aiOpenTradesResult,
+    aiResultsResult,
   ] = await Promise.all([
     supabaseClient
       .from("wallets")
@@ -195,12 +202,34 @@ async function loadSupabaseAccountData() {
       .eq("user_id", authUser.id)
       .order("created_at", { ascending: false })
       .limit(100),
+
+    supabaseClient
+      .from("ai_bot_accounts")
+      .select("user_id, is_active, started_at, stopped_at, initial_balance, created_at, updated_at")
+      .eq("user_id", authUser.id)
+      .maybeSingle(),
+
+    supabaseClient
+      .from("ai_strategy_trades")
+      .select("id, pair, side, entry_price, exit_price, opened_at, closed_at, pnl_percent, status")
+      .eq("status", "open")
+      .order("opened_at", { ascending: false }),
+
+    supabaseClient
+      .from("user_ai_trade_results")
+      .select("id, pair, side, entry_price, exit_price, opened_at, closed_at, pnl_percent, balance_before, pnl_amount, balance_after, created_at")
+      .eq("user_id", authUser.id)
+      .order("closed_at", { ascending: false })
+      .limit(200),
   ]);
 
   if (walletResult.error) throw walletResult.error;
   if (fundingResult.error) throw fundingResult.error;
   if (transactionResult.error) throw transactionResult.error;
   if (transferResult.error) throw transferResult.error;
+  if (botAccountResult.error) throw botAccountResult.error;
+  if (aiOpenTradesResult.error) throw aiOpenTradesResult.error;
+  if (aiResultsResult.error) throw aiResultsResult.error;
 
   Object.assign(userWallet, walletResult.data);
 
@@ -215,9 +244,13 @@ async function loadSupabaseAccountData() {
   state.fundingRequests = fundingResult.data || [];
   state.transactions = transactionResult.data || [];
   state.transfers = transferResult.data || [];
+  state.aiBotAccount = botAccountResult.data || null;
+  state.aiOpenTrades = aiOpenTradesResult.data || [];
+  state.aiTradeResults = aiResultsResult.data || [];
 
   applySupabaseWalletToPortfolio();
   renderAccount();
+  renderAiAssistant();
 }
 
 function formatOperationStatus(status) {
@@ -350,7 +383,6 @@ function renderAccount() {
 
   renderOperations();
   renderCompleteOperationHistory();
-  renderBot();
   updateTerminalBalances();
 }
 
@@ -727,13 +759,7 @@ document.querySelectorAll("[data-operation-filter]").forEach((button) => {
   });
 });
 
-function renderBot() {
-  $("botBalance").textContent = `$${state.botBalance.toFixed(2)}`;
-  $("botStatus").textContent = state.botRunning ? "Активен" : "Остановлен";
-  $("botStatus").className = state.botRunning ? "positive" : "";
-  $("botStatusDescription").textContent = state.botRunning ? "Алгоритм выполняет мониторинг рынка" : "Торговля не запущена";
-  $("toggleBotButton").textContent = state.botRunning ? "Остановить торговлю" : "Запустить торговлю";
-}
+
 
 async function transferBotFunds(direction) {
   const amount = Number($("botTransferAmount").value);
@@ -777,911 +803,8 @@ $("transferFromBotButton").addEventListener(
   "click",
   () => transferBotFunds("bot_to_spot")
 );
-$("toggleBotButton").addEventListener("click",()=>{
-  if (state.botBalance <= 0 && !state.botRunning) return showToast("Сначала переведите средства на счёт бота");
-  state.botRunning = !state.botRunning; saveState(); renderBot(); showToast(state.botRunning ? "Торговля бота запущена" : "Торговля бота остановлена");
-});
-const periodStats = {
-  day:[0,0,0,0], week:[0,0,0,0], month:[0,0,0,0], quarter:[0,0,0,0]
-};
-$("botPeriodTabs").querySelectorAll("button").forEach(btn=>btn.addEventListener("click",()=>{
-  $("botPeriodTabs").querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===btn));
-  const [ret,trades,wr,dd]=periodStats[btn.dataset.period];
-  $("periodReturn").textContent=`${ret.toFixed(2)}%`; $("periodTrades").textContent=trades;
-  $("periodWinRate").textContent=`${wr}%`; $("periodDrawdown").textContent=`${dd.toFixed(2)}%`;
-}));
 
-function formatPrice(value) {
-  const n = Number(value); if (!Number.isFinite(n)) return "—";
-  return n >= 1000 ? n.toLocaleString("en-US",{maximumFractionDigits:2,minimumFractionDigits:2}) :
-    n >= 1 ? n.toFixed(4) : n.toFixed(8);
-}
 
-
-const COIN_DISPLAY_NAMES = {
-  BTCUSDT: "Bitcoin / Tether",
-  ETHUSDT: "Ethereum / Tether",
-  SOLUSDT: "Solana / Tether",
-  BNBUSDT: "BNB / Tether",
-  XRPUSDT: "XRP / Tether",
-};
-
-
-const EXCLUDED_MARKET_ASSETS = new Set([
-  "USDC", "FDUSD", "TUSD", "USDP", "DAI", "EUR", "AEUR", "TRY", "BRL"
-]);
-
-const EXCLUDED_MARKET_SUFFIXES = ["UP", "DOWN", "BULL", "BEAR"];
-
-const MARKET_NAMES = {
-  BTC: "Bitcoin",
-  ETH: "Ethereum",
-  BNB: "BNB",
-  SOL: "Solana",
-  XRP: "XRP",
-  DOGE: "Dogecoin",
-  ADA: "Cardano",
-  AVAX: "Avalanche",
-  LINK: "Chainlink",
-  SUI: "Sui",
-  TRX: "TRON",
-  LTC: "Litecoin",
-  TON: "Toncoin",
-  DOT: "Polkadot",
-  BCH: "Bitcoin Cash",
-  SHIB: "Shiba Inu",
-  XLM: "Stellar",
-  HBAR: "Hedera",
-  UNI: "Uniswap",
-  AAVE: "Aave",
-  NEAR: "NEAR Protocol",
-  APT: "Aptos",
-  FIL: "Filecoin",
-  ICP: "Internet Computer",
-  ATOM: "Cosmos",
-  ARB: "Arbitrum",
-  OP: "Optimism",
-  ETC: "Ethereum Classic",
-  ALGO: "Algorand",
-  VET: "VeChain",
-  INJ: "Injective",
-  RENDER: "Render",
-  FET: "Artificial Superintelligence",
-  PEPE: "Pepe",
-  WIF: "dogwifhat",
-  BONK: "Bonk"
-};
-
-function isAllowedMarketInstrument(info) {
-  const base = info.baseAsset;
-
-  return (
-    info.status === "TRADING" &&
-    info.quoteAsset === "USDT" &&
-    info.isSpotTradingAllowed !== false &&
-    !EXCLUDED_MARKET_ASSETS.has(base) &&
-    !EXCLUDED_MARKET_SUFFIXES.some((suffix) => base.endsWith(suffix))
-  );
-}
-
-async function loadMarketUniverse() {
-  if (state.marketUniverse.length) {
-    renderMarketPicker();
-    return;
-  }
-
-  try {
-    const [exchangeInfo, tickers] = await Promise.all([
-      fetchJson(`${REST_BASE}/api/v3/exchangeInfo`),
-      fetchJson(`${REST_BASE}/api/v3/ticker/24hr`)
-    ]);
-
-    const allowed = new Map(
-      exchangeInfo.symbols
-        .filter(isAllowedMarketInstrument)
-        .map((info) => [info.symbol, info])
-    );
-
-    state.marketUniverse = tickers
-      .filter((ticker) => allowed.has(ticker.symbol))
-      .sort((a, b) => Number(b.quoteVolume) - Number(a.quoteVolume))
-      .slice(0, 100)
-      .map((ticker) => {
-        const info = allowed.get(ticker.symbol);
-
-        return {
-          symbol: ticker.symbol,
-          baseAsset: info.baseAsset,
-          name: MARKET_NAMES[info.baseAsset] || info.baseAsset,
-          price: Number(ticker.lastPrice),
-          change: Number(ticker.priceChangePercent),
-          volume: Number(ticker.quoteVolume)
-        };
-      });
-
-    const select = $("tradeSymbolSelect");
-    select.innerHTML = state.marketUniverse
-      .map((item) => `<option value="${item.symbol}">${item.symbol}</option>`)
-      .join("");
-
-    if (state.marketUniverse.some((item) => item.symbol === state.currentSymbol)) {
-      select.value = state.currentSymbol;
-    } else if (state.marketUniverse.length) {
-      state.currentSymbol = state.marketUniverse[0].symbol;
-      select.value = state.currentSymbol;
-    }
-
-    renderMarketPicker();
-    updateMarketPickerLabel();
-  } catch (error) {
-    console.error(error);
-    $("marketPickerList").innerHTML =
-      '<div class="market-picker-empty">Не удалось загрузить инструменты.</div>';
-  }
-}
-
-function renderMarketPicker() {
-  const query = ($("marketSearchInput")?.value || "").trim().toLowerCase();
-
-  const filtered = state.marketUniverse.filter((item) =>
-    `${item.symbol} ${item.baseAsset} ${item.name}`
-      .toLowerCase()
-      .includes(query)
-  );
-
-  $("marketPickerList").innerHTML = filtered.length
-    ? filtered.map((item) => `
-        <button type="button"
-          class="market-picker-row ${item.symbol === state.currentSymbol ? "selected" : ""}"
-          data-market-symbol="${item.symbol}">
-          <span class="market-picker-coin">
-            <strong>${item.baseAsset}/USDT</strong>
-            <small>${item.name}</small>
-          </span>
-          <span class="market-picker-price">${formatPrice(item.price)}</span>
-          <span class="market-picker-change ${item.change >= 0 ? "positive" : "negative"}">
-            ${item.change >= 0 ? "+" : ""}${item.change.toFixed(2)}%
-          </span>
-        </button>
-      `).join("")
-    : '<div class="market-picker-empty">Монета не найдена.</div>';
-
-  document.querySelectorAll("[data-market-symbol]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      const symbol = button.dataset.marketSymbol;
-      state.currentSymbol = symbol;
-      $("tradeSymbolSelect").value = symbol;
-      $("marketPickerDropdown").classList.add("hidden");
-      $("marketSearchInput").value = "";
-      updateMarketPickerLabel();
-      renderMarketPicker();
-      await loadTradingTerminal();
-    });
-  });
-}
-
-function updateMarketPickerLabel() {
-  const item = state.marketUniverse.find(
-    (market) => market.symbol === state.currentSymbol
-  );
-
-  const base = state.currentSymbol.replace("USDT", "");
-  $("marketPickerSymbol").textContent = state.currentSymbol;
-  $("marketPickerName").textContent =
-    item?.name ? `${item.name} / Tether` : `${base} / Tether`;
-}
-
-async function loadTradingTerminal() {
-  const symbol = $("tradeSymbolSelect").value || state.currentSymbol;
-  state.currentSymbol = symbol;
-  updateMarketPickerLabel();
-  const activeInterval =
-    document.querySelector("[data-chart-interval].active")?.dataset.chartInterval || "15m";
-
-  state.currentSymbol = symbol;
-
-  try {
-    const [klines, ticker, depth] = await Promise.all([
-      fetchJson(`${REST_BASE}/api/v3/klines?symbol=${symbol}&interval=${activeInterval}&limit=500`),
-      fetchJson(`${REST_BASE}/api/v3/ticker/24hr?symbol=${symbol}`),
-      fetchJson(`${REST_BASE}/api/v3/depth?symbol=${symbol}&limit=20`)
-    ]);
-
-    const lastPrice = Number(ticker.lastPrice);
-    const change = Number(ticker.priceChangePercent);
-
-    const marketItem = state.marketUniverse.find((item) => item.symbol === symbol);
-    if (marketItem) {
-      marketItem.price = lastPrice;
-      marketItem.change = change;
-    }
-    const base = symbol.replace("USDT", "");
-
-    $("terminalSymbolLabel").textContent = symbol;
-    $("terminalBaseName").textContent = COIN_DISPLAY_NAMES[symbol] || `${base} / Tether`;
-    $("terminalPrice").textContent = formatPrice(lastPrice);
-    $("terminalOpen").textContent = formatPrice(ticker.openPrice);
-    $("terminalHigh").textContent = formatPrice(ticker.highPrice);
-    $("terminalLow").textContent = formatPrice(ticker.lowPrice);
-    $("terminalVolume").textContent =
-      new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 })
-        .format(Number(ticker.quoteVolume));
-    $("terminalTradeCount").textContent = Number(ticker.count).toLocaleString("en-US");
-    $("terminalChange").textContent = `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`;
-    $("terminalChange").className = change >= 0 ? "positive" : "negative";
-    $("orderPrice").value = formatRawNumber(lastPrice);
-    $("baseAssetSuffix").textContent = base;
-    $("orderbookMid").textContent = formatPrice(lastPrice);
-    $("orderbookDirection").textContent =
-      `${change >= 0 ? "↑" : "↓"} ${formatPrice(ticker.weightedAvgPrice)}`;
-    $("orderbookDirection").className = change >= 0 ? "positive" : "negative";
-
-    updateTerminalBalances();
-    renderProOrderbook(depth);
-    renderProfessionalChart(klines);
-    renderOrders();
-    renderTerminalAssets();
-    renderTerminalTradeHistory();
-    updateOrderCalculation();
-    startTerminalRealtimeStream(symbol, activeInterval);
-  } catch (error) {
-    console.error("Ошибка торгового терминала:", error);
-
-    const chartContainer = $("terminalChart");
-    if (chartContainer && !state.chart) {
-      chartContainer.innerHTML = `
-        <div class="terminal-empty-state">
-          <strong>Не удалось загрузить график</strong>
-          <span>${escapeHtml(error?.message || "Ошибка рыночного API")}</span>
-        </div>
-      `;
-    }
-
-    showToast(`Не удалось загрузить терминал: ${error?.message || "неизвестная ошибка"}`);
-  }
-}
-
-function formatRawNumber(value) {
-  const number = Number(value);
-  if (!Number.isFinite(number)) return "";
-  if (number >= 1000) return number.toFixed(2);
-  if (number >= 1) return number.toFixed(4);
-  return number.toFixed(8);
-}
-
-
-function stopTerminalRealtimeStream() {
-  state.terminalSocketGeneration += 1;
-
-  if (state.terminalSocketReconnectTimer) {
-    clearTimeout(state.terminalSocketReconnectTimer);
-    state.terminalSocketReconnectTimer = null;
-  }
-
-  if (state.tradeSocket) {
-    state.tradeSocket.onopen = null;
-    state.tradeSocket.onmessage = null;
-    state.tradeSocket.onerror = null;
-    state.tradeSocket.onclose = null;
-
-    try {
-      state.tradeSocket.close(1000, "Terminal stream changed");
-    } catch {
-      // Socket may already be closed.
-    }
-
-    state.tradeSocket = null;
-  }
-}
-
-function startTerminalRealtimeStream(symbol, interval) {
-  stopTerminalRealtimeStream();
-
-  if (state.section !== "trading") return;
-
-  const generation = state.terminalSocketGeneration;
-  const streamSymbol = symbol.toLowerCase();
-  const streams = [
-    `${streamSymbol}@kline_${interval}`,
-    `${streamSymbol}@ticker`,
-    `${streamSymbol}@depth20@1000ms`,
-  ].join("/");
-
-  const socket = new WebSocket(
-    `wss://stream.binance.com:9443/stream?streams=${streams}`
-  );
-
-  state.tradeSocket = socket;
-
-  socket.onopen = () => {
-    const live = document.querySelector(".terminal-live-status");
-    live?.classList.remove("connection-error");
-    live?.classList.add("connection-live");
-
-    const text = live?.querySelector("span");
-    if (text) text.textContent = "LIVE";
-  };
-
-  socket.onmessage = (event) => {
-    if (
-      generation !== state.terminalSocketGeneration ||
-      state.section !== "trading" ||
-      state.currentSymbol !== symbol
-    ) {
-      return;
-    }
-
-    let payload;
-
-    try {
-      payload = JSON.parse(event.data);
-    } catch {
-      return;
-    }
-
-    const stream = payload.stream || "";
-    const data = payload.data || {};
-
-    if (stream.includes("@kline_")) {
-      updateRealtimeCandle(data.k);
-      return;
-    }
-
-    if (stream.endsWith("@ticker")) {
-      updateRealtimeTicker(data);
-      return;
-    }
-
-    if (stream.includes("@depth20")) {
-      renderProOrderbook({
-        asks: data.asks || data.a || [],
-        bids: data.bids || data.b || [],
-      });
-    }
-  };
-
-  socket.onerror = () => {
-    const live = document.querySelector(".terminal-live-status");
-    live?.classList.remove("connection-live");
-    live?.classList.add("connection-error");
-
-    const text = live?.querySelector("span");
-    if (text) text.textContent = "RECONNECT";
-  };
-
-  socket.onclose = () => {
-    if (
-      generation !== state.terminalSocketGeneration ||
-      state.section !== "trading" ||
-      state.currentSymbol !== symbol
-    ) {
-      return;
-    }
-
-    const live = document.querySelector(".terminal-live-status");
-    live?.classList.remove("connection-live");
-    live?.classList.add("connection-error");
-
-    const text = live?.querySelector("span");
-    if (text) text.textContent = "RECONNECT";
-
-    state.terminalSocketReconnectTimer = setTimeout(() => {
-      if (
-        generation === state.terminalSocketGeneration &&
-        state.section === "trading" &&
-        state.currentSymbol === symbol
-      ) {
-        startTerminalRealtimeStream(symbol, interval);
-      }
-    }, 2000);
-  };
-}
-
-function updateRealtimeCandle(kline) {
-  if (!kline || !state.candleSeries || !state.volumeSeries) return;
-
-  const time = Math.floor(Number(kline.t) / 1000);
-  const open = Number(kline.o);
-  const high = Number(kline.h);
-  const low = Number(kline.l);
-  const close = Number(kline.c);
-  const volume = Number(kline.v);
-
-  state.candleSeries.update({
-    time,
-    open,
-    high,
-    low,
-    close,
-  });
-
-  state.volumeSeries.update({
-    time,
-    value: volume,
-    color:
-      close >= open
-        ? "rgba(32,201,135,.52)"
-        : "rgba(255,95,120,.52)",
-  });
-
-  updateChartOhlc([0, open, high, low, close, volume]);
-}
-
-function updateRealtimeTicker(ticker) {
-  if (!ticker) return;
-
-  const lastPrice = Number(ticker.c);
-  const change = Number(ticker.P);
-  const base = state.currentSymbol.replace("USDT", "");
-
-  if (Number.isFinite(lastPrice)) {
-    $("terminalPrice").textContent = formatPrice(lastPrice);
-    $("orderbookMid").textContent = formatPrice(lastPrice);
-
-    if ($("orderType")?.value === "MARKET" || !$("orderPrice")?.value) {
-      $("orderPrice").value = formatRawNumber(lastPrice);
-    }
-  }
-
-  if (Number.isFinite(change)) {
-    $("terminalChange").textContent =
-      `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`;
-    $("terminalChange").className =
-      change >= 0 ? "positive" : "negative";
-  }
-
-  $("terminalOpen").textContent = formatPrice(ticker.o);
-  $("terminalHigh").textContent = formatPrice(ticker.h);
-  $("terminalLow").textContent = formatPrice(ticker.l);
-  $("terminalVolume").textContent =
-    new Intl.NumberFormat("en-US", {
-      notation: "compact",
-      maximumFractionDigits: 2,
-    }).format(Number(ticker.q));
-  $("terminalTradeCount").textContent =
-    Number(ticker.n || 0).toLocaleString("en-US");
-
-  const weightedPrice = Number(ticker.w);
-  $("orderbookDirection").textContent =
-    `${change >= 0 ? "↑" : "↓"} ${formatPrice(weightedPrice)}`;
-  $("orderbookDirection").className =
-    change >= 0 ? "positive" : "negative";
-
-  const marketItem = state.marketUniverse.find(
-    (item) => item.symbol === state.currentSymbol
-  );
-
-  if (marketItem) {
-    marketItem.price = lastPrice;
-    marketItem.change = change;
-  }
-
-  state.prices[base] = lastPrice;
-  updateOrderCalculation();
-}
-
-function renderProfessionalChart(rows) {
-  const container = $("terminalChart");
-
-  if (!container || !Array.isArray(rows) || !rows.length) {
-    console.error("Нет контейнера или данных для графика");
-    return;
-  }
-
-  if (!window.LightweightCharts) {
-    container.innerHTML =
-      '<div class="terminal-empty-state"><strong>Библиотека графика не загрузилась</strong></div>';
-    return;
-  }
-
-  const containerWidth = Math.max(container.clientWidth, 320);
-  const containerHeight = Math.max(container.clientHeight, 320);
-
-  if (!state.chart) {
-    state.chart = LightweightCharts.createChart(container, {
-      width: containerWidth,
-      height: containerHeight,
-      layout: {
-        background: { type: "solid", color: "#0d1219" },
-        textColor: "#8490a2",
-        attributionLogo: false,
-      },
-      localization: {
-        locale: "ru-RU",
-      },
-      grid: {
-        vertLines: { color: "rgba(116,128,149,.10)" },
-        horzLines: { color: "rgba(116,128,149,.10)" },
-      },
-      crosshair: {
-        mode: LightweightCharts.CrosshairMode.Normal,
-      },
-      rightPriceScale: {
-        visible: true,
-        borderColor: "#242b36",
-        autoScale: true,
-        scaleMargins: {
-          top: 0.06,
-          bottom: 0.23,
-        },
-      },
-      timeScale: {
-        visible: true,
-        borderColor: "#242b36",
-        timeVisible: true,
-        secondsVisible: false,
-        rightOffset: 8,
-        barSpacing: 7,
-        minBarSpacing: 1.5,
-        fixLeftEdge: false,
-        fixRightEdge: false,
-      },
-      handleScroll: {
-        mouseWheel: true,
-        pressedMouseMove: true,
-        horzTouchDrag: true,
-        vertTouchDrag: true,
-      },
-      handleScale: {
-        axisPressedMouseMove: {
-          time: true,
-          price: true,
-        },
-        mouseWheel: true,
-        pinch: true,
-      },
-    });
-
-    state.candleSeries = state.chart.addSeries(
-      LightweightCharts.CandlestickSeries,
-      {
-        upColor: "#20c987",
-        downColor: "#ff5f78",
-        borderVisible: false,
-        wickUpColor: "#20c987",
-        wickDownColor: "#ff5f78",
-        priceLineVisible: true,
-        lastValueVisible: true,
-      }
-    );
-
-    state.volumeSeries = state.chart.addSeries(
-      LightweightCharts.HistogramSeries,
-      {
-        priceFormat: { type: "volume" },
-        priceScaleId: "volume",
-        priceLineVisible: false,
-        lastValueVisible: false,
-      }
-    );
-
-    state.volumeSeries.priceScale().applyOptions({
-      scaleMargins: {
-        top: 0.80,
-        bottom: 0,
-      },
-    });
-
-    state.chart.subscribeCrosshairMove((param) => {
-      if (!param || !param.time || !param.seriesData) {
-        updateChartOhlc(rows.at(-1));
-        return;
-      }
-
-      const candle = param.seriesData.get(state.candleSeries);
-      const volume = param.seriesData.get(state.volumeSeries);
-
-      if (candle) {
-        updateChartOhlc([
-          0,
-          candle.open,
-          candle.high,
-          candle.low,
-          candle.close,
-          volume?.value || 0,
-        ]);
-      }
-    });
-
-    const resizeChart = () => {
-      if (!state.chart || !container.isConnected) return;
-
-      const width = Math.max(container.clientWidth, 320);
-      const height = Math.max(container.clientHeight, 320);
-      state.chart.resize(width, height);
-    };
-
-    state.chartResizeObserver?.disconnect?.();
-    state.chartResizeObserver = new ResizeObserver(() => {
-      requestAnimationFrame(resizeChart);
-    });
-    state.chartResizeObserver.observe(container);
-
-    window.addEventListener("resize", resizeChart);
-  }
-
-  const candleData = rows.map((row) => ({
-    time: Math.floor(Number(row[0]) / 1000),
-    open: Number(row[1]),
-    high: Number(row[2]),
-    low: Number(row[3]),
-    close: Number(row[4]),
-  }));
-
-  const volumeData = rows.map((row) => ({
-    time: Math.floor(Number(row[0]) / 1000),
-    value: Number(row[5]),
-    color:
-      Number(row[4]) >= Number(row[1])
-        ? "rgba(32,201,135,.52)"
-        : "rgba(255,95,120,.52)",
-  }));
-
-  state.candleSeries.setData(candleData);
-  state.volumeSeries.setData(volumeData);
-  updateChartOhlc(rows.at(-1));
-
-  requestAnimationFrame(() => {
-    const width = Math.max(container.clientWidth, 320);
-    const height = Math.max(container.clientHeight, 320);
-    state.chart.resize(width, height);
-    state.chart.timeScale().fitContent();
-  });
-}
-
-function updateChartOhlc(row) {
-  if (!row) return;
-  $("chartOpen").textContent = formatPrice(row[1]);
-  $("chartHigh").textContent = formatPrice(row[2]);
-  $("chartLow").textContent = formatPrice(row[3]);
-  $("chartClose").textContent = formatPrice(row[4]);
-  $("chartVolume").textContent =
-    new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 })
-      .format(Number(row[5]));
-}
-
-function renderProOrderbook(depth) {
-  if (!depth || !Array.isArray(depth.asks) || !Array.isArray(depth.bids)) {
-    throw new Error("Некорректные данные стакана");
-  }
-
-  const precision = Number($("orderbookPrecision")?.value) || .1;
-
-  const prepareRows = (rows) => {
-    let cumulative = 0;
-    const normalized = rows.map(([price, quantity]) => {
-      cumulative += Number(quantity);
-      return {
-        price: Math.round(Number(price) / precision) * precision,
-        quantity: Number(quantity),
-        total: cumulative,
-      };
-    });
-
-    const maxTotal = Math.max(...normalized.map((item) => item.total), 1);
-    return normalized.map((item) => ({
-      ...item,
-      depth: item.total / maxTotal * 100,
-    }));
-  };
-
-  const visibleOrderbookRows = window.matchMedia("(max-width: 760px)").matches ? 5 : 8;
-  const asks = prepareRows([...depth.asks].reverse().slice(0, visibleOrderbookRows));
-  const bids = prepareRows(depth.bids.slice(0, visibleOrderbookRows));
-
-  $("asksList").innerHTML = asks.map((item) => `
-    <div class="pro-orderbook-row" style="--depth-width:${item.depth}%">
-      <span>${formatPrice(item.price)}</span>
-      <span>${item.quantity.toFixed(5)}</span>
-      <span>${item.total.toFixed(5)}</span>
-    </div>
-  `).join("");
-
-  $("bidsList").innerHTML = bids.map((item) => `
-    <div class="pro-orderbook-row" style="--depth-width:${item.depth}%">
-      <span>${formatPrice(item.price)}</span>
-      <span>${item.quantity.toFixed(5)}</span>
-      <span>${item.total.toFixed(5)}</span>
-    </div>
-  `).join("");
-
-  const bidTotal = bids.reduce((sum, item) => sum + item.quantity, 0);
-  const askTotal = asks.reduce((sum, item) => sum + item.quantity, 0);
-  const total = bidTotal + askTotal || 1;
-  const bidPercent = bidTotal / total * 100;
-  const askPercent = 100 - bidPercent;
-
-  $("mobileBidRatio").textContent = `${bidPercent.toFixed(2)}%`;
-  $("mobileAskRatio").textContent = `${askPercent.toFixed(2)}%`;
-  $("mobileBidRatioBar").style.width = `${bidPercent}%`;
-  $("mobileAskRatioBar").style.width = `${askPercent}%`;
-}
-
-function renderProRecentTrades(trades) {
-  $("recentTradesList").innerHTML = trades.reverse().map((trade) => `
-    <div class="pro-recent-row">
-      <span class="${trade.isBuyerMaker ? "negative" : "positive"}">
-        ${formatPrice(trade.price)}
-      </span>
-      <span>${Number(trade.qty).toFixed(5)}</span>
-      <span>${new Date(trade.time).toLocaleTimeString("ru-RU", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      })}</span>
-    </div>
-  `).join("");
-}
-
-function updateTerminalBalances() {
-  const usdt = state.portfolio.find((item) => item.asset === "USDT");
-  const available = usdt?.amount || 0;
-  const locked = state.orders
-    .filter((order) => order.status === "Открыт")
-    .reduce((sum, order) => sum + (order.side === "BUY" ? order.total : 0), 0);
-
-  $("availableUsdt").textContent = `${available.toFixed(2)} USDT`;
-  $("terminalAvailableBalance").textContent = `${available.toFixed(2)} USDT`;
-  $("terminalLockedBalance").textContent = `${locked.toFixed(2)} USDT`;
-  $("terminalAccountBalance").textContent =
-    `${(available + locked).toFixed(2)} USDT`;
-  $("terminalRealizedPnl").textContent =
-    `${Number(localStorage.getItem("fastboot-realized-pnl") || 0).toFixed(2)} USDT`;
-}
-
-function calculateOrderAmountFromPercent(percent) {
-  const usdt = state.portfolio.find((item) => item.asset === "USDT")?.amount || 0;
-  const price = Number($("orderPrice").value) ||
-    Number(String($("terminalPrice").textContent).replaceAll(",", ""));
-  if (!(price > 0)) return;
-
-  $("orderPercentSlider").value = String(percent);
-
-  if (state.orderSide === "BUY") {
-    $("orderAmount").value = ((usdt * percent / 100) / price).toFixed(8);
-  } else {
-    const asset = state.currentSymbol.replace("USDT", "");
-    const amount = state.portfolio.find((item) => item.asset === asset)?.amount || 0;
-    $("orderAmount").value = (amount * percent / 100).toFixed(8);
-  }
-
-  updateOrderCalculation();
-}
-
-function updateOrderCalculation() {
-  const price = Number($("orderPrice").value) ||
-    Number(String($("terminalPrice").textContent).replaceAll(",", ""));
-  const amount = Number($("orderAmount").value) || 0;
-  const total = price * amount;
-  const fee = total * .001;
-
-  $("orderTotal").textContent = `${total.toFixed(2)} USDT`;
-  $("estimatedFee").textContent = `${fee.toFixed(2)} USDT`;
-
-  const usdt = state.portfolio.find((item) => item.asset === "USDT")?.amount || 0;
-  const asset = state.currentSymbol.replace("USDT", "");
-  const assetAmount = state.portfolio.find((item) => item.asset === asset)?.amount || 0;
-
-  $("mobileMaxBuy").textContent = `${usdt.toFixed(2)} USDT`;
-  $("mobileBuyCost").textContent = `${total.toFixed(2)} USDT`;
-  $("mobileMaxSell").textContent = `${assetAmount.toFixed(8)} ${asset}`;
-  $("mobileSellCost").textContent = `${total.toFixed(2)} USDT`;
-}
-
-function placeLocalTerminalOrder(side) {
-  state.orderSide = side;
-
-  const type = $("orderType").value;
-  const amount = Number($("orderAmount").value);
-  const displayedPrice =
-    Number(String($("terminalPrice").textContent).replaceAll(",", ""));
-  const price = type === "MARKET"
-    ? displayedPrice
-    : Number($("orderPrice").value);
-
-  if (!(amount > 0) || !(price > 0)) {
-    showToast("Введите цену и количество");
-    return;
-  }
-
-  const total = price * amount;
-  const order = {
-    date: new Date().toLocaleString("ru-RU"),
-    symbol: state.currentSymbol,
-    type,
-    side,
-    price,
-    amount,
-    total,
-    status: type === "MARKET" ? "Исполнен локально" : "Открыт",
-    takeProfit: Number($("takeProfitPrice")?.value) || null,
-    stopLoss: Number($("stopLossPrice")?.value) || null,
-    postOnly: Boolean($("postOnly")?.checked),
-  };
-
-  state.orders.unshift(order);
-  saveState();
-  renderOrders();
-  renderTerminalTradeHistory();
-  updateTerminalBalances();
-  $("orderAmount").value = "";
-  $("orderPercentSlider").value = "0";
-  updateOrderCalculation();
-  showToast(`${side === "BUY" ? "Покупка" : "Продажа"} добавлена в локальную историю`);
-}
-
-function renderOrders() {
-  const rows = state.orders.length
-    ? state.orders.map((order) => `
-      <div class="terminal-order-row">
-        <span>${order.date}</span>
-        <strong>${order.symbol}</strong>
-        <span>${order.type}</span>
-        <span class="${order.side === "BUY" ? "positive" : "negative"}">${order.side}</span>
-        <span>${formatPrice(order.price)}</span>
-        <span>${order.amount}</span>
-        <span>${order.status}</span>
-      </div>
-    `).join("")
-    : `<div class="terminal-empty-state"><strong>Ордеров пока нет</strong></div>`;
-
-  $("ordersHistory").innerHTML = rows;
-
-  const openCount = state.orders.filter((order) => order.status === "Открыт").length;
-  $("openOrdersTabCount").textContent = `(${openCount})`;
-  $("mobileOpenOrdersCount").textContent = `(${openCount})`;
-
-  $("openOrdersContent").innerHTML = openCount
-    ? state.orders
-        .filter((order) => order.status === "Открыт")
-        .map((order) => `
-          <div class="terminal-order-row">
-            <span>${order.date}</span>
-            <strong>${order.symbol}</strong>
-            <span>${order.type}</span>
-            <span class="${order.side === "BUY" ? "positive" : "negative"}">${order.side}</span>
-            <span>${formatPrice(order.price)}</span>
-            <span>${order.amount}</span>
-            <span>${order.status}</span>
-          </div>
-        `).join("")
-    : `<div class="terminal-empty-state"><strong>Открытых ордеров нет</strong></div>`;
-}
-
-function renderTerminalTradeHistory() {
-  const filled = state.orders.filter((order) =>
-    String(order.status).includes("Исполнен")
-  );
-
-  $("terminalTradeHistory").innerHTML = filled.length
-    ? filled.map((order) => `
-      <div class="terminal-order-row">
-        <span>${order.date}</span>
-        <strong>${order.symbol}</strong>
-        <span class="${order.side === "BUY" ? "positive" : "negative"}">${order.side}</span>
-        <span>${formatPrice(order.price)}</span>
-        <span>${order.amount}</span>
-        <span>${order.total.toFixed(2)}</span>
-        <span>${order.status}</span>
-      </div>
-    `).join("")
-    : `<div class="terminal-empty-state"><strong>Исполненных сделок пока нет</strong></div>`;
-}
-
-function renderTerminalAssets() {
-  $("terminalAssetsList").innerHTML = state.portfolio.map((item) => `
-    <article class="terminal-asset-card">
-      <span>${item.name}</span>
-      <strong>${item.asset}: ${item.amount.toFixed(item.asset === "USDT" ? 2 : 8)}</strong>
-    </article>
-  `).join("");
-}
-
-$("tradeSymbolSelect").addEventListener("change", () => {
-  state.currentSymbol = $("tradeSymbolSelect").value;
-  updateMarketPickerLabel();
-  loadTradingTerminal();
-});
 
 document.querySelectorAll("[data-chart-interval]").forEach((button) => {
   button.addEventListener("click", () => {
@@ -1829,6 +952,378 @@ function openAdminBalanceModal(u){if(!u)return;$("adminModalTitle").textContent=
 function openAdminRoleModal(u){if(!u)return;$("adminModalTitle").textContent="Изменение роли";$("adminModalBody").innerHTML=`<div class="admin-modal-user"><strong>${escapeHtml(u.username||"User")}</strong><span>${escapeHtml(u.email||"")}</span></div><div class="modal-form"><label>Роль<select id="adminNewRole"><option value="user" ${u.role==="user"?"selected":""}>user</option><option value="admin" ${u.role==="admin"?"selected":""}>admin</option></select></label><button id="confirmAdminRoleButton" class="primary-action">Сохранить</button></div>`;$("adminModal").classList.remove("hidden");$("confirmAdminRoleButton").onclick=async()=>{try{const {error}=await supabaseClient.rpc("admin_set_user_role",{p_user_id:u.id,p_role:$("adminNewRole").value});if(error)throw error;$("adminModal").classList.add("hidden");showToast("Роль изменена");await loadAdminPanel($("adminUserSearch").value.trim());}catch(e){showToast(e.message||"Ошибка");}};}
 async function processAdminFunding(id,action){if(!confirm(action==="approve"?"Одобрить заявку?":"Отклонить заявку?"))return;try{const {error}=await supabaseClient.rpc("admin_process_funding_request",{p_request_id:id,p_action:action,p_note:null});if(error)throw error;showToast(action==="approve"?"Заявка одобрена":"Заявка отклонена");await loadAdminPanel($("adminUserSearch").value.trim());}catch(e){showToast(e.message||"Ошибка");}}
 $("adminRefreshButton")?.addEventListener("click",()=>loadAdminPanel($("adminUserSearch").value.trim()));$("adminSearchButton")?.addEventListener("click",()=>loadAdminPanel($("adminUserSearch").value.trim()));$("adminUserSearch")?.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();loadAdminPanel(e.target.value.trim());}});$("closeAdminModalButton")?.addEventListener("click",()=>$("adminModal").classList.add("hidden"));
+
+
+function aiClass(value) {
+  return Number(value) >= 0 ? "positive" : "negative";
+}
+
+function aiPeriod(days) {
+  const from = Date.now() - days * 86400000;
+  const rows = state.aiTradeResults.filter(
+    (item) => new Date(item.closed_at).getTime() >= from
+  );
+
+  return {
+    percent: rows.reduce((sum, item) => sum + Number(item.pnl_percent || 0), 0),
+    amount: rows.reduce((sum, item) => sum + Number(item.pnl_amount || 0), 0),
+  };
+}
+
+function renderAiAssistant() {
+  const spot = Number(userWallet?.spot_balance || 0);
+  const bot = Number(userWallet?.bot_balance || 0);
+  const active = Boolean(state.aiBotAccount?.is_active);
+  const initial = Number(state.aiBotAccount?.initial_balance || bot || 0);
+
+  const totalPnl = state.aiTradeResults.reduce(
+    (sum, item) => sum + Number(item.pnl_amount || 0),
+    0
+  );
+  const totalPercent = initial > 0 ? (totalPnl / initial) * 100 : 0;
+
+  $("botBalance").textContent = `${bot.toFixed(2)} USDT`;
+  $("aiSpotBalance").textContent = `${spot.toFixed(2)} USDT`;
+  $("aiBotBalanceSmall").textContent = `${bot.toFixed(2)} USDT`;
+  $("aiInitialBalance").textContent = `${initial.toFixed(2)} USDT`;
+
+  $("aiTotalPnl").textContent =
+    `${totalPnl >= 0 ? "+" : ""}${totalPnl.toFixed(2)} USDT`;
+  $("aiTotalPnl").className = aiClass(totalPnl);
+
+  $("aiReturnBadge").textContent =
+    `${totalPercent >= 0 ? "+" : ""}${totalPercent.toFixed(2)}%`;
+  $("aiReturnBadge").className = `ai-return-badge ${aiClass(totalPercent)}`;
+
+  $("botStatus").textContent = active ? "Активен" : "Остановлен";
+  $("aiStatusDot").classList.toggle("active", active);
+  $("startBotButton").disabled = active || bot <= 0;
+  $("stopBotButton").disabled = !active;
+
+  const day = aiPeriod(1);
+  const week = aiPeriod(7);
+  const month = aiPeriod(30);
+
+  [
+    ["botDayPnl", "botDayAmount", day],
+    ["botWeekPnl", "botWeekAmount", week],
+    ["botMonthPnl", "botMonthAmount", month],
+  ].forEach(([pId, aId, data]) => {
+    $(pId).textContent =
+      `${data.percent >= 0 ? "+" : ""}${data.percent.toFixed(2)}%`;
+    $(pId).className = aiClass(data.percent);
+
+    $(aId).textContent =
+      `${data.amount >= 0 ? "+" : ""}${data.amount.toFixed(2)} USDT`;
+  });
+
+  const wins = state.aiTradeResults.filter(
+    (item) => Number(item.pnl_percent) > 0
+  ).length;
+  const winRate = state.aiTradeResults.length
+    ? (wins / state.aiTradeResults.length) * 100
+    : 0;
+
+  $("botTradesCount").textContent = state.aiTradeResults.length;
+  $("botWinRate").textContent = `Win rate ${winRate.toFixed(0)}%`;
+
+  renderAiOpenTrades();
+  renderAiHistory();
+  renderAiEquity();
+}
+
+function renderAiOpenTrades() {
+  const active = Boolean(state.aiBotAccount?.is_active);
+  const startedAt = state.aiBotAccount?.started_at;
+
+  const rows = active
+    ? state.aiOpenTrades.filter(
+        (trade) => !startedAt || new Date(trade.opened_at) >= new Date(startedAt)
+      )
+    : [];
+
+  $("botOpenTrades").innerHTML = rows.length
+    ? rows.map((trade) => `
+      <article class="ai-open-trade-row">
+        <div>
+          <strong>${escapeHtml(trade.pair)}</strong>
+          <span class="${trade.side === "LONG" ? "long" : "short"}">
+            ${escapeHtml(trade.side)}
+          </span>
+        </div>
+        <div><span>Цена входа</span><strong>${formatPrice(Number(trade.entry_price))}</strong></div>
+        <div><span>Открыта</span><strong>${formatDateTime(trade.opened_at)}</strong></div>
+        <span class="status-pill status-pending">В работе</span>
+      </article>
+    `).join("")
+    : '<div class="admin-empty">Активных сделок нет</div>';
+}
+
+function renderAiHistory() {
+  $("botHistory").innerHTML = state.aiTradeResults.length
+    ? state.aiTradeResults.map((trade) => `
+      <div class="ai-history-row">
+        <strong>${escapeHtml(trade.pair)}</strong>
+        <span class="ai-side-badge ${trade.side.toLowerCase()}">${escapeHtml(trade.side)}</span>
+        <span>${formatDateTime(trade.opened_at)}</span>
+        <span>${formatDateTime(trade.closed_at)}</span>
+        <span class="ai-price-pair">
+          ${formatPrice(Number(trade.entry_price))}
+          <small>→</small>
+          ${formatPrice(Number(trade.exit_price))}
+        </span>
+        <div class="ai-result-cell">
+          <strong class="${aiClass(trade.pnl_percent)}">
+            ${Number(trade.pnl_percent) >= 0 ? "+" : ""}${Number(trade.pnl_percent).toFixed(2)}%
+          </strong>
+          <span class="${aiClass(trade.pnl_amount)}">
+            ${Number(trade.pnl_amount) >= 0 ? "+" : ""}${Number(trade.pnl_amount).toFixed(2)} USDT
+          </span>
+        </div>
+      </div>
+    `).join("")
+    : '<div class="admin-empty">История сделок пока пуста</div>';
+}
+
+function renderAiEquity() {
+  const container = $("aiEquityChart");
+  const rows = [...state.aiTradeResults].reverse();
+
+  if (!rows.length) {
+    container.innerHTML =
+      '<div class="admin-empty">График появится после первой сделки</div>';
+    return;
+  }
+
+  const values = rows.map((item) => Number(item.balance_after));
+  const width = 620;
+  const height = 180;
+  const pad = 18;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = Math.max(max - min, 1);
+
+  const points = values.map((value, index) => {
+    const x = pad + (index / Math.max(values.length - 1, 1)) * (width - pad * 2);
+    const y = height - pad - ((value - min) / range) * (height - pad * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+
+  container.innerHTML = `
+    <svg viewBox="0 0 ${width} ${height}" role="img">
+      <polyline class="ai-equity-line" points="${points}"></polyline>
+    </svg>
+    <div class="ai-equity-range">
+      <span>${min.toFixed(2)} USDT</span>
+      <strong>${values.at(-1).toFixed(2)} USDT</strong>
+      <span>${max.toFixed(2)} USDT</span>
+    </div>
+  `;
+}
+
+async function setAiBotStatus(active) {
+  if (active && Number(userWallet?.bot_balance || 0) <= 0) {
+    showToast("Сначала переведите средства на AI-счёт");
+    return;
+  }
+
+  const button = active ? $("startBotButton") : $("stopBotButton");
+  button.disabled = true;
+
+  try {
+    const { error } = await supabaseClient.rpc(
+      "set_ai_bot_status",
+      { p_active: active }
+    );
+
+    if (error) throw error;
+
+    showToast(active ? "AI Assistant запущен" : "AI Assistant остановлен");
+    await loadSupabaseAccountData();
+  } catch (error) {
+    console.error(error);
+    showToast(error?.message || "Не удалось изменить статус");
+  } finally {
+    button.disabled = false;
+  }
+}
+
+$("startBotButton").addEventListener("click", () => setAiBotStatus(true));
+$("stopBotButton").addEventListener("click", () => setAiBotStatus(false));
+
+function localDateTimeValue(date = new Date()) {
+  const offset = date.getTimezoneOffset();
+  return new Date(date.getTime() - offset * 60000)
+    .toISOString()
+    .slice(0, 16);
+}
+
+$("adminAiOpenedAt").value = localDateTimeValue();
+
+async function loadAdminAiTrades() {
+  if (userProfile.role !== "admin") return;
+
+  try {
+    const { data, error } = await supabaseClient.rpc(
+      "admin_list_open_ai_trades"
+    );
+
+    if (error) throw error;
+
+    state.adminAiOpenTrades = data || [];
+    renderAdminAiTrades();
+  } catch (error) {
+    console.error(error);
+    showToast(error?.message || "Не удалось загрузить AI-сделки");
+  }
+}
+
+function renderAdminAiTrades() {
+  $("adminAiOpenCount").textContent = state.adminAiOpenTrades.length;
+
+  $("adminAiOpenTrades").innerHTML = state.adminAiOpenTrades.length
+    ? state.adminAiOpenTrades.map((trade) => `
+      <article class="admin-ai-trade-row">
+        <div>
+          <strong>${escapeHtml(trade.pair)}</strong>
+          <span class="${trade.side === "LONG" ? "long" : "short"}">${escapeHtml(trade.side)}</span>
+        </div>
+        <div><span>Вход</span><strong>${formatPrice(Number(trade.entry_price))}</strong></div>
+        <div><span>Открытие</span><strong>${formatDateTime(trade.opened_at)}</strong></div>
+        <button type="button" class="primary-action compact" data-close-ai-trade="${trade.id}">
+          Закрыть
+        </button>
+      </article>
+    `).join("")
+    : '<div class="admin-empty">Открытых сделок нет</div>';
+
+  document.querySelectorAll("[data-close-ai-trade]").forEach((button) => {
+    button.addEventListener("click", () => {
+      openCloseAiTradeModal(
+        state.adminAiOpenTrades.find(
+          (item) => item.id === button.dataset.closeAiTrade
+        )
+      );
+    });
+  });
+}
+
+$("adminAiTradeForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  const pair = $("adminAiPair").value.trim().toUpperCase();
+  const side = $("adminAiSide").value;
+  const entryPrice = Number($("adminAiEntryPrice").value);
+  const openedAt = new Date($("adminAiOpenedAt").value).toISOString();
+
+  if (!/^[A-Z0-9]{5,20}$/.test(pair)) {
+    showToast("Введите корректную торговую пару");
+    return;
+  }
+
+  if (!(entryPrice > 0)) {
+    showToast("Введите цену открытия");
+    return;
+  }
+
+  try {
+    const { error } = await supabaseClient.rpc(
+      "admin_open_ai_trade",
+      {
+        p_pair: pair,
+        p_side: side,
+        p_entry_price: entryPrice,
+        p_opened_at: openedAt,
+      }
+    );
+
+    if (error) throw error;
+
+    event.target.reset();
+    $("adminAiSide").value = "LONG";
+    $("adminAiOpenedAt").value = localDateTimeValue();
+
+    showToast("Сделка AI Assistant открыта");
+    await loadAdminAiTrades();
+  } catch (error) {
+    console.error(error);
+    showToast(error?.message || "Не удалось открыть сделку");
+  }
+});
+
+let selectedAdminAiTrade = null;
+
+function openCloseAiTradeModal(trade) {
+  if (!trade) return;
+
+  selectedAdminAiTrade = trade;
+
+  $("closeAiTradeSummary").innerHTML = `
+    <strong>${escapeHtml(trade.pair)} · ${escapeHtml(trade.side)}</strong>
+    <span>Цена открытия: ${formatPrice(Number(trade.entry_price))}</span>
+  `;
+
+  $("closeAiExitPrice").value = "";
+  $("closeAiPnlPercent").value = "";
+  $("closeAiClosedAt").value = localDateTimeValue();
+  $("closeAiTradeModal").classList.remove("hidden");
+}
+
+$("closeAiTradeModalButton").addEventListener("click", () => {
+  $("closeAiTradeModal").classList.add("hidden");
+  selectedAdminAiTrade = null;
+});
+
+$("confirmCloseAiTradeButton").addEventListener("click", async () => {
+  if (!selectedAdminAiTrade) return;
+
+  const exitPrice = Number($("closeAiExitPrice").value);
+  const pnlPercent = Number($("closeAiPnlPercent").value);
+  const closedAt = new Date($("closeAiClosedAt").value).toISOString();
+
+  if (!(exitPrice > 0)) {
+    showToast("Введите цену закрытия");
+    return;
+  }
+
+  if (!Number.isFinite(pnlPercent) || pnlPercent < -100 || pnlPercent > 100) {
+    showToast("Введите корректный результат в процентах");
+    return;
+  }
+
+  $("confirmCloseAiTradeButton").disabled = true;
+
+  try {
+    const { error } = await supabaseClient.rpc(
+      "admin_close_ai_trade",
+      {
+        p_trade_id: selectedAdminAiTrade.id,
+        p_exit_price: exitPrice,
+        p_closed_at: closedAt,
+        p_pnl_percent: pnlPercent,
+      }
+    );
+
+    if (error) throw error;
+
+    $("closeAiTradeModal").classList.add("hidden");
+    selectedAdminAiTrade = null;
+    showToast("Сделка закрыта, результат применён");
+
+    await Promise.all([
+      loadAdminAiTrades(),
+      loadAdminPanel($("adminUserSearch").value.trim()),
+      loadSupabaseAccountData(),
+    ]);
+  } catch (error) {
+    console.error(error);
+    showToast(error?.message || "Не удалось закрыть сделку");
+  } finally {
+    $("confirmCloseAiTradeButton").disabled = false;
+  }
+});
+
+$("adminReloadAiTrades").addEventListener("click", loadAdminAiTrades);
 
 async function loadMarketAnalysis() {
   const symbol=$("analysisCoinSelect").value;

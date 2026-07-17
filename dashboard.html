@@ -205,80 +205,127 @@
         </section>
 
         <section class="dashboard-section" id="assistant">
-          <div class="section-heading">
-            <span class="section-kicker">AI TRADING BOT</span>
-            <h2>Подключение и управление торговым ботом</h2>
-            <p>Отдельный баланс, риск-менеджмент и статистика автоматической торговли.</p>
+          <div class="section-heading ai-heading">
+            <div>
+              <span class="section-kicker">FASTBOOT INTELLIGENCE</span>
+              <h2>AI Assistant</h2>
+              <p>Управление AI-счётом, статусом стратегии и результатами сделок.</p>
+            </div>
+
+            <div class="ai-status-shell">
+              <span id="aiStatusDot" class="ai-status-dot"></span>
+              <div>
+                <small>Статус</small>
+                <strong id="botStatus">Остановлен</strong>
+              </div>
+            </div>
           </div>
 
-          <div class="bot-summary-grid">
-            <article class="bot-balance-card">
-              <span>Баланс счёта бота</span>
-              <strong id="botBalance">$0.00</strong>
-              <small>Средства, выделенные для автоматической торговли</small>
-            </article>
-            <article class="bot-status-card">
-              <span>Статус бота</span>
-              <strong id="botStatus">Остановлен</strong>
-              <small id="botStatusDescription">Торговля не запущена</small>
-            </article>
-            <article class="bot-stat-card">
-              <span>Текущий PnL</span>
-              <strong id="botPnl">$0.00</strong>
-              <small>С момента последнего запуска</small>
-            </article>
-          </div>
+          <div class="ai-hero-grid">
+            <article class="ai-balance-card">
+              <div class="ai-card-top">
+                <div>
+                  <span>Баланс AI Assistant</span>
+                  <strong id="botBalance">0.00 USDT</strong>
+                </div>
+                <span id="aiReturnBadge" class="ai-return-badge">0.00%</span>
+              </div>
 
-          <div class="bot-actions panel">
-            <div class="transfer-box">
-              <label>
-                Перевод с основного счёта на счёт бота
-                <input id="botTransferAmount" type="number" min="1" placeholder="Сумма USDT">
+              <div class="ai-balance-meta">
+                <div>
+                  <span>Начальный баланс</span>
+                  <strong id="aiInitialBalance">0.00 USDT</strong>
+                </div>
+                <div>
+                  <span>Общий результат</span>
+                  <strong id="aiTotalPnl">0.00 USDT</strong>
+                </div>
+              </div>
+
+              <div class="ai-actions-row">
+                <button id="startBotButton" class="primary-action" type="button">
+                  Запустить AI Assistant
+                </button>
+                <button id="stopBotButton" class="danger-action" type="button">
+                  Остановить
+                </button>
+              </div>
+            </article>
+
+            <article class="ai-transfer-card">
+              <div class="panel-head">
+                <div>
+                  <h3>Управление средствами</h3>
+                  <span>Перевод между основным и AI-счётом</span>
+                </div>
+              </div>
+
+              <div class="ai-transfer-balances">
+                <div>
+                  <span>Основной счёт</span>
+                  <strong id="aiSpotBalance">0.00 USDT</strong>
+                </div>
+                <div>
+                  <span>AI-счёт</span>
+                  <strong id="aiBotBalanceSmall">0.00 USDT</strong>
+                </div>
+              </div>
+
+              <label class="ai-transfer-input">
+                Сумма USDT
+                <input id="botTransferAmount" type="number" min="0.01" step="0.01">
               </label>
-              <button id="transferToBotButton" class="primary-action" type="button">
-                На счёт бота
-              </button>
-              <button id="transferFromBotButton" class="secondary-action" type="button">
-                На основной счёт
-              </button>
-            </div>
-            <div class="bot-control-buttons">
-              <button id="toggleBotButton" class="primary-action" type="button">
-                Запустить торговлю
-              </button>
-            </div>
-          </div>
 
-          <div class="period-tabs" id="botPeriodTabs">
-            <button class="active" data-period="day">День</button>
-            <button data-period="week">Неделя</button>
-            <button data-period="month">Месяц</button>
-            <button data-period="quarter">Квартал</button>
-          </div>
-
-          <div class="bot-performance-grid">
-            <article class="panel performance-card">
-              <span>Доходность</span><strong id="periodReturn">0.00%</strong>
-            </article>
-            <article class="panel performance-card">
-              <span>Сделки</span><strong id="periodTrades">0</strong>
-            </article>
-            <article class="panel performance-card">
-              <span>Win rate</span><strong id="periodWinRate">0%</strong>
-            </article>
-            <article class="panel performance-card">
-              <span>Макс. просадка</span><strong id="periodDrawdown">0.00%</strong>
+              <div class="ai-transfer-actions">
+                <button id="transferToBotButton" class="primary-action" type="button">
+                  На AI-счёт
+                </button>
+                <button id="transferFromBotButton" class="secondary-action" type="button">
+                  На основной счёт
+                </button>
+              </div>
             </article>
           </div>
 
-          <article class="panel">
+          <div class="ai-stat-grid">
+            <article><span>Сегодня</span><strong id="botDayPnl">0.00%</strong><small id="botDayAmount">0.00 USDT</small></article>
+            <article><span>7 дней</span><strong id="botWeekPnl">0.00%</strong><small id="botWeekAmount">0.00 USDT</small></article>
+            <article><span>30 дней</span><strong id="botMonthPnl">0.00%</strong><small id="botMonthAmount">0.00 USDT</small></article>
+            <article><span>Сделок</span><strong id="botTradesCount">0</strong><small id="botWinRate">Win rate 0%</small></article>
+          </div>
+
+          <div class="ai-content-grid">
+            <article class="panel">
+              <div class="panel-head">
+                <div><h3>Активные сделки</h3><span>Текущие позиции AI Assistant</span></div>
+              </div>
+              <div id="botOpenTrades" class="ai-trades-list">
+                <div class="admin-empty">Активных сделок нет</div>
+              </div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-head">
+                <div><h3>Динамика результата</h3><span>Изменение AI-баланса по сделкам</span></div>
+              </div>
+              <div id="aiEquityChart" class="ai-equity-chart"></div>
+            </article>
+          </div>
+
+          <article class="panel ai-history-panel">
             <div class="panel-head">
-              <div><h3>История сделок бота</h3><span>Автоматические сделки</span></div>
+              <div><h3>История сделок AI Assistant</h3><span>Персональный результат от вашего AI-баланса</span></div>
             </div>
-            <div class="trade-table-head">
-              <span>Время</span><span>Пара</span><span>Сторона</span><span>Объём</span><span>PnL</span>
+
+            <div class="ai-history-table">
+              <div class="ai-history-head">
+                <span>Пара</span><span>Направление</span><span>Открытие</span>
+                <span>Закрытие</span><span>Вход / выход</span><span>Результат</span>
+              </div>
+              <div id="botHistory" class="ai-history-body">
+                <div class="admin-empty">История сделок пока пуста</div>
+              </div>
             </div>
-            <div id="botTrades" class="trade-list empty-list">Сделок пока нет</div>
           </article>
         </section>
 
@@ -709,6 +756,38 @@
     <article class="panel admin-users-panel"><div class="panel-head admin-head"><div><h3>Пользователи</h3><p>Поиск по email, username или FASTBOOT ID</p></div><div class="admin-search"><input id="adminUserSearch" type="search" placeholder="Поиск"><button id="adminSearchButton" class="secondary-action" type="button">Найти</button></div></div><div class="admin-table"><div class="admin-table-head"><span>Пользователь</span><span>Роль</span><span>Spot</span><span>AI Bot</span><span>Дата</span><span>Действия</span></div><div id="adminUsersList"><div class="admin-empty">Загрузка…</div></div></div></article>
     <article class="panel admin-funding-panel"><div class="panel-head"><div><h3>Финансовые заявки</h3><p>Пополнения и выводы</p></div></div><div id="adminFundingList" class="admin-funding-list"><div class="admin-empty">Загрузка…</div></div></article>
   </div>
+
+  <article class="panel admin-ai-panel">
+    <div class="panel-head admin-head">
+      <div>
+        <h3>AI Assistant — управление сделками</h3>
+        <p>Открытие и закрытие сделок для активных AI-счетов</p>
+      </div>
+      <button id="adminReloadAiTrades" class="secondary-action" type="button">Обновить</button>
+    </div>
+
+    <div class="admin-ai-grid">
+      <form id="adminAiTradeForm" class="admin-ai-form">
+        <label>Торговая пара<input id="adminAiPair" type="text" maxlength="20" placeholder="BTCUSDT" required></label>
+        <label>Направление
+          <select id="adminAiSide">
+            <option value="LONG">LONG</option>
+            <option value="SHORT">SHORT</option>
+          </select>
+        </label>
+        <label>Цена открытия<input id="adminAiEntryPrice" type="number" min="0.00000001" step="any" required></label>
+        <label>Время открытия<input id="adminAiOpenedAt" type="datetime-local" required></label>
+        <button class="primary-action" type="submit">Открыть сделку</button>
+      </form>
+
+      <div class="admin-ai-trades-wrap">
+        <div class="admin-ai-subhead"><strong>Открытые сделки</strong><span id="adminAiOpenCount">0</span></div>
+        <div id="adminAiOpenTrades" class="admin-ai-trades-list">
+          <div class="admin-empty">Открытых сделок нет</div>
+        </div>
+      </div>
+    </div>
+  </article>
 </section>
 
         <section class="dashboard-section" id="settings">
@@ -783,6 +862,23 @@
   </div>
 
   <div id="adminModal" class="modal hidden"><div class="modal-card admin-modal-card"><button id="closeAdminModalButton" class="modal-close" type="button">×</button><h2 id="adminModalTitle">Действие администратора</h2><div id="adminModalBody"></div></div></div>
+
+  <div id="closeAiTradeModal" class="modal hidden">
+    <div class="modal-card admin-modal-card">
+      <button id="closeAiTradeModalButton" class="modal-close" type="button">×</button>
+      <h2>Закрыть сделку AI Assistant</h2>
+      <div id="closeAiTradeSummary" class="admin-modal-user"></div>
+
+      <div class="modal-form">
+        <label>Цена закрытия<input id="closeAiExitPrice" type="number" min="0.00000001" step="any"></label>
+        <label>Время закрытия<input id="closeAiClosedAt" type="datetime-local"></label>
+        <label>Результат сделки, %<input id="closeAiPnlPercent" type="number" step="0.01" min="-100" max="100"></label>
+        <button id="confirmCloseAiTradeButton" class="primary-action" type="button">
+          Закрыть и применить результат
+        </button>
+      </div>
+    </div>
+  </div>
 
   <div id="actionModal" class="modal hidden">
     <div class="modal-card">
