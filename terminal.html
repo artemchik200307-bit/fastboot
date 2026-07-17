@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+  <meta name="theme-color" content="#0b1018">
+  <title>FASTBOOT Terminal</title>
+  <link rel="stylesheet" href="terminal.css?v=2">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/lightweight-charts@5.0.8/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+<body>
+  <main class="terminal-app">
+    <header class="terminal-topbar">
+      <div class="terminal-brand">
+        <strong>FASTBOOT</strong>
+        <span>TERMINAL</span>
+      </div>
+
+      <div class="symbol-select-wrap">
+        <label for="symbolSelect">Пара</label>
+        <select id="symbolSelect">
+          <option>BTCUSDT</option>
+          <option>ETHUSDT</option>
+          <option>SOLUSDT</option>
+          <option>BNBUSDT</option>
+          <option>XRPUSDT</option>
+          <option>DOGEUSDT</option>
+          <option>ADAUSDT</option>
+          <option>AVAXUSDT</option>
+          <option>LINKUSDT</option>
+          <option>TRXUSDT</option>
+        </select>
+      </div>
+
+      <div class="market-price-box">
+        <span id="marketPrice">—</span>
+        <strong id="marketChange">0.00%</strong>
+      </div>
+
+      <div class="terminal-wallet-box">
+        <span>Торговый счёт</span>
+        <strong id="tradingBalance">0.00 USDT</strong>
+        <button id="openTransferButton" type="button">Перевести</button>
+      </div>
+    </header>
+
+    <section class="terminal-market-stats">
+      <div><span>Открытие 24ч</span><strong id="statOpen">—</strong></div>
+      <div><span>Макс. 24ч</span><strong id="statHigh">—</strong></div>
+      <div><span>Мин. 24ч</span><strong id="statLow">—</strong></div>
+      <div><span>Объём 24ч</span><strong id="statVolume">—</strong></div>
+    </section>
+
+    <section class="terminal-workspace">
+      <article class="chart-panel terminal-panel">
+        <div class="panel-toolbar">
+          <div class="interval-tabs">
+            <button data-interval="1m">1м</button>
+            <button data-interval="5m">5м</button>
+            <button data-interval="15m" class="active">15м</button>
+            <button data-interval="1h">1ч</button>
+            <button data-interval="4h">4ч</button>
+            <button data-interval="1d">1д</button>
+          </div>
+          <button id="refreshChartButton" class="icon-button" type="button">↻</button>
+        </div>
+        <div id="terminalChart" class="terminal-chart"></div>
+      </article>
+
+      <article class="orderbook-panel terminal-panel">
+        <div class="panel-heading">
+          <div>
+            <h3>Биржевой стакан</h3>
+            <span>Глубина рынка</span>
+          </div>
+          <select id="depthPrecision">
+            <option value="0.01">0.01</option>
+            <option value="0.1" selected>0.1</option>
+            <option value="1">1</option>
+          </select>
+        </div>
+
+        <div class="orderbook-head">
+          <span>Цена</span><span>Размер</span>
+        </div>
+        <div id="asksList" class="orderbook-list"></div>
+        <div class="orderbook-mid">
+          <strong id="orderbookPrice">—</strong>
+          <span id="orderbookReference">—</span>
+        </div>
+        <div id="bidsList" class="orderbook-list"></div>
+
+        <div class="orderbook-ratio">
+          <span id="bidRatio">50.00%</span>
+          <div>
+            <i id="bidRatioBar"></i>
+            <b id="askRatioBar"></b>
+          </div>
+          <span id="askRatio">50.00%</span>
+        </div>
+      </article>
+
+      <article class="order-panel terminal-panel">
+        <div class="order-type-tabs">
+          <button data-order-type="LIMIT" class="active">Лимит</button>
+          <button data-order-type="MARKET">Рынок</button>
+        </div>
+
+        <div class="available-line">
+          <span>Доступно</span>
+          <strong id="availableBalance">0.00 USDT</strong>
+        </div>
+
+        <label id="priceField">
+          Цена
+          <div class="input-shell">
+            <input id="orderPrice" type="number" min="0" step="any">
+            <span>USDT</span>
+          </div>
+        </label>
+
+        <label>
+          Количество
+          <div class="input-shell">
+            <input id="orderQuantity" type="number" min="0" step="any">
+            <span id="baseAssetLabel">BTC</span>
+          </div>
+        </label>
+
+        <input id="orderPercent" type="range" min="0" max="100" step="25" value="0">
+        <div class="range-labels">
+          <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+        </div>
+
+        <div class="order-calculation">
+          <div><span>Сумма</span><strong id="orderTotal">0.00 USDT</strong></div>
+          <div><span>Комиссия</span><strong id="orderFee">0.00 USDT</strong></div>
+        </div>
+
+        <div class="order-buttons">
+          <button id="buyButton" class="buy-button" type="button">Купить/Лонг</button>
+          <button id="sellButton" class="sell-button" type="button">Продать/Шорт</button>
+        </div>
+      </article>
+    </section>
+
+    <section class="terminal-bottom terminal-panel">
+      <nav class="bottom-tabs">
+        <button data-bottom-tab="positions" class="active">
+          Позиции <span id="positionsCount">(0)</span>
+        </button>
+        <button data-bottom-tab="orders">
+          Открытые ордера <span id="ordersCount">(0)</span>
+        </button>
+        <button data-bottom-tab="trades">История сделок</button>
+      </nav>
+
+      <div id="positionsTab" class="bottom-tab-content active">
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Пара</th><th>Сторона</th><th>Вход</th><th>Текущая</th>
+                <th>Количество</th><th>Маржа</th><th>PnL</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="positionsBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="ordersTab" class="bottom-tab-content">
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Пара</th><th>Сторона</th><th>Тип</th><th>Цена</th>
+                <th>Количество</th><th>Зарезервировано</th><th>Дата</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="ordersBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="tradesTab" class="bottom-tab-content">
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Пара</th><th>Сторона</th><th>Вход</th><th>Выход</th>
+                <th>Количество</th><th>PnL</th><th>Результат</th><th>Закрыта</th>
+              </tr>
+            </thead>
+            <tbody id="tradesBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="transferModal" class="modal hidden">
+    <div class="modal-card">
+      <button id="closeTransferModal" class="modal-close" type="button">×</button>
+      <h2>Перевод на торговый счёт</h2>
+
+      <label>
+        Направление
+        <select id="transferDirection">
+          <option value="spot_to_trading">Основной → Торговый</option>
+          <option value="trading_to_spot">Торговый → Основной</option>
+        </select>
+      </label>
+
+      <label>
+        Сумма USDT
+        <input id="transferAmount" type="number" min="0.01" step="0.01">
+      </label>
+
+      <button id="confirmTransferButton" class="primary-button" type="button">
+        Выполнить перевод
+      </button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="supabase-config.js"></script>
+  <script src="terminal.js?v=2"></script>
+</body>
+</html>

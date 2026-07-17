@@ -54,6 +54,7 @@ const state = {
 const titles = {
   overview: "Dashboard",
   assistant: "AI Assistant",
+  trading: "Торговый терминал",
   "market-analysis": "Анализ рынка",
   journal: "Торговый журнал",
   admin: "Admin Panel",
@@ -79,7 +80,18 @@ function openSection(id) {
   document.body.classList.remove("mobile-bottom-drawer-open");
   document.documentElement.style.overflow = "";
   document.body.style.overflow = "";
-  document.body.classList.remove("trading-mode");
+  document.body.classList.toggle("trading-mode", id === "trading");
+
+  if (id === "trading") {
+    const terminalFrame = $("terminalFrame");
+
+    if (terminalFrame?.contentWindow) {
+      terminalFrame.contentWindow.postMessage(
+        { type: "FASTBOOT_TERMINAL_REFRESH" },
+        window.location.origin
+      );
+    }
+  }
   document.querySelectorAll(".dashboard-section").forEach((el) => el.classList.toggle("active", el.id === id));
   document.querySelectorAll(".nav-item[data-section]").forEach((el) => el.classList.toggle("active", el.dataset.section === id));
   $("pageTitle").textContent = titles[id] || "FASTBOOT";
@@ -1550,7 +1562,7 @@ function renderAiAssistant() {
 
   $("botStatus").textContent = active ? "Активен" : "Остановлен";
   $("aiStatusDot").classList.toggle("active", active);
-  $("startBotButton").disabled = active || bot <= 0;
+  $("startBotButton").disabled = active || bot < 50;
   $("stopBotButton").disabled = !active;
 
   const day = aiPeriod(1);
@@ -1647,8 +1659,8 @@ function renderAiEquity() {
 }
 
 async function setAiBotStatus(active) {
-  if (active && Number(userWallet?.bot_balance || 0) <= 0) {
-    showToast("Сначала переведите средства на AI-счёт");
+  if (active && Number(userWallet?.bot_balance || 0) < 50) {
+    showToast("Для запуска AI Assistant нужно минимум 50 USDT на AI-счёте");
     return;
   }
 

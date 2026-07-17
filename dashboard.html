@@ -10,7 +10,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#080c12">
   <title>FASTBOOT — Личный кабинет</title>
-  <link rel="stylesheet" href="dashboard.css?v=clean-no-terminal-1-6">
+  <link rel="stylesheet" href="dashboard.css?v=terminal-v2">
   <script src="https://unpkg.com/lightweight-charts@5.2.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
@@ -24,6 +24,9 @@
         </button>
         <button class="nav-item" data-section="assistant">
           <span class="nav-icon">AI</span><span>AI Assistant</span>
+        </button>
+        <button class="nav-item" data-section="trading">
+          <span class="nav-icon">T</span><span>Торговля</span>
         </button>
         <button class="nav-item" data-section="market-analysis">
           <span class="nav-icon">A</span><span>Анализ рынка</span>
@@ -316,6 +319,26 @@
               </div>
             </div>
           </article>
+        </section>
+
+        <section class="dashboard-section terminal-host-section" id="trading">
+          <div class="terminal-host-head">
+            <div>
+              <span class="section-kicker">FASTBOOT TERMINAL</span>
+              <h2>Торговый терминал</h2>
+              <p>Отдельный торговый счёт, ордера, позиции и история сделок.</p>
+            </div>
+          </div>
+
+          <div class="terminal-frame-shell">
+            <iframe
+              id="terminalFrame"
+              class="terminal-frame"
+              src="terminal.html"
+              title="FASTBOOT Trading Terminal"
+              loading="lazy"
+            ></iframe>
+          </div>
         </section>
 
         <section class="dashboard-section" id="market-analysis">

@@ -1,0 +1,748 @@
+(() => {
+  "use strict";
+
+  const $ = (id) => document.getElementById(id);
+  const REST_BASE = "https://api.binance.com";
+  const REFRESH_MS = 3000;
+
+  let supabaseClient = null;
+  let currentUser = null;
+  let currentSymbol = "BTCUSDT";
+  let currentInterval = "15m";
+  let currentPrice = 0;
+  let currentTicker = null;
+  let tradingBalance = 0;
+  let chart = null;
+  let candleSeries = null;
+  let volumeSeries = null;
+  let refreshTimer = null;
+
+  const state = {
+    positions: [],
+    orders: [],
+    trades: [],
+  };
+
+  function showToast(message) {
+    const toast = $("toast");
+    toast.textContent = message;
+    toast.classList.remove("hidden");
+    clearTimeout(showToast.timer);
+    showToast.timer = setTimeout(() => toast.classList.add("hidden"), 3200);
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function formatPrice(value) {
+    const number = Number(value || 0);
+    if (!Number.isFinite(number)) return "—";
+
+    if (Math.abs(number) >= 1000) {
+      return number.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    }
+
+    if (Math.abs(number) >= 1) {
+      return number.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 6,
+      });
+    }
+
+    return number.toLocaleString("en-US", {
+      minimumFractionDigits: 4,
+      maximumFractionDigits: 8,
+    });
+  }
+
+  function formatNumber(value, digits = 8) {
+    const number = Number(value || 0);
+    return Number.isFinite(number)
+      ? number.toFixed(digits).replace(/0+$/, "").replace(/\.$/, "")
+      : "0";
+  }
+
+  function formatDate(value) {
+    if (!value) return "—";
+    return new Date(value).toLocaleString("ru-RU");
+  }
+
+  async function fetchJson(url) {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`Market API ${response.status}`);
+    }
+    return response.json();
+  }
+
+  async function initializeSupabase() {
+    if (!window.supabase || !window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
+      throw new Error("Supabase config не загружен");
+    }
+
+    supabaseClient = window.supabase.createClient(
+      window.SUPABASE_URL,
+      window.SUPABASE_ANON_KEY,
+      {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: false,
+        },
+      }
+    );
+
+    const { data, error } = await supabaseClient.auth.getUser();
+    if (error || !data?.user) {
+      throw new Error("Пользователь не авторизован");
+    }
+
+    currentUser = data.user;
+  }
+
+  async function loadWalletAndAccountData() {
+    const [walletResult, positionsResult, ordersResult, tradesResult] =
+      await Promise.all([
+        supabaseClient
+          .from("wallets")
+          .select("spot_balance, trading_balance")
+          .eq("user_id", currentUser.id)
+          .single(),
+
+        supabaseClient
+          .from("terminal_positions")
+          .select("*")
+          .eq("user_id", currentUser.id)
+          .eq("status", "open")
+          .order("opened_at", { ascending: false }),
+
+        supabaseClient
+          .from("terminal_orders")
+          .select("*")
+          .eq("user_id", currentUser.id)
+          .eq("status", "open")
+          .order("created_at", { ascending: false }),
+
+        supabaseClient
+          .from("terminal_trades")
+          .select("*")
+          .eq("user_id", currentUser.id)
+          .order("closed_at", { ascending: false })
+          .limit(100),
+      ]);
+
+    if (walletResult.error) throw walletResult.error;
+    if (positionsResult.error) throw positionsResult.error;
+    if (ordersResult.error) throw ordersResult.error;
+    if (tradesResult.error) throw tradesResult.error;
+
+    tradingBalance = Number(walletResult.data?.trading_balance || 0);
+    state.positions = positionsResult.data || [];
+    state.orders = ordersResult.data || [];
+    state.trades = tradesResult.data || [];
+
+    $("tradingBalance").textContent = `${tradingBalance.toFixed(2)} USDT`;
+    $("availableBalance").textContent = `${tradingBalance.toFixed(2)} USDT`;
+
+    renderPositions();
+    renderOrders();
+    renderTrades();
+    updateOrderCalculation();
+  }
+
+  function createChart() {
+    const container = $("terminalChart");
+
+    chart = LightweightCharts.createChart(container, {
+      width: Math.max(container.clientWidth, 320),
+      height: Math.max(container.clientHeight, 300),
+      layout: {
+        background: { type: "solid", color: "#101722" },
+        textColor: "#8290a6",
+        attributionLogo: false,
+      },
+      grid: {
+        vertLines: { color: "rgba(130,144,166,.08)" },
+        horzLines: { color: "rgba(130,144,166,.08)" },
+      },
+      rightPriceScale: {
+        borderColor: "#263247",
+        scaleMargins: { top: .06, bottom: .22 },
+      },
+      timeScale: {
+        borderColor: "#263247",
+        timeVisible: true,
+        secondsVisible: false,
+      },
+    });
+
+    candleSeries = chart.addSeries(
+      LightweightCharts.CandlestickSeries,
+      {
+        upColor: "#20c987",
+        downColor: "#ff5571",
+        borderVisible: false,
+        wickUpColor: "#20c987",
+        wickDownColor: "#ff5571",
+      }
+    );
+
+    volumeSeries = chart.addSeries(
+      LightweightCharts.HistogramSeries,
+      {
+        priceFormat: { type: "volume" },
+        priceScaleId: "volume",
+        lastValueVisible: false,
+        priceLineVisible: false,
+      }
+    );
+
+    volumeSeries.priceScale().applyOptions({
+      scaleMargins: { top: .82, bottom: 0 },
+    });
+
+    new ResizeObserver(() => {
+      chart.resize(
+        Math.max(container.clientWidth, 320),
+        Math.max(container.clientHeight, 300)
+      );
+    }).observe(container);
+  }
+
+  async function loadMarket() {
+    const [ticker, depth, klines] = await Promise.all([
+      fetchJson(
+        `${REST_BASE}/api/v3/ticker/24hr?symbol=${encodeURIComponent(currentSymbol)}`
+      ),
+      fetchJson(
+        `${REST_BASE}/api/v3/depth?symbol=${encodeURIComponent(currentSymbol)}&limit=50`
+      ),
+      fetchJson(
+        `${REST_BASE}/api/v3/klines?symbol=${encodeURIComponent(currentSymbol)}` +
+        `&interval=${encodeURIComponent(currentInterval)}&limit=300`
+      ),
+    ]);
+
+    currentTicker = ticker;
+    currentPrice = Number(ticker.lastPrice || 0);
+
+    const change = Number(ticker.priceChangePercent || 0);
+    $("marketPrice").textContent = formatPrice(currentPrice);
+    $("marketChange").textContent =
+      `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`;
+    $("marketChange").className = change >= 0 ? "positive" : "negative";
+
+    $("statOpen").textContent = formatPrice(ticker.openPrice);
+    $("statHigh").textContent = formatPrice(ticker.highPrice);
+    $("statLow").textContent = formatPrice(ticker.lowPrice);
+    $("statVolume").textContent = new Intl.NumberFormat("en-US", {
+      notation: "compact",
+      maximumFractionDigits: 2,
+    }).format(Number(ticker.quoteVolume || 0));
+
+    $("orderbookPrice").textContent = formatPrice(currentPrice);
+    $("orderbookReference").textContent =
+      `${change >= 0 ? "↑" : "↓"} ${formatPrice(ticker.prevClosePrice)}`;
+
+    const limit = matchMedia("(max-width: 760px)").matches ? 5 : 8;
+    renderOrderbook(depth, limit);
+
+    candleSeries.setData(
+      klines.map((row) => ({
+        time: Math.floor(Number(row[0]) / 1000),
+        open: Number(row[1]),
+        high: Number(row[2]),
+        low: Number(row[3]),
+        close: Number(row[4]),
+      }))
+    );
+
+    volumeSeries.setData(
+      klines.map((row) => ({
+        time: Math.floor(Number(row[0]) / 1000),
+        value: Number(row[5]),
+        color:
+          Number(row[4]) >= Number(row[1])
+            ? "rgba(32,201,135,.4)"
+            : "rgba(255,85,113,.4)",
+      }))
+    );
+
+    chart.timeScale().fitContent();
+
+    if (!$("orderPrice").value || $("priceField").hidden) {
+      $("orderPrice").value = currentPrice.toFixed(
+        currentPrice >= 100 ? 2 : 6
+      );
+    }
+
+    updatePositionsMarketPrice();
+    await processLimitOrders();
+    updateOrderCalculation();
+  }
+
+  function renderOrderbook(depth, limit) {
+    const precision = Number($("depthPrecision").value || .1);
+    const normalize = (value) =>
+      Math.round(Number(value) / precision) * precision;
+
+    const asks = (depth.asks || []).slice(0, limit).reverse();
+    const bids = (depth.bids || []).slice(0, limit);
+
+    const maxAsk = Math.max(...asks.map((row) => Number(row[1])), 1);
+    const maxBid = Math.max(...bids.map((row) => Number(row[1])), 1);
+
+    $("asksList").innerHTML = asks.map((row) => {
+      const price = normalize(row[0]);
+      const quantity = Number(row[1]);
+      const depthPercent = Math.min((quantity / maxAsk) * 100, 100);
+
+      return `
+        <div class="orderbook-row ask" style="--depth:${depthPercent}%">
+          <span>${formatPrice(price)}</span>
+          <span>${formatNumber(quantity, 5)}</span>
+        </div>
+      `;
+    }).join("");
+
+    $("bidsList").innerHTML = bids.map((row) => {
+      const price = normalize(row[0]);
+      const quantity = Number(row[1]);
+      const depthPercent = Math.min((quantity / maxBid) * 100, 100);
+
+      return `
+        <div class="orderbook-row bid" style="--depth:${depthPercent}%">
+          <span>${formatPrice(price)}</span>
+          <span>${formatNumber(quantity, 5)}</span>
+        </div>
+      `;
+    }).join("");
+
+    const bidVolume = bids.reduce((sum, row) => sum + Number(row[1]), 0);
+    const askVolume = asks.reduce((sum, row) => sum + Number(row[1]), 0);
+    const total = Math.max(bidVolume + askVolume, 1);
+    const bidRatio = (bidVolume / total) * 100;
+    const askRatio = 100 - bidRatio;
+
+    $("bidRatio").textContent = `${bidRatio.toFixed(2)}%`;
+    $("askRatio").textContent = `${askRatio.toFixed(2)}%`;
+    $("bidRatioBar").style.width = `${bidRatio}%`;
+    $("askRatioBar").style.width = `${askRatio}%`;
+  }
+
+  function updateOrderCalculation() {
+    const orderType =
+      document.querySelector("[data-order-type].active")?.dataset.orderType ||
+      "LIMIT";
+
+    const price =
+      orderType === "MARKET"
+        ? currentPrice
+        : Number($("orderPrice").value || 0);
+
+    const quantity = Number($("orderQuantity").value || 0);
+    const total = Math.max(price * quantity, 0);
+
+    $("orderTotal").textContent = `${total.toFixed(2)} USDT`;
+    $("orderFee").textContent = `${(total * .001).toFixed(2)} USDT`;
+  }
+
+  function setQuantityFromPercent(percent) {
+    const orderType =
+      document.querySelector("[data-order-type].active")?.dataset.orderType ||
+      "LIMIT";
+    const price =
+      orderType === "MARKET"
+        ? currentPrice
+        : Number($("orderPrice").value || 0);
+
+    if (!(price > 0)) return;
+
+    const quantity = (tradingBalance * (Number(percent) / 100)) / price;
+    $("orderQuantity").value =
+      quantity > 0 ? quantity.toFixed(8) : "";
+    updateOrderCalculation();
+  }
+
+  async function placeOrder(side) {
+    const orderType =
+      document.querySelector("[data-order-type].active")?.dataset.orderType ||
+      "LIMIT";
+
+    const quantity = Number($("orderQuantity").value || 0);
+    const price =
+      orderType === "MARKET"
+        ? currentPrice
+        : Number($("orderPrice").value || 0);
+
+    if (!(quantity > 0) || !(price > 0)) {
+      showToast("Введите цену и количество");
+      return;
+    }
+
+    try {
+      const rpc =
+        orderType === "MARKET"
+          ? "open_terminal_market_position"
+          : "create_terminal_limit_order";
+
+      const params =
+        orderType === "MARKET"
+          ? {
+              p_symbol: currentSymbol,
+              p_side: side,
+              p_price: currentPrice,
+              p_quantity: quantity,
+            }
+          : {
+              p_symbol: currentSymbol,
+              p_side: side,
+              p_limit_price: price,
+              p_quantity: quantity,
+            };
+
+      const { error } = await supabaseClient.rpc(rpc, params);
+      if (error) throw error;
+
+      $("orderQuantity").value = "";
+      $("orderPercent").value = "0";
+      showToast(
+        orderType === "MARKET"
+          ? "Позиция открыта"
+          : "Лимитный ордер создан"
+      );
+
+      await loadWalletAndAccountData();
+    } catch (error) {
+      console.error(error);
+      showToast(error.message || "Не удалось создать ордер");
+    }
+  }
+
+  async function processLimitOrders() {
+    const matching = state.orders.filter((order) => {
+      if (order.symbol !== currentSymbol || order.status !== "open") return false;
+
+      const limitPrice = Number(order.price);
+      return order.side === "LONG"
+        ? currentPrice <= limitPrice
+        : currentPrice >= limitPrice;
+    });
+
+    for (const order of matching) {
+      const { error } = await supabaseClient.rpc(
+        "fill_terminal_limit_order",
+        {
+          p_order_id: order.id,
+          p_fill_price: currentPrice,
+        }
+      );
+
+      if (!error) {
+        showToast(`${order.symbol}: лимитный ордер исполнен`);
+      }
+    }
+
+    if (matching.length) {
+      await loadWalletAndAccountData();
+    }
+  }
+
+  function updatePositionsMarketPrice() {
+    state.positions = state.positions.map((position) => {
+      if (position.symbol !== currentSymbol) return position;
+
+      const entry = Number(position.entry_price);
+      const quantity = Number(position.quantity);
+      const pnl =
+        position.side === "LONG"
+          ? (currentPrice - entry) * quantity
+          : (entry - currentPrice) * quantity;
+
+      return {
+        ...position,
+        current_price: currentPrice,
+        live_pnl: pnl,
+      };
+    });
+
+    renderPositions();
+  }
+
+  function renderPositions() {
+    $("positionsCount").textContent = `(${state.positions.length})`;
+
+    $("positionsBody").innerHTML = state.positions.length
+      ? state.positions.map((position) => {
+          const livePrice =
+            Number(position.current_price) ||
+            (position.symbol === currentSymbol ? currentPrice : Number(position.entry_price));
+
+          const pnl =
+            Number.isFinite(Number(position.live_pnl))
+              ? Number(position.live_pnl)
+              : position.side === "LONG"
+                ? (livePrice - Number(position.entry_price)) * Number(position.quantity)
+                : (Number(position.entry_price) - livePrice) * Number(position.quantity);
+
+          return `
+            <tr>
+              <td><strong>${escapeHtml(position.symbol)}</strong></td>
+              <td class="${position.side === "LONG" ? "positive" : "negative"}">
+                ${escapeHtml(position.side)}
+              </td>
+              <td>${formatPrice(position.entry_price)}</td>
+              <td>${formatPrice(livePrice)}</td>
+              <td>${formatNumber(position.quantity)}</td>
+              <td>${Number(position.margin).toFixed(2)} USDT</td>
+              <td class="${pnl >= 0 ? "positive" : "negative"}">
+                ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USDT
+              </td>
+              <td>
+                <button data-close-position="${position.id}">Закрыть</button>
+              </td>
+            </tr>
+          `;
+        }).join("")
+      : '<tr><td colspan="8" class="empty-row">Открытых позиций нет</td></tr>';
+
+    document.querySelectorAll("[data-close-position]").forEach((button) => {
+      button.onclick = () => closePosition(button.dataset.closePosition);
+    });
+  }
+
+  function renderOrders() {
+    $("ordersCount").textContent = `(${state.orders.length})`;
+
+    $("ordersBody").innerHTML = state.orders.length
+      ? state.orders.map((order) => `
+          <tr>
+            <td><strong>${escapeHtml(order.symbol)}</strong></td>
+            <td class="${order.side === "LONG" ? "positive" : "negative"}">
+              ${escapeHtml(order.side)}
+            </td>
+            <td>${escapeHtml(order.order_type)}</td>
+            <td>${formatPrice(order.price)}</td>
+            <td>${formatNumber(order.quantity)}</td>
+            <td>${Number(order.reserved_amount).toFixed(2)} USDT</td>
+            <td>${formatDate(order.created_at)}</td>
+            <td><button data-cancel-order="${order.id}">Отменить</button></td>
+          </tr>
+        `).join("")
+      : '<tr><td colspan="8" class="empty-row">Открытых ордеров нет</td></tr>';
+
+    document.querySelectorAll("[data-cancel-order]").forEach((button) => {
+      button.onclick = () => cancelOrder(button.dataset.cancelOrder);
+    });
+  }
+
+  function renderTrades() {
+    $("tradesBody").innerHTML = state.trades.length
+      ? state.trades.map((trade) => `
+          <tr>
+            <td><strong>${escapeHtml(trade.symbol)}</strong></td>
+            <td class="${trade.side === "LONG" ? "positive" : "negative"}">
+              ${escapeHtml(trade.side)}
+            </td>
+            <td>${formatPrice(trade.entry_price)}</td>
+            <td>${formatPrice(trade.exit_price)}</td>
+            <td>${formatNumber(trade.quantity)}</td>
+            <td class="${Number(trade.pnl) >= 0 ? "positive" : "negative"}">
+              ${Number(trade.pnl) >= 0 ? "+" : ""}${Number(trade.pnl).toFixed(2)} USDT
+            </td>
+            <td class="${Number(trade.pnl_percent) >= 0 ? "positive" : "negative"}">
+              ${Number(trade.pnl_percent) >= 0 ? "+" : ""}${Number(trade.pnl_percent).toFixed(2)}%
+            </td>
+            <td>${formatDate(trade.closed_at)}</td>
+          </tr>
+        `).join("")
+      : '<tr><td colspan="8" class="empty-row">История сделок пуста</td></tr>';
+  }
+
+  async function closePosition(positionId) {
+    try {
+      const { error } = await supabaseClient.rpc(
+        "close_terminal_position",
+        {
+          p_position_id: positionId,
+          p_exit_price: currentPrice,
+        }
+      );
+
+      if (error) throw error;
+
+      showToast("Позиция закрыта");
+      await loadWalletAndAccountData();
+    } catch (error) {
+      console.error(error);
+      showToast(error.message || "Не удалось закрыть позицию");
+    }
+  }
+
+  async function cancelOrder(orderId) {
+    try {
+      const { error } = await supabaseClient.rpc(
+        "cancel_terminal_limit_order",
+        { p_order_id: orderId }
+      );
+
+      if (error) throw error;
+
+      showToast("Ордер отменён");
+      await loadWalletAndAccountData();
+    } catch (error) {
+      console.error(error);
+      showToast(error.message || "Не удалось отменить ордер");
+    }
+  }
+
+  function bindEvents() {
+    $("symbolSelect").onchange = async (event) => {
+      currentSymbol = event.target.value;
+      $("baseAssetLabel").textContent = currentSymbol.replace("USDT", "");
+      await loadMarket();
+    };
+
+    document.querySelectorAll("[data-interval]").forEach((button) => {
+      button.onclick = async () => {
+        document.querySelectorAll("[data-interval]").forEach((item) =>
+          item.classList.toggle("active", item === button)
+        );
+        currentInterval = button.dataset.interval;
+        await loadMarket();
+      };
+    });
+
+    document.querySelectorAll("[data-order-type]").forEach((button) => {
+      button.onclick = () => {
+        document.querySelectorAll("[data-order-type]").forEach((item) =>
+          item.classList.toggle("active", item === button)
+        );
+
+        const market = button.dataset.orderType === "MARKET";
+        $("priceField").hidden = market;
+
+        if (market) {
+          $("orderPrice").value = currentPrice;
+        }
+
+        updateOrderCalculation();
+      };
+    });
+
+    document.querySelectorAll("[data-bottom-tab]").forEach((button) => {
+      button.onclick = () => {
+        document.querySelectorAll("[data-bottom-tab]").forEach((item) =>
+          item.classList.toggle("active", item === button)
+        );
+
+        document.querySelectorAll(".bottom-tab-content").forEach((panel) =>
+          panel.classList.toggle(
+            "active",
+            panel.id === `${button.dataset.bottomTab}Tab`
+          )
+        );
+      };
+    });
+
+    $("refreshChartButton").onclick = loadMarket;
+    $("depthPrecision").onchange = loadMarket;
+    $("orderPrice").oninput = updateOrderCalculation;
+    $("orderQuantity").oninput = updateOrderCalculation;
+    $("orderPercent").oninput = (event) =>
+      setQuantityFromPercent(event.target.value);
+
+    $("buyButton").onclick = () => placeOrder("LONG");
+    $("sellButton").onclick = () => placeOrder("SHORT");
+
+    $("openTransferButton").onclick = () =>
+      $("transferModal").classList.remove("hidden");
+
+    $("closeTransferModal").onclick = () =>
+      $("transferModal").classList.add("hidden");
+
+    $("confirmTransferButton").onclick = async () => {
+      const direction = $("transferDirection").value;
+      const amount = Number($("transferAmount").value || 0);
+
+      if (!(amount > 0)) {
+        showToast("Введите сумму");
+        return;
+      }
+
+      try {
+        const { error } = await supabaseClient.rpc(
+          "transfer_trading_balance",
+          {
+            p_direction: direction,
+            p_amount: amount,
+          }
+        );
+
+        if (error) throw error;
+
+        $("transferAmount").value = "";
+        $("transferModal").classList.add("hidden");
+        showToast("Перевод выполнен");
+        await loadWalletAndAccountData();
+      } catch (error) {
+        console.error(error);
+        showToast(error.message || "Не удалось выполнить перевод");
+      }
+    };
+
+    window.addEventListener("message", (event) => {
+      if (event.origin !== window.location.origin) return;
+
+      if (event.data?.type === "FASTBOOT_TERMINAL_REFRESH") {
+        loadWalletAndAccountData().catch(console.error);
+      }
+    });
+  }
+
+  async function refreshLoop() {
+    try {
+      await loadMarket();
+
+      // Wallet and DB data less frequently than market.
+      if (!refreshLoop.counter || refreshLoop.counter % 3 === 0) {
+        await loadWalletAndAccountData();
+      }
+
+      refreshLoop.counter = (refreshLoop.counter || 0) + 1;
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  async function start() {
+    try {
+      await initializeSupabase();
+      createChart();
+      bindEvents();
+
+      $("baseAssetLabel").textContent = currentSymbol.replace("USDT", "");
+
+      await Promise.all([
+        loadWalletAndAccountData(),
+        loadMarket(),
+      ]);
+
+      refreshTimer = setInterval(refreshLoop, REFRESH_MS);
+    } catch (error) {
+      console.error(error);
+      showToast(error.message || "Не удалось запустить терминал");
+    }
+  }
+
+  start();
+})();
