@@ -19,6 +19,10 @@
   let candleSeries = null;
   let volumeSeries = null;
   let volumeVisible = true;
+  let spotBalance = 0;
+  let activeProtectionPosition = null;
+  const closingPositionIds = new Set();
+  const chartPriceLines = [];
 
   let drawingTool = "cursor";
   let drawingStart = null;
@@ -166,16 +170,19 @@
     if (tradesResult.error) throw tradesResult.error;
 
     tradingBalance = Number(walletResult.data?.trading_balance || 0);
+    spotBalance = Number(walletResult.data?.spot_balance || 0);
     state.positions = positionsResult.data || [];
     state.orders = ordersResult.data || [];
     state.trades = tradesResult.data || [];
 
     $("tradingBalance").textContent = `${tradingBalance.toFixed(2)} USDT`;
+    $("spotBalance").textContent = `${spotBalance.toFixed(2)} USDT`;
     $("availableBalance").textContent = `${tradingBalance.toFixed(2)} USDT`;
 
     renderPositions();
     renderOrders();
     renderTrades();
+    renderTradingLevels();
     updateOrderCalculation();
   }
 
@@ -314,6 +321,8 @@
 
     updatePositionsMarketPrice();
     await processLimitOrders();
+    await processPositionProtection();
+    renderTradingLevels();
     updateOrderCalculation();
     renderDrawings();
   }
@@ -366,6 +375,191 @@
     $("askRatio").textContent = `${askRatio.toFixed(2)}%`;
     $("bidRatioBar").style.width = `${bidRatio}%`;
     $("askRatioBar").style.width = `${askRatio}%`;
+  }
+
+  function clearTradingLevels() {
+    while (chartPriceLines.length) {
+      const line = chartPriceLines.pop();
+
+      try {
+        candleSeries.removePriceLine(line);
+      } catch {}
+    }
+  }
+
+  function addTradingLevel(price, title, color, lineStyle = 2) {
+    if (!(Number(price) > 0) || !candleSeries) return;
+
+    const line = candleSeries.createPriceLine({
+      price: Number(price),
+      color,
+      lineWidth: 1,
+      lineStyle,
+      axisLabelVisible: true,
+      title,
+    });
+
+    chartPriceLines.push(line);
+  }
+
+  function renderTradingLevels() {
+    clearTradingLevels();
+
+    state.positions
+      .filter((position) => position.symbol === currentSymbol)
+      .forEach((position) => {
+        addTradingLevel(
+          position.entry_price,
+          `${position.side} ENTRY`,
+          "#6f91ff",
+          2
+        );
+
+        if (Number(position.take_profit) > 0) {
+          addTradingLevel(position.take_profit, "TP", "#22c98a", 2);
+        }
+
+        if (Number(position.stop_loss) > 0) {
+          addTradingLevel(position.stop_loss, "SL", "#ff5572", 2);
+        }
+      });
+
+    state.orders
+      .filter((order) => order.symbol === currentSymbol)
+      .forEach((order) => {
+        addTradingLevel(
+          order.price,
+          `${order.side} LIMIT`,
+          "#e5b85c",
+          3
+        );
+      });
+  }
+
+  async function processPositionProtection() {
+    const triggered = state.positions.filter((position) => {
+      if (
+        position.symbol !== currentSymbol ||
+        closingPositionIds.has(position.id)
+      ) {
+        return false;
+      }
+
+      const tp = Number(position.take_profit || 0);
+      const sl = Number(position.stop_loss || 0);
+
+      if (position.side === "LONG") {
+        return (tp > 0 && currentPrice >= tp) ||
+          (sl > 0 && currentPrice <= sl);
+      }
+
+      return (tp > 0 && currentPrice <= tp) ||
+        (sl > 0 && currentPrice >= sl);
+    });
+
+    for (const position of triggered) {
+      closingPositionIds.add(position.id);
+
+      try {
+        const { error } = await supabaseClient.rpc(
+          "close_terminal_position",
+          {
+            p_position_id: position.id,
+            p_exit_price: currentPrice,
+          }
+        );
+
+        if (error) throw error;
+
+        showToast(
+          `${position.symbol}: позиция закрыта по ${
+            Number(position.take_profit) > 0 &&
+            (
+              (position.side === "LONG" && currentPrice >= Number(position.take_profit)) ||
+              (position.side === "SHORT" && currentPrice <= Number(position.take_profit))
+            )
+              ? "Take Profit"
+              : "Stop Loss"
+          }`
+        );
+      } catch (error) {
+        console.error("TP/SL close error:", error);
+      } finally {
+        closingPositionIds.delete(position.id);
+      }
+    }
+
+    if (triggered.length) {
+      await loadAccountData();
+      notifyParentJournalRefresh();
+    }
+  }
+
+  function openProtectionModal(positionId) {
+    const position = state.positions.find((item) => item.id === positionId);
+    if (!position) return;
+
+    activeProtectionPosition = position;
+
+    $("protectionPositionInfo").innerHTML = `
+      <strong>${escapeHtml(position.symbol)} · ${escapeHtml(position.side)}</strong>
+      <span>Цена входа: ${formatPrice(position.entry_price)}</span>
+      <span>Текущая цена: ${formatPrice(
+        position.symbol === currentSymbol
+          ? currentPrice
+          : position.entry_price
+      )}</span>
+    `;
+
+    $("takeProfitInput").value =
+      Number(position.take_profit) > 0 ? position.take_profit : "";
+
+    $("stopLossInput").value =
+      Number(position.stop_loss) > 0 ? position.stop_loss : "";
+
+    $("protectionModal").classList.remove("hidden");
+  }
+
+  async function savePositionProtection(clear = false) {
+    if (!activeProtectionPosition) return;
+
+    const takeProfit = clear
+      ? null
+      : Number($("takeProfitInput").value || 0) || null;
+
+    const stopLoss = clear
+      ? null
+      : Number($("stopLossInput").value || 0) || null;
+
+    try {
+      const { error } = await supabaseClient.rpc(
+        "set_terminal_position_protection",
+        {
+          p_position_id: activeProtectionPosition.id,
+          p_take_profit: takeProfit,
+          p_stop_loss: stopLoss,
+        }
+      );
+
+      if (error) throw error;
+
+      $("protectionModal").classList.add("hidden");
+      activeProtectionPosition = null;
+      showToast(clear ? "TP/SL удалены" : "TP/SL сохранены");
+      await loadAccountData();
+    } catch (error) {
+      console.error(error);
+      showToast(error.message || "Не удалось сохранить TP/SL");
+    }
+  }
+
+  function notifyParentJournalRefresh() {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage(
+        { type: "FASTBOOT_TERMINAL_JOURNAL_REFRESH" },
+        window.location.origin
+      );
+    }
   }
 
   function currentOrderType() {
@@ -508,26 +702,56 @@
             Number.isFinite(Number(position.live_pnl))
               ? Number(position.live_pnl)
               : position.side === "LONG"
-                ? (livePrice - Number(position.entry_price)) * Number(position.quantity)
-                : (Number(position.entry_price) - livePrice) * Number(position.quantity);
+                ? (livePrice - Number(position.entry_price)) *
+                  Number(position.quantity)
+                : (Number(position.entry_price) - livePrice) *
+                  Number(position.quantity);
 
           return `
             <tr>
               <td><strong>${escapeHtml(position.symbol)}</strong></td>
-              <td class="${position.side === "LONG" ? "positive" : "negative"}">${escapeHtml(position.side)}</td>
+              <td class="${position.side === "LONG" ? "positive" : "negative"}">
+                ${escapeHtml(position.side)}
+              </td>
               <td>${formatPrice(position.entry_price)}</td>
               <td>${formatPrice(livePrice)}</td>
               <td>${formatNumber(position.quantity)}</td>
               <td>${Number(position.margin).toFixed(2)} USDT</td>
-              <td class="${pnl >= 0 ? "positive" : "negative"}">${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USDT</td>
-              <td><button data-close-position="${position.id}">Закрыть</button></td>
+              <td class="${pnl >= 0 ? "positive" : "negative"}">
+                ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USDT
+              </td>
+              <td>
+                <div class="position-protection">
+                  <span class="tp">TP: ${
+                    Number(position.take_profit) > 0
+                      ? formatPrice(position.take_profit)
+                      : "—"
+                  }</span>
+                  <span class="sl">SL: ${
+                    Number(position.stop_loss) > 0
+                      ? formatPrice(position.stop_loss)
+                      : "—"
+                  }</span>
+                </div>
+              </td>
+              <td>
+                <div class="position-actions">
+                  <button data-protection-position="${position.id}">TP/SL</button>
+                  <button data-close-position="${position.id}">Закрыть</button>
+                </div>
+              </td>
             </tr>
           `;
         }).join("")
-      : '<tr><td colspan="8" class="empty-row">Открытых позиций нет</td></tr>';
+      : '<tr><td colspan="9" class="empty-row">Открытых позиций нет</td></tr>';
 
     document.querySelectorAll("[data-close-position]").forEach((button) => {
       button.onclick = () => closePosition(button.dataset.closePosition);
+    });
+
+    document.querySelectorAll("[data-protection-position]").forEach((button) => {
+      button.onclick = () =>
+        openProtectionModal(button.dataset.protectionPosition);
     });
   }
 
@@ -585,6 +809,7 @@
 
       showToast("Позиция закрыта");
       await loadAccountData();
+      notifyParentJournalRefresh();
     } catch (error) {
       console.error(error);
       showToast(error.message || "Не удалось закрыть позицию");
@@ -953,6 +1178,17 @@
         );
       };
     });
+
+    $("closeProtectionModal").onclick = () => {
+      $("protectionModal").classList.add("hidden");
+      activeProtectionPosition = null;
+    };
+
+    $("saveProtectionButton").onclick = () =>
+      savePositionProtection(false);
+
+    $("clearProtectionButton").onclick = () =>
+      savePositionProtection(true);
 
     $("openTransferButton").onclick = () =>
       $("transferModal").classList.remove("hidden");

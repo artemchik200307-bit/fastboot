@@ -322,3 +322,187 @@ td button { border:1px solid var(--line); border-radius:6px; padding:5px 8px; ba
   body.chart-open .drawing-tools { max-width:calc(100vw - 170px); overflow-x:auto; }
   body.chart-open .chart-stage { height:calc(100dvh - 42px); }
 }
+
+
+/* ===== INTEGRATED TERMINAL 3.1 ===== */
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--panel);
+}
+
+.terminal-app {
+  display: flex;
+  height: 100vh;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--panel);
+}
+
+.topbar {
+  min-height: 52px;
+  padding-block: 5px;
+}
+
+.wallet-box {
+  display: flex;
+  min-width: 390px;
+  align-items: center;
+  gap: 13px;
+  padding: 6px 8px 6px 13px;
+}
+
+.wallet-box .wallet-value {
+  min-width: 92px;
+}
+
+.wallet-box .wallet-value small,
+.wallet-box .wallet-value strong {
+  display: block;
+}
+
+.wallet-box .wallet-value strong {
+  margin-top: 2px;
+  font-size: 12px;
+}
+
+.wallet-box > i {
+  width: 1px;
+  height: 28px;
+  background: var(--line);
+}
+
+.wallet-box button {
+  width: 145px;
+  min-height: 34px;
+  margin-left: auto;
+}
+
+.stats-row {
+  flex: 0 0 auto;
+}
+
+.workspace {
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.chart-panel,
+.orderbook-panel,
+.order-panel {
+  min-height: 0;
+}
+
+.chart-stage {
+  height: calc(100% - 42px);
+  min-height: 360px;
+}
+
+.bottom-panel {
+  flex: 0 0 190px;
+  min-height: 190px;
+  overflow: hidden;
+  background: var(--panel);
+}
+
+.tab-content {
+  min-height: 145px;
+  max-height: 145px;
+  overflow: auto;
+}
+
+.protection-position-info {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--panel2);
+  font-size: 10px;
+}
+
+.protection-position-info span {
+  color: var(--muted);
+}
+
+.protection-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 17px;
+}
+
+.protection-actions .primary {
+  margin-top: 0;
+}
+
+.secondary-modal-button {
+  min-height: 43px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel2);
+  color: var(--text);
+  font-weight: 800;
+}
+
+.position-protection {
+  display: grid;
+  gap: 3px;
+  font-size: 8px;
+}
+
+.position-protection .tp {
+  color: var(--green);
+}
+
+.position-protection .sl {
+  color: var(--red);
+}
+
+.position-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.position-actions button {
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  html,
+  body {
+    overflow: auto;
+  }
+
+  .terminal-app {
+    height: auto;
+    min-height: 100dvh;
+  }
+
+  .wallet-box {
+    min-width: 98px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 3px;
+    padding: 5px;
+  }
+
+  .wallet-box .wallet-value:nth-child(3),
+  .wallet-box > i {
+    display: none;
+  }
+
+  .wallet-box button {
+    width: 100%;
+    min-height: 25px;
+  }
+
+  .workspace {
+    min-height: calc(100dvh - 107px);
+  }
+
+  .bottom-panel {
+    display: none;
+  }
+}

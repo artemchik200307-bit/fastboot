@@ -30,6 +30,8 @@ const state = {
   aiBotAccount: null,
   aiTradeResults: [],
   adminAiOpenTrades: [],
+  adminBotStatuses: [],
+  terminalJournalTrades: [],
   botBalance: Number(userWallet?.bot_balance || 0),
   botRunning: localStorage.getItem(storageKey("bot-running")) === "true",
   orders: JSON.parse(localStorage.getItem(storageKey("orders")) || "[]"),
@@ -858,12 +860,121 @@ function safeFormatPrice(value) {
 }
 
 function assertAdmin(){if(userProfile.role!=="admin")throw new Error("Недостаточно прав администратора");}
-async function loadAdminPanel(search=""){
- assertAdmin(); $("adminUsersList").innerHTML='<div class="admin-empty">Загрузка…</div>'; $("adminFundingList").innerHTML='<div class="admin-empty">Загрузка…</div>';
- try{const [o,u,f]=await Promise.all([supabaseClient.rpc("admin_platform_overview"),supabaseClient.rpc("admin_list_users",{p_search:search||null,p_limit:100,p_offset:0}),supabaseClient.rpc("admin_list_funding_requests",{p_status:"pending",p_limit:100})]); if(o.error)throw o.error;if(u.error)throw u.error;if(f.error)throw f.error; state.adminOverview=o.data?.[0]||o.data||{};state.adminUsers=u.data||[];state.adminFundingRequests=f.data||[];renderAdminOverview();renderAdminUsers();renderAdminFunding();}catch(e){console.error(e);showToast(e.message||"Ошибка Admin Panel");}
+async function loadAdminPanel(search = "") {
+  assertAdmin();
+
+  $("adminUsersList").innerHTML =
+    '<div class="admin-empty">Загрузка…</div>';
+
+  $("adminFundingList").innerHTML =
+    '<div class="admin-empty">Загрузка…</div>';
+
+  try {
+    const [overview, users, funding, botStatuses] =
+      await Promise.all([
+        supabaseClient.rpc("admin_platform_overview"),
+        supabaseClient.rpc("admin_list_users", {
+          p_search: search || null,
+          p_limit: 100,
+          p_offset: 0,
+        }),
+        supabaseClient.rpc("admin_list_funding_requests", {
+          p_status: "pending",
+          p_limit: 100,
+        }),
+        supabaseClient.rpc("admin_list_ai_bot_statuses", {
+          p_search: search || null,
+        }),
+      ]);
+
+    if (overview.error) throw overview.error;
+    if (users.error) throw users.error;
+    if (funding.error) throw funding.error;
+    if (botStatuses.error) throw botStatuses.error;
+
+    state.adminOverview =
+      overview.data?.[0] || overview.data || {};
+
+    state.adminUsers = users.data || [];
+    state.adminFundingRequests = funding.data || [];
+    state.adminBotStatuses = botStatuses.data || [];
+
+    const botMap = new Map(
+      state.adminBotStatuses.map((item) => [
+        item.user_id,
+        Boolean(item.is_active),
+      ])
+    );
+
+    state.adminUsers = state.adminUsers.map((user) => ({
+      ...user,
+      ai_bot_active: botMap.get(user.id) || false,
+    }));
+
+    renderAdminOverview();
+    renderAdminUsers();
+    renderAdminFunding();
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || "Ошибка Admin Panel");
+  }
 }
+
 function renderAdminOverview(){const d=state.adminOverview||{};$("adminUsersCount").textContent=Number(d.users_count||0).toLocaleString("ru-RU");$("adminTotalBalance").textContent=`${Number(d.total_platform_balance||0).toFixed(2)} USDT`;$("adminPendingCount").textContent=Number(d.pending_requests_count||0);$("adminAdminsCount").textContent=Number(d.admins_count||0);}
-function renderAdminUsers(){const r=state.adminUsers;$("adminUsersList").innerHTML=r.length?r.map(u=>`<div class="admin-user-row"><div class="admin-user-identity"><strong>${escapeHtml(u.username||"User")}</strong><span>${escapeHtml(u.email||"")}</span><small>${escapeHtml(u.fastboot_id||"")}</small></div><span class="admin-role-badge ${u.role==="admin"?"admin":""}">${escapeHtml(u.role||"user")}</span><strong>${Number(u.spot_balance||0).toFixed(2)}</strong><strong>${Number(u.bot_balance||0).toFixed(2)}</strong><span>${formatDateTime(u.created_at)}</span><div class="admin-row-actions"><button class="secondary-action compact" data-admin-balance="${u.id}">Баланс</button><button class="secondary-action compact" data-admin-role="${u.id}">Роль</button></div></div>`).join(""):'<div class="admin-empty">Пользователи не найдены</div>';document.querySelectorAll("[data-admin-balance]").forEach(b=>b.onclick=()=>openAdminBalanceModal(r.find(x=>x.id===b.dataset.adminBalance)));document.querySelectorAll("[data-admin-role]").forEach(b=>b.onclick=()=>openAdminRoleModal(r.find(x=>x.id===b.dataset.adminRole)));}
+function renderAdminUsers() {
+  const users = state.adminUsers;
+
+  $("adminUsersList").innerHTML = users.length
+    ? users.map((user) => `
+      <div class="admin-user-row">
+        <div class="admin-user-identity">
+          <strong>${escapeHtml(user.username || "User")}</strong>
+          <span>${escapeHtml(user.email || "")}</span>
+          <small>${escapeHtml(user.fastboot_id || "")}</small>
+        </div>
+
+        <span class="admin-role-badge ${
+          user.role === "admin" ? "admin" : ""
+        }">
+          ${escapeHtml(user.role || "user")}
+        </span>
+
+        <span class="admin-bot-status ${
+          user.ai_bot_active ? "active" : "inactive"
+        }">
+          <i></i>
+          ${user.ai_bot_active ? "AI включён" : "AI выключен"}
+        </span>
+
+        <strong>${Number(user.spot_balance || 0).toFixed(2)}</strong>
+        <strong>${Number(user.bot_balance || 0).toFixed(2)}</strong>
+        <span>${formatDateTime(user.created_at)}</span>
+
+        <div class="admin-row-actions">
+          <button class="secondary-action compact"
+            data-admin-balance="${user.id}">Баланс</button>
+          <button class="secondary-action compact"
+            data-admin-role="${user.id}">Роль</button>
+        </div>
+      </div>
+    `).join("")
+    : '<div class="admin-empty">Пользователи не найдены</div>';
+
+  document.querySelectorAll("[data-admin-balance]").forEach((button) => {
+    button.onclick = () =>
+      openAdminBalanceModal(
+        users.find((item) => item.id === button.dataset.adminBalance)
+      );
+  });
+
+  document.querySelectorAll("[data-admin-role]").forEach((button) => {
+    button.onclick = () =>
+      openAdminRoleModal(
+        users.find((item) => item.id === button.dataset.adminRole)
+      );
+  });
+}
+
 function renderAdminFunding(){
   const a=state.adminFundingRequests;
 
@@ -1190,14 +1301,92 @@ async function loadMarketAnalysis() {
 $("refreshAnalysisButton").addEventListener("click",loadMarketAnalysis);
 $("analysisCoinSelect").addEventListener("change",loadMarketAnalysis);
 
-function renderJournal() {
-  $("journalOrdersCount").textContent=state.orders.length;
-  $("journalBuyCount").textContent=state.orders.filter(o=>o.side==="BUY").length;
-  $("journalSellCount").textContent=state.orders.filter(o=>o.side==="SELL").length;
-  $("journalTurnover").textContent=`${state.orders.reduce((s,o)=>s+o.total,0).toFixed(2)} USDT`;
-  $("journalOrders").innerHTML=state.orders.length?state.orders.map(o=>`<div class="order-history-row"><span>${o.date}</span><strong>${o.symbol}</strong><span>${o.type}</span><span class="${o.side==="BUY"?"positive":"negative"}">${o.side}</span><span>${safeFormatPrice(o.price)}</span><span>${o.amount}</span><span>${o.total.toFixed(2)}</span></div>`).join(""):"Сделок пока нет";
-  $("journalOrders").classList.toggle("empty-list",!state.orders.length);
+async function loadTerminalJournalTrades() {
+  try {
+    const { data, error } = await supabaseClient
+      .from("terminal_trades")
+      .select("*")
+      .eq("user_id", authUser.id)
+      .order("closed_at", { ascending: false })
+      .limit(200);
+
+    if (error) throw error;
+    state.terminalJournalTrades = data || [];
+  } catch (error) {
+    console.error("Terminal journal load error:", error);
+    state.terminalJournalTrades = [];
+  }
 }
+
+async function renderJournal() {
+  await loadTerminalJournalTrades();
+
+  const localOrders = state.orders.map((order) => ({
+    date: order.date,
+    symbol: order.symbol,
+    type: order.type,
+    side: order.side,
+    price: order.price,
+    amount: order.amount,
+    total: Number(order.total || 0),
+    pnl: null,
+    source: "Локальная сделка",
+  }));
+
+  const terminalTrades = state.terminalJournalTrades.map((trade) => ({
+    date: formatDateTime(trade.closed_at),
+    symbol: trade.symbol,
+    type: "MARKET",
+    side: trade.side === "LONG" ? "BUY" : "SELL",
+    price: Number(trade.exit_price),
+    amount: formatQuantity(trade.quantity),
+    total: Number(trade.exit_price) * Number(trade.quantity),
+    pnl: Number(trade.pnl || 0),
+    source: "Терминал",
+  }));
+
+  const rows = [...terminalTrades, ...localOrders];
+
+  $("journalOrdersCount").textContent = rows.length;
+  $("journalBuyCount").textContent =
+    rows.filter((item) => item.side === "BUY").length;
+
+  $("journalSellCount").textContent =
+    rows.filter((item) => item.side === "SELL").length;
+
+  $("journalTurnover").textContent =
+    `${rows.reduce((sum, item) => sum + item.total, 0).toFixed(2)} USDT`;
+
+  $("journalOrders").innerHTML = rows.length
+    ? rows.map((item) => `
+      <div class="order-history-row terminal-journal-row">
+        <span>${escapeHtml(item.date)}</span>
+        <strong>${escapeHtml(item.symbol)}</strong>
+        <span>${escapeHtml(item.type)}</span>
+        <span class="${item.side === "BUY" ? "positive" : "negative"}">
+          ${escapeHtml(item.side)}
+        </span>
+        <span>${safeFormatPrice(item.price)}</span>
+        <span>${escapeHtml(item.amount)}</span>
+        <span>${item.total.toFixed(2)}</span>
+        <span class="${
+          item.pnl === null
+            ? ""
+            : item.pnl >= 0
+              ? "positive"
+              : "negative"
+        }">
+          ${item.pnl === null
+            ? item.source
+            : `${item.pnl >= 0 ? "+" : ""}${item.pnl.toFixed(2)} USDT`}
+        </span>
+      </div>
+    `).join("")
+    : "Сделок пока нет";
+
+  $("journalOrders").classList.toggle("empty-list", !rows.length);
+}
+
 
 $("saveProfileButton").addEventListener("click", async () => {
   const name = $("settingsName").value.trim();
@@ -1342,6 +1531,13 @@ loadSupabaseAccountData()
 
 window.addEventListener("message", (event) => {
   if (event.origin !== window.location.origin) return;
+
+  if (event.data?.type === "FASTBOOT_TERMINAL_JOURNAL_REFRESH") {
+    if (state.section === "journal") {
+      renderJournal();
+    }
+    return;
+  }
 
   if (event.data?.type === "FASTBOOT_OPEN_SECTION") {
     const section = String(event.data.section || "overview");

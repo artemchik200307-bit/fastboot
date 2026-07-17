@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
   <meta name="theme-color" content="#0a1019">
   <title>FASTBOOT Terminal</title>
-  <link rel="stylesheet" href="terminal.css?v=3-0">
+  <link rel="stylesheet" href="terminal.css?v=3-1">
   <script src="https://unpkg.com/lightweight-charts@5.0.8/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
@@ -44,8 +44,15 @@
       </div>
 
       <div class="wallet-box">
-        <small>Торговый счёт</small>
-        <strong id="tradingBalance">0.00 USDT</strong>
+        <div class="wallet-value">
+          <small>Торговый счёт</small>
+          <strong id="tradingBalance">0.00 USDT</strong>
+        </div>
+        <i></i>
+        <div class="wallet-value">
+          <small>Основной баланс</small>
+          <strong id="spotBalance">0.00 USDT</strong>
+        </div>
         <button id="openTransferButton" type="button">Перевести</button>
       </div>
     </header>
@@ -203,7 +210,7 @@
             <thead>
               <tr>
                 <th>Пара</th><th>Сторона</th><th>Вход</th><th>Текущая</th>
-                <th>Количество</th><th>Маржа</th><th>PnL</th><th></th>
+                <th>Количество</th><th>Маржа</th><th>PnL</th><th>TP / SL</th><th></th>
               </tr>
             </thead>
             <tbody id="positionsBody"></tbody>
@@ -263,8 +270,31 @@
     </div>
   </div>
 
+  <div id="protectionModal" class="modal hidden">
+    <div class="modal-card">
+      <button id="closeProtectionModal" class="close-modal" type="button">×</button>
+      <h2>TP / SL позиции</h2>
+      <div id="protectionPositionInfo" class="protection-position-info"></div>
+
+      <label>
+        Take Profit
+        <input id="takeProfitInput" type="number" min="0" step="any" placeholder="Не установлен">
+      </label>
+
+      <label>
+        Stop Loss
+        <input id="stopLossInput" type="number" min="0" step="any" placeholder="Не установлен">
+      </label>
+
+      <div class="protection-actions">
+        <button id="clearProtectionButton" class="secondary-modal-button" type="button">Очистить</button>
+        <button id="saveProtectionButton" class="primary" type="button">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast hidden"></div>
 
-  <script src="terminal.js?v=3-0"></script>
+  <script src="terminal.js?v=3-1"></script>
 </body>
 </html>
