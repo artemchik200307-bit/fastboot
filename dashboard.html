@@ -10,7 +10,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#080c12">
   <title>FASTBOOT — Личный кабинет</title>
-  <link rel="stylesheet" href="dashboard.css?v=ai-fees-referral-v2">
+  <link rel="stylesheet" href="dashboard.css?v=admin-referral-fix-2-2">
   <script src="https://unpkg.com/lightweight-charts@5.2.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
@@ -279,9 +279,8 @@
                 С убыточных сделок комиссия не удерживается. В истории показываются
                 валовая прибыль, комиссия и чистый результат.
               </p>
-              <small>
-                AI Assistant работает в режиме demo / paper trading, пока не подключено
-                реальное исполнение ордеров через биржевой API.
+              <small class="ai-execution-disclosure">
+                Сделки отображаются внутри платформы и не исполняются на внешней бирже.
               </small>
             </div>
           </article>
@@ -468,7 +467,6 @@
                 <div class="referral-table-head">
                   <span>ID пользователя</span>
                   <span>Регистрация</span>
-                  <span>Статус</span>
                   <span>Активный баланс</span>
                   <span>Мой доход</span>
                 </div>

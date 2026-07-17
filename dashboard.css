@@ -5298,3 +5298,27 @@ body.modal-open .modal {
     min-width: 650px;
   }
 }
+
+
+/* ===== AI DISCLOSURE CLEAN 2.1 ===== */
+.ai-execution-disclosure {
+  margin-top: 7px;
+  color: #8d99ab;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+
+/* ===== ADMIN + REFERRAL USER VIEW FIX 2.2 ===== */
+.referral-table-head,
+.referral-user-row {
+  grid-template-columns:
+    minmax(150px, 1.25fr)
+    minmax(120px, .9fr)
+    minmax(150px, 1fr)
+    minmax(100px, .75fr);
+}
+
+#admin.dashboard-section.active {
+  display: block;
+}

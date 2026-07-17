@@ -308,14 +308,7 @@ function renderReferralProgram() {
         </div>
 
         <span>${formatDateTime(user.registered_at)}</span>
-
-        <span class="referral-user-status ${
-          user.ai_active ? "active" : ""
-        }">
-          ${user.ai_active ? "Активен" : "Неактивен"}
-        </span>
-
-        <span>
+<span>
           ${(
             Number(user.spot_balance || 0) +
             Number(user.bot_balance || 0) +
