@@ -671,6 +671,17 @@
   }
 
   function bindEvents() {
+    $("desktopTerminalHomeButton")?.addEventListener("click", () => {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage(
+          { type: "FASTBOOT_OPEN_SECTION", section: "overview" },
+          window.location.origin
+        );
+      } else {
+        window.location.href = "dashboard.html";
+      }
+    });
+
     $("mobileOpenChartButton")?.addEventListener("click", openMobileChart);
     $("mobileChartHomeButton")?.addEventListener("click", closeMobileChart);
     $("mobileTerminalHomeButton")?.addEventListener("click", closeMobileChart);

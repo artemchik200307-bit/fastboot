@@ -1335,6 +1335,16 @@ loadSupabaseAccountData()
     loadPrices();
   });
 
+
+window.addEventListener("message", (event) => {
+  if (event.origin !== window.location.origin) return;
+
+  if (event.data?.type === "FASTBOOT_OPEN_SECTION") {
+    const section = String(event.data.section || "overview");
+    openSection(titles[section] ? section : "overview");
+  }
+});
+
 openSection(titles[restoredSection] ? restoredSection : "overview");
 
 $("tradingHomeButton")?.addEventListener("click", () => {

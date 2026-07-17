@@ -531,3 +531,53 @@ body {
     font-size: 8px;
   }
 }
+
+
+/* ===== DESKTOP TERMINAL HOME 2.3 ===== */
+.terminal-brand-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.desktop-terminal-home-button {
+  display: inline-grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  place-items: center;
+  border: 1px solid rgba(111, 145, 255, .42);
+  border-radius: 10px;
+  background: rgba(111, 145, 255, .12);
+  color: #e7ecff;
+  cursor: pointer;
+  transition:
+    transform .16s ease,
+    background .16s ease,
+    border-color .16s ease;
+}
+
+.desktop-terminal-home-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(111, 145, 255, .72);
+  background: rgba(111, 145, 255, .21);
+}
+
+.desktop-terminal-home-button:active {
+  transform: translateY(0);
+}
+
+.desktop-terminal-home-button span {
+  font-size: 22px;
+  line-height: 1;
+}
+
+@media (max-width: 760px) {
+  .desktop-terminal-home-button {
+    display: none;
+  }
+
+  .terminal-brand-wrap {
+    gap: 0;
+  }
+}

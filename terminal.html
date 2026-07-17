@@ -5,16 +5,28 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
   <meta name="theme-color" content="#0b1018">
   <title>FASTBOOT Terminal</title>
-  <link rel="stylesheet" href="terminal.css?v=2-2">
+  <link rel="stylesheet" href="terminal.css?v=2-3">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://unpkg.com/lightweight-charts@5.0.8/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
   <main class="terminal-app">
     <header class="terminal-topbar">
-      <div class="terminal-brand">
-        <strong>FASTBOOT</strong>
-        <span>TERMINAL</span>
+      <div class="terminal-brand-wrap">
+        <button
+          id="desktopTerminalHomeButton"
+          class="desktop-terminal-home-button"
+          type="button"
+          aria-label="Вернуться на Dashboard"
+          title="Вернуться на Dashboard"
+        >
+          <span aria-hidden="true">⌂</span>
+        </button>
+
+        <div class="terminal-brand">
+          <strong>FASTBOOT</strong>
+          <span>TERMINAL</span>
+        </div>
       </div>
 
       <div class="symbol-select-wrap">
@@ -251,6 +263,6 @@
   <div id="toast" class="toast hidden"></div>
 
   <script src="supabase-config.js"></script>
-  <script src="terminal.js?v=2-2"></script>
+  <script src="terminal.js?v=2-3"></script>
 </body>
 </html>
