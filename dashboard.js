@@ -1125,6 +1125,245 @@ $("fitChartButton")?.addEventListener("click", () => {
 $("refreshTerminalButton")?.addEventListener("click", loadTradingTerminal);
 $("orderbookPrecision")?.addEventListener("change", loadTradingTerminal);
 
+
+function getTerminalMarketPrice() {
+  const raw = $("terminalPrice")?.textContent || "0";
+  return Number(raw.replaceAll(",", "")) || 0;
+}
+
+function getAvailableUsdt() {
+  const portfolioUsdt = state.portfolio.find(
+    (item) => item.asset === "USDT"
+  );
+
+  return Number(
+    portfolioUsdt?.amount ??
+    userWallet?.spot_balance ??
+    0
+  );
+}
+
+function updateOrderCalculation() {
+  const type = $("orderType")?.value || "LIMIT";
+  const marketPrice = getTerminalMarketPrice();
+  const enteredPrice = Number($("orderPrice")?.value || 0);
+  const price = type === "MARKET"
+    ? marketPrice
+    : enteredPrice || marketPrice;
+
+  const amount = Math.max(
+    Number($("orderAmount")?.value || 0),
+    0
+  );
+
+  const total = price > 0 ? price * amount : 0;
+  const fee = total * 0.001;
+  const available = getAvailableUsdt();
+  const maxAmount = price > 0 ? available / price : 0;
+
+  if ($("availableUsdt")) {
+    $("availableUsdt").textContent =
+      `${available.toFixed(2)} USDT`;
+  }
+
+  if ($("orderTotal")) {
+    $("orderTotal").textContent =
+      `${total.toFixed(2)} USDT`;
+  }
+
+  if ($("estimatedFee")) {
+    $("estimatedFee").textContent =
+      `${fee.toFixed(2)} USDT`;
+  }
+
+  if ($("mobileMaxBuy")) {
+    $("mobileMaxBuy").textContent =
+      `${available.toFixed(2)} USDT`;
+  }
+
+  if ($("mobileBuyCost")) {
+    $("mobileBuyCost").textContent =
+      `${total.toFixed(2)} USDT`;
+  }
+
+  if ($("mobileMaxSell")) {
+    $("mobileMaxSell").textContent =
+      `${maxAmount.toFixed(8)} ${(
+        state.currentSymbol || "BTCUSDT"
+      ).replace("USDT", "")}`;
+  }
+
+  if ($("mobileSellCost")) {
+    $("mobileSellCost").textContent =
+      `${total.toFixed(2)} USDT`;
+  }
+
+  const baseAsset = (state.currentSymbol || "BTCUSDT")
+    .replace("USDT", "");
+
+  if ($("baseAssetSuffix")) {
+    $("baseAssetSuffix").textContent = baseAsset;
+  }
+}
+
+function calculateOrderAmountFromPercent(percent) {
+  const normalizedPercent = Math.min(
+    Math.max(Number(percent) || 0, 0),
+    100
+  );
+
+  const type = $("orderType")?.value || "LIMIT";
+  const marketPrice = getTerminalMarketPrice();
+  const enteredPrice = Number($("orderPrice")?.value || 0);
+  const price = type === "MARKET"
+    ? marketPrice
+    : enteredPrice || marketPrice;
+
+  const available = getAvailableUsdt();
+
+  if (!(price > 0)) {
+    showToast("Цена ещё не загружена");
+    return;
+  }
+
+  const amount =
+    (available * (normalizedPercent / 100)) / price;
+
+  if ($("orderAmount")) {
+    $("orderAmount").value = amount > 0
+      ? amount.toFixed(8)
+      : "";
+  }
+
+  if ($("orderPercentSlider")) {
+    $("orderPercentSlider").value =
+      String(normalizedPercent);
+  }
+
+  updateOrderCalculation();
+}
+
+function renderLocalTerminalOrders() {
+  const rows = [...state.orders].reverse();
+
+  if ($("ordersHistory")) {
+    $("ordersHistory").innerHTML = rows.length
+      ? rows.map((order) => `
+        <div class="terminal-order-row">
+          <span>${escapeHtml(order.date)}</span>
+          <strong>${escapeHtml(order.symbol)}</strong>
+          <span>${escapeHtml(order.type)}</span>
+          <span class="${order.side === "BUY" ? "positive" : "negative"}">
+            ${escapeHtml(order.side)}
+          </span>
+          <span>${formatPrice(order.price)}</span>
+          <span>${formatQuantity(order.amount)}</span>
+          <span>${escapeHtml(order.status || "Исполнен")}</span>
+        </div>
+      `).join("")
+      : '<div class="terminal-empty-state"><strong>История ордеров пуста</strong></div>';
+  }
+
+  if ($("terminalTradeHistory")) {
+    $("terminalTradeHistory").innerHTML = rows.length
+      ? rows.map((order) => `
+        <div class="terminal-order-row">
+          <span>${escapeHtml(order.date)}</span>
+          <strong>${escapeHtml(order.symbol)}</strong>
+          <span class="${order.side === "BUY" ? "positive" : "negative"}">
+            ${escapeHtml(order.side)}
+          </span>
+          <span>${formatPrice(order.price)}</span>
+          <span>${formatQuantity(order.amount)}</span>
+          <span>${Number(order.total || 0).toFixed(2)} USDT</span>
+          <span>${escapeHtml(order.status || "Исполнен")}</span>
+        </div>
+      `).join("")
+      : '<div class="terminal-empty-state"><strong>История сделок пуста</strong></div>';
+  }
+
+  if ($("openOrdersTabCount")) {
+    $("openOrdersTabCount").textContent = "(0)";
+  }
+
+  if ($("positionsTabCount")) {
+    $("positionsTabCount").textContent = "(0)";
+  }
+}
+
+function placeLocalTerminalOrder(side) {
+  const type = $("orderType")?.value || "LIMIT";
+  const marketPrice = getTerminalMarketPrice();
+  const enteredPrice = Number($("orderPrice")?.value || 0);
+  const price = type === "MARKET"
+    ? marketPrice
+    : enteredPrice;
+
+  const amount = Number($("orderAmount")?.value || 0);
+  const available = getAvailableUsdt();
+  const total = price * amount;
+
+  if (!(price > 0)) {
+    showToast("Введите корректную цену");
+    return;
+  }
+
+  if (!(amount > 0)) {
+    showToast("Введите количество");
+    return;
+  }
+
+  if (side === "BUY" && total > available) {
+    showToast("Недостаточно средств");
+    return;
+  }
+
+  const order = {
+    id:
+      typeof crypto !== "undefined" &&
+      typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random()}`,
+    date: new Date().toLocaleString("ru-RU"),
+    createdAt: new Date().toISOString(),
+    symbol: state.currentSymbol || "BTCUSDT",
+    type,
+    side,
+    price,
+    amount,
+    total,
+    fee: total * 0.001,
+    takeProfit: $("takeProfitStopLoss")?.checked
+      ? Number($("takeProfitPrice")?.value || 0) || null
+      : null,
+    stopLoss: $("takeProfitStopLoss")?.checked
+      ? Number($("stopLossPrice")?.value || 0) || null
+      : null,
+    status: "Исполнен",
+  };
+
+  state.orders.push(order);
+  saveState();
+  renderLocalTerminalOrders();
+  renderJournal();
+
+  showToast(
+    side === "BUY"
+      ? "Ордер на покупку добавлен"
+      : "Ордер на продажу добавлен"
+  );
+
+  if ($("orderAmount")) {
+    $("orderAmount").value = "";
+  }
+
+  if ($("orderPercentSlider")) {
+    $("orderPercentSlider").value = "0";
+  }
+
+  updateOrderCalculation();
+}
+
 document.querySelectorAll("[data-order-type]").forEach((button) => {
   button.addEventListener("click", () => {
     document.querySelectorAll("[data-order-type]").forEach((item) =>
@@ -1140,10 +1379,10 @@ document.querySelectorAll("[data-order-type]").forEach((button) => {
 });
 
 ["orderPrice", "orderAmount"].forEach((id) => {
-  $(id).addEventListener("input", updateOrderCalculation);
+  $(id)?.addEventListener("input", updateOrderCalculation);
 });
 
-$("orderPercentSlider").addEventListener("input", (event) => {
+$("orderPercentSlider")?.addEventListener("input", (event) => {
   calculateOrderAmountFromPercent(Number(event.target.value));
 });
 
@@ -1153,12 +1392,12 @@ document.querySelectorAll("[data-percent]").forEach((button) => {
   });
 });
 
-$("takeProfitStopLoss").addEventListener("change", (event) => {
+$("takeProfitStopLoss")?.addEventListener("change", (event) => {
   $("tpSlFields").classList.toggle("hidden", !event.target.checked);
 });
 
-$("buyOrderButton").addEventListener("click", () => placeLocalTerminalOrder("BUY"));
-$("sellOrderButton").addEventListener("click", () => placeLocalTerminalOrder("SELL"));
+$("buyOrderButton")?.addEventListener("click", () => placeLocalTerminalOrder("BUY"));
+$("sellOrderButton")?.addEventListener("click", () => placeLocalTerminalOrder("SELL"));
 
 $("terminalBottomTabs").querySelectorAll("button").forEach((button) => {
   button.addEventListener("click", () => {
@@ -1765,6 +2004,8 @@ loadSupabaseAccountData()
   });
 
 openSection(titles[restoredSection] ? restoredSection : "overview");
+renderLocalTerminalOrders();
+updateOrderCalculation();
 
 $("tradingHomeButton")?.addEventListener("click", () => {
   openSection("overview");
