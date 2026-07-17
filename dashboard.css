@@ -4138,3 +4138,48 @@ body.trading-mode .sidebar.open {
     overflow-y: auto !important;
   }
 }
+
+
+/* ===== SUPABASE WALLET DASHBOARD V2 ===== */
+.operation-status {
+  max-width: 48%;
+  text-align: right;
+}
+
+.operation-status strong,
+.operation-status span {
+  display: block;
+}
+
+.operation-status strong {
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.operation-status span {
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transfer-box {
+  flex-wrap: wrap;
+}
+
+#transferFromBotButton {
+  flex-shrink: 0;
+}
+
+@media (max-width: 780px) {
+  .operation-status {
+    max-width: 52%;
+  }
+
+  .transfer-box #transferToBotButton,
+  .transfer-box #transferFromBotButton {
+    width: 100%;
+  }
+}

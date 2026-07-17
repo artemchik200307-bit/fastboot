@@ -85,12 +85,12 @@
             <div class="balance-main">
               <span>Общий баланс</span>
               <strong id="totalBalance">$0.00</strong>
-              <small>Эквивалент портфеля в USDT</small>
+              <small>Основной счёт + баланс AI-бота</small>
             </div>
             <div class="account-actions">
               <button id="depositButton" class="primary-action" type="button">Пополнить</button>
               <button id="withdrawButton" class="secondary-action" type="button">Вывести</button>
-              <button id="exchangeButton" class="secondary-action" type="button">Обмен</button>
+              <button id="exchangeButton" class="secondary-action" type="button">Перевод</button>
             </div>
           </div>
 
@@ -167,7 +167,10 @@
                 <input id="botTransferAmount" type="number" min="1" placeholder="Сумма USDT">
               </label>
               <button id="transferToBotButton" class="primary-action" type="button">
-                Перевести
+                На счёт бота
+              </button>
+              <button id="transferFromBotButton" class="secondary-action" type="button">
+                На основной счёт
               </button>
             </div>
             <div class="bot-control-buttons">

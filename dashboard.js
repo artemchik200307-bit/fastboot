@@ -11,14 +11,21 @@ if (!supabaseClient || !authUser || !userProfile) {
   throw new Error("Dashboard запущен до завершения авторизации.");
 }
 
+const storageKey = (name) => `fastboot-${authUser.id}-${name}`;
+
 const state = {
   section: "overview",
-  portfolio: JSON.parse(localStorage.getItem("fastboot-portfolio") || '[{"asset":"USDT","name":"Tether","amount":0},{"asset":"BTC","name":"Bitcoin","amount":0},{"asset":"ETH","name":"Ethereum","amount":0},{"asset":"SOL","name":"Solana","amount":0}]'),
-  deposits: JSON.parse(localStorage.getItem("fastboot-deposits") || "[]"),
-  withdrawals: JSON.parse(localStorage.getItem("fastboot-withdrawals") || "[]"),
+  portfolio: [
+    { asset: "USDT", name: "Tether", amount: Number(userWallet?.spot_balance || 0) },
+  ],
+  deposits: [],
+  withdrawals: [],
+  transfers: [],
+  transactions: [],
+  fundingRequests: [],
   botBalance: Number(userWallet?.bot_balance || 0),
-  botRunning: localStorage.getItem("fastboot-bot-running") === "true",
-  orders: JSON.parse(localStorage.getItem("fastboot-orders") || "[]"),
+  botRunning: localStorage.getItem(storageKey("bot-running")) === "true",
+  orders: JSON.parse(localStorage.getItem(storageKey("orders")) || "[]"),
   prices: {},
   chart: null,
   candleSeries: null,
@@ -46,12 +53,8 @@ const titles = {
 };
 
 function saveState() {
-  localStorage.setItem("fastboot-portfolio", JSON.stringify(state.portfolio));
-  localStorage.setItem("fastboot-deposits", JSON.stringify(state.deposits));
-  localStorage.setItem("fastboot-withdrawals", JSON.stringify(state.withdrawals));
-  localStorage.setItem("fastboot-bot-balance", String(state.botBalance));
-  localStorage.setItem("fastboot-bot-running", String(state.botRunning));
-  localStorage.setItem("fastboot-orders", JSON.stringify(state.orders));
+  localStorage.setItem(storageKey("bot-running"), String(state.botRunning));
+  localStorage.setItem(storageKey("orders"), JSON.stringify(state.orders));
 }
 
 function showToast(message) {
@@ -140,6 +143,91 @@ function applySupabaseWalletToPortfolio() {
   if (usdt) {
     usdt.amount = Number(userWallet?.spot_balance || 0);
   }
+
+  state.botBalance = Number(userWallet?.bot_balance || 0);
+}
+
+
+async function loadSupabaseAccountData() {
+  const [
+    walletResult,
+    fundingResult,
+    transactionResult,
+    transferResult,
+  ] = await Promise.all([
+    supabaseClient
+      .from("wallets")
+      .select("user_id, spot_balance, bot_balance, currency, updated_at")
+      .eq("user_id", authUser.id)
+      .single(),
+
+    supabaseClient
+      .from("funding_requests")
+      .select("id, type, amount, asset, status, details, created_at")
+      .eq("user_id", authUser.id)
+      .order("created_at", { ascending: false })
+      .limit(50),
+
+    supabaseClient
+      .from("transactions")
+      .select("id, type, amount, asset, status, description, created_at")
+      .eq("user_id", authUser.id)
+      .order("created_at", { ascending: false })
+      .limit(100),
+
+    supabaseClient
+      .from("wallet_transfers")
+      .select("id, from_wallet, to_wallet, amount, created_at")
+      .eq("user_id", authUser.id)
+      .order("created_at", { ascending: false })
+      .limit(100),
+  ]);
+
+  if (walletResult.error) throw walletResult.error;
+  if (fundingResult.error) throw fundingResult.error;
+  if (transactionResult.error) throw transactionResult.error;
+  if (transferResult.error) throw transferResult.error;
+
+  Object.assign(userWallet, walletResult.data);
+
+  state.deposits = (fundingResult.data || []).filter(
+    (item) => item.type === "deposit"
+  );
+
+  state.withdrawals = (fundingResult.data || []).filter(
+    (item) => item.type === "withdraw"
+  );
+
+  state.fundingRequests = fundingResult.data || [];
+  state.transactions = transactionResult.data || [];
+  state.transfers = transferResult.data || [];
+
+  applySupabaseWalletToPortfolio();
+  renderAccount();
+}
+
+function formatOperationStatus(status) {
+  const map = {
+    pending: "Ожидает",
+    approved: "Одобрено",
+    completed: "Выполнено",
+    rejected: "Отклонено",
+    cancelled: "Отменено",
+  };
+
+  return map[status] || status || "—";
+}
+
+function formatDateTime(value) {
+  if (!value) return "—";
+
+  return new Date(value).toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 async function fetchJson(url) {
@@ -165,90 +253,207 @@ function portfolioValue(item) {
 }
 
 function renderAccount() {
-  const total = state.portfolio.reduce((sum, item) => sum + portfolioValue(item), 0);
-  $("totalBalance").textContent = `$${total.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  const spotBalance = Number(userWallet?.spot_balance || 0);
+  const botBalance = Number(userWallet?.bot_balance || 0);
+  const total = spotBalance + botBalance;
 
-  $("portfolioList").innerHTML = state.portfolio.map((item) => `
+  $("totalBalance").textContent =
+    `$${total.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+
+  $("portfolioList").innerHTML = `
     <div class="portfolio-row">
-      <span class="asset-name"><strong>${item.asset}</strong><span>${item.name}</span></span>
-      <strong>${item.amount.toFixed(item.asset === "USDT" ? 2 : 8)}</strong>
-      <span>${item.asset === "USDT" ? "1.00" : formatPrice(state.prices[item.asset])}</span>
-      <span>$${portfolioValue(item).toFixed(2)}</span>
-    </div>`).join("");
+      <span class="asset-name">
+        <strong>USDT</strong>
+        <span>Основной счёт</span>
+      </span>
+      <strong>${spotBalance.toFixed(2)}</strong>
+      <span>1.00</span>
+      <span>$${spotBalance.toFixed(2)}</span>
+    </div>
+    <div class="portfolio-row">
+      <span class="asset-name">
+        <strong>USDT</strong>
+        <span>AI Bot Wallet</span>
+      </span>
+      <strong>${botBalance.toFixed(2)}</strong>
+      <span>1.00</span>
+      <span>$${botBalance.toFixed(2)}</span>
+    </div>
+  `;
 
-  $("allocationBars").innerHTML = state.portfolio.map((item) => {
-    const value = portfolioValue(item);
-    const percent = total > 0 ? value / total * 100 : 0;
-    return `<div class="allocation-item"><div><span>${item.asset}</span><strong>${percent.toFixed(1)}%</strong></div><div class="allocation-track"><div class="allocation-fill" style="width:${percent}%"></div></div></div>`;
-  }).join("");
+  const spotPercent = total > 0 ? (spotBalance / total) * 100 : 0;
+  const botPercent = total > 0 ? (botBalance / total) * 100 : 0;
+
+  $("allocationBars").innerHTML = `
+    <div class="allocation-item">
+      <div><span>Основной счёт</span><strong>${spotPercent.toFixed(1)}%</strong></div>
+      <div class="allocation-track">
+        <div class="allocation-fill" style="width:${spotPercent}%"></div>
+      </div>
+    </div>
+    <div class="allocation-item">
+      <div><span>AI Bot</span><strong>${botPercent.toFixed(1)}%</strong></div>
+      <div class="allocation-track">
+        <div class="allocation-fill" style="width:${botPercent}%"></div>
+      </div>
+    </div>
+  `;
 
   renderOperations();
   renderBot();
+  updateTerminalBalances();
 }
 
 function renderOperations() {
-  const operationHtml = (items) => items.length ? items.slice(0,8).map((item) => `
-    <div class="operation-row"><div><strong>${item.asset}</strong><br><span>${item.date}</span></div><strong>${item.amount.toFixed(2)}</strong></div>`).join("") : '<div class="empty-list">Операций пока нет</div>';
+  const operationHtml = (items) => items.length
+    ? items.slice(0, 8).map((item) => `
+      <div class="operation-row">
+        <div>
+          <strong>${Number(item.amount).toFixed(2)} ${item.asset || "USDT"}</strong>
+          <br>
+          <span>${formatDateTime(item.created_at)}</span>
+        </div>
+        <div class="operation-status">
+          <strong>${formatOperationStatus(item.status)}</strong>
+          <span>${item.details || ""}</span>
+        </div>
+      </div>
+    `).join("")
+    : '<div class="empty-list">Операций пока нет</div>';
+
   $("depositHistory").innerHTML = operationHtml(state.deposits);
   $("withdrawHistory").innerHTML = operationHtml(state.withdrawals);
 }
 
 function openMoneyModal(type) {
   const config = {
-    deposit: ["Пополнение счёта", "Пополнить"],
-    withdraw: ["Вывод средств", "Вывести"],
-    exchange: ["Обмен активов", "Обменять"],
+    deposit: ["Заявка на пополнение", "Отправить заявку"],
+    withdraw: ["Заявка на вывод", "Отправить заявку"],
+    exchange: ["Перевод между счетами", "Выполнить перевод"],
   }[type];
 
   $("modalTitle").textContent = config[0];
-  $("modalBody").innerHTML = type === "exchange" ? `
-    <div class="modal-form">
-      <label>Из актива<select id="modalFromAsset">${state.portfolio.map(x=>`<option>${x.asset}</option>`).join("")}</select></label>
-      <label>В актив<select id="modalToAsset">${state.portfolio.map(x=>`<option>${x.asset}</option>`).join("")}</select></label>
-      <label>Количество<input id="modalAmount" type="number" step="any" min="0"></label>
-      <button id="confirmModalAction" class="primary-action" type="button">${config[1]}</button>
-    </div>` : `
-    <div class="modal-form">
-      <label>Актив<select id="modalAsset">${state.portfolio.map(x=>`<option>${x.asset}</option>`).join("")}</select></label>
-      <label>Количество<input id="modalAmount" type="number" step="any" min="0"></label>
-      <button id="confirmModalAction" class="primary-action" type="button">${config[1]}</button>
-    </div>`;
-
-  $("actionModal").classList.remove("hidden");
-  $("confirmModalAction").addEventListener("click", () => processMoneyAction(type));
-}
-
-function processMoneyAction(type) {
-  const amount = Number($("modalAmount").value);
-  if (!(amount > 0)) return showToast("Введите корректную сумму");
 
   if (type === "exchange") {
-    const from = $("modalFromAsset").value;
-    const to = $("modalToAsset").value;
-    if (from === to) return showToast("Выберите разные активы");
-    const fromItem = state.portfolio.find(x=>x.asset===from);
-    const toItem = state.portfolio.find(x=>x.asset===to);
-    if (fromItem.amount < amount) return showToast("Недостаточно средств");
-    const usdValue = amount * (state.prices[from] || 0);
-    const received = usdValue / (state.prices[to] || 1);
-    fromItem.amount -= amount;
-    toItem.amount += received;
+    $("modalBody").innerHTML = `
+      <div class="modal-form">
+        <label>
+          Направление
+          <select id="modalTransferDirection">
+            <option value="spot_to_bot">Основной счёт → AI Bot</option>
+            <option value="bot_to_spot">AI Bot → Основной счёт</option>
+          </select>
+        </label>
+        <label>
+          Сумма USDT
+          <input id="modalAmount" type="number" step="0.01" min="0.01">
+        </label>
+        <button id="confirmModalAction" class="primary-action" type="button">
+          ${config[1]}
+        </button>
+      </div>
+    `;
   } else {
-    const asset = $("modalAsset").value;
-    const item = state.portfolio.find(x=>x.asset===asset);
-    if (type === "withdraw" && item.amount < amount) return showToast("Недостаточно средств");
-    item.amount += type === "deposit" ? amount : -amount;
-    const record = { asset, amount, date: new Date().toLocaleString("ru-RU") };
-    (type === "deposit" ? state.deposits : state.withdrawals).unshift(record);
+    $("modalBody").innerHTML = `
+      <div class="modal-form">
+        <label>
+          Сумма USDT
+          <input id="modalAmount" type="number" step="0.01" min="0.01">
+        </label>
+        <label>
+          Комментарий или реквизиты
+          <input
+            id="modalDetails"
+            type="text"
+            maxlength="300"
+            placeholder="${type === "deposit"
+              ? "Например: сеть TRC20"
+              : "Например: адрес кошелька"}"
+          >
+        </label>
+        <button id="confirmModalAction" class="primary-action" type="button">
+          ${config[1]}
+        </button>
+      </div>
+    `;
   }
 
-  saveState(); renderAccount(); $("actionModal").classList.add("hidden"); showToast("Операция сохранена");
+  $("actionModal").classList.remove("hidden");
+  $("confirmModalAction").addEventListener(
+    "click",
+    () => processMoneyAction(type),
+    { once: true }
+  );
 }
 
-$("depositButton").addEventListener("click",()=>openMoneyModal("deposit"));
-$("withdrawButton").addEventListener("click",()=>openMoneyModal("withdraw"));
-$("exchangeButton").addEventListener("click",()=>openMoneyModal("exchange"));
-$("closeModalButton").addEventListener("click",()=>$("actionModal").classList.add("hidden"));
+async function processMoneyAction(type) {
+  const amount = Number($("modalAmount")?.value);
+
+  if (!(amount > 0)) {
+    showToast("Введите корректную сумму");
+    return;
+  }
+
+  const button = $("confirmModalAction");
+  button.disabled = true;
+
+  try {
+    if (type === "exchange") {
+      const direction = $("modalTransferDirection").value;
+
+      const { error } = await supabaseClient.rpc(
+        "transfer_wallet_balance",
+        {
+          p_direction: direction,
+          p_amount: amount,
+        }
+      );
+
+      if (error) throw error;
+
+      showToast("Перевод выполнен");
+    } else {
+      const details = $("modalDetails")?.value.trim() || null;
+
+      const { error } = await supabaseClient.rpc(
+        "request_funding_operation",
+        {
+          p_type: type,
+          p_amount: amount,
+          p_asset: "USDT",
+          p_details: details,
+        }
+      );
+
+      if (error) throw error;
+
+      showToast(
+        type === "deposit"
+          ? "Заявка на пополнение создана"
+          : "Заявка на вывод создана"
+      );
+    }
+
+    $("actionModal").classList.add("hidden");
+    await loadSupabaseAccountData();
+  } catch (error) {
+    console.error("Ошибка финансовой операции:", error);
+    showToast(error?.message || "Не удалось выполнить операцию");
+  } finally {
+    button.disabled = false;
+  }
+}
+
+$("depositButton").addEventListener("click", () => openMoneyModal("deposit"));
+$("withdrawButton").addEventListener("click", () => openMoneyModal("withdraw"));
+$("exchangeButton").addEventListener("click", () => openMoneyModal("exchange"));
+$("closeModalButton").addEventListener(
+  "click",
+  () => $("actionModal").classList.add("hidden")
+);
 
 function renderBot() {
   $("botBalance").textContent = `$${state.botBalance.toFixed(2)}`;
@@ -258,14 +463,48 @@ function renderBot() {
   $("toggleBotButton").textContent = state.botRunning ? "Остановить торговлю" : "Запустить торговлю";
 }
 
-$("transferToBotButton").addEventListener("click",()=>{
+async function transferBotFunds(direction) {
   const amount = Number($("botTransferAmount").value);
-  const usdt = state.portfolio.find(x=>x.asset==="USDT");
-  if (!(amount>0)) return showToast("Введите сумму");
-  if (usdt.amount < amount) return showToast("Недостаточно USDT на основном счёте");
-  usdt.amount -= amount; state.botBalance += amount; $("botTransferAmount").value = "";
-  saveState(); renderAccount(); showToast("Средства переведены на счёт бота");
-});
+
+  if (!(amount > 0)) {
+    showToast("Введите сумму");
+    return;
+  }
+
+  try {
+    const { error } = await supabaseClient.rpc(
+      "transfer_wallet_balance",
+      {
+        p_direction: direction,
+        p_amount: amount,
+      }
+    );
+
+    if (error) throw error;
+
+    $("botTransferAmount").value = "";
+    await loadSupabaseAccountData();
+
+    showToast(
+      direction === "spot_to_bot"
+        ? "Средства переведены на счёт бота"
+        : "Средства возвращены на основной счёт"
+    );
+  } catch (error) {
+    console.error("Ошибка перевода:", error);
+    showToast(error?.message || "Не удалось выполнить перевод");
+  }
+}
+
+$("transferToBotButton").addEventListener(
+  "click",
+  () => transferBotFunds("spot_to_bot")
+);
+
+$("transferFromBotButton").addEventListener(
+  "click",
+  () => transferBotFunds("bot_to_spot")
+);
 $("toggleBotButton").addEventListener("click",()=>{
   if (state.botBalance <= 0 && !state.botRunning) return showToast("Сначала переведите средства на счёт бота");
   state.botRunning = !state.botRunning; saveState(); renderBot(); showToast(state.botRunning ? "Торговля бота запущена" : "Торговля бота остановлена");
@@ -1325,9 +1564,19 @@ document.body.style.overflow = "";
 document.body.classList.remove("mobile-bottom-drawer-open");
 initializeUser();
 applySupabaseWalletToPortfolio();
-loadPrices();
 renderOrders();
 renderJournal();
+
+loadSupabaseAccountData()
+  .catch((error) => {
+    console.error("Ошибка загрузки аккаунта:", error);
+    showToast("Не удалось загрузить данные аккаунта");
+    renderAccount();
+  })
+  .finally(() => {
+    loadPrices();
+  });
+
 openSection(titles[restoredSection] ? restoredSection : "overview");
 
 
