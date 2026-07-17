@@ -4793,3 +4793,39 @@ body.modal-open .modal {
 #journal {
   display: none !important;
 }
+
+
+/* ===== ADMIN PANEL RESTORE 3.3 ===== */
+#admin.dashboard-section {
+  width: 100%;
+}
+
+#admin.dashboard-section.active {
+  display: block;
+}
+
+.admin-section {
+  padding-bottom: 40px;
+}
+
+.admin-table-head {
+  grid-template-columns:
+    minmax(190px, 1.5fr)
+    minmax(65px, .55fr)
+    minmax(95px, .75fr)
+    minmax(70px, .6fr)
+    minmax(70px, .6fr)
+    minmax(100px, .8fr)
+    auto;
+}
+
+@media (max-width: 900px) {
+  .admin-table {
+    overflow-x: auto;
+  }
+
+  .admin-table-head,
+  .admin-user-row {
+    min-width: 980px;
+  }
+}
