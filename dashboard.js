@@ -1513,3 +1513,53 @@ document.querySelectorAll("[data-mobile-chart-interval]").forEach((button) => {
     await loadMobileChartData();
   });
 });
+
+
+function closeMobileBottomDrawer() {
+  document.body.classList.remove("mobile-bottom-drawer-open");
+}
+
+function openMobileBottomDrawer(tabName, clickedButton) {
+  const targetMap = {
+    "open-orders": "openOrdersContent",
+    positions: "positionsContent",
+  };
+
+  const targetId = targetMap[tabName];
+  if (!targetId) return;
+
+  const isAlreadyOpen =
+    document.body.classList.contains("mobile-bottom-drawer-open") &&
+    clickedButton.classList.contains("active");
+
+  document.querySelectorAll("[data-mobile-bottom]").forEach((item) => {
+    item.classList.toggle("active", item === clickedButton);
+  });
+
+  document.querySelectorAll(".terminal-bottom-content").forEach((content) => {
+    content.classList.toggle("active", content.id === targetId);
+  });
+
+  if (isAlreadyOpen) {
+    closeMobileBottomDrawer();
+    return;
+  }
+
+  document.body.classList.add("mobile-bottom-drawer-open");
+}
+
+document.querySelectorAll("[data-mobile-bottom]").forEach((button) => {
+  button.addEventListener("click", (event) => {
+    if (!window.matchMedia("(max-width: 760px)").matches) return;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    openMobileBottomDrawer(button.dataset.mobileBottom, button);
+  }, true);
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeMobileBottomDrawer();
+  }
+});
