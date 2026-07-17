@@ -278,6 +278,12 @@
                 <strong id="terminalPrice">—</strong>
                 <span id="terminalChange">—</span>
               </div>
+              <button id="mobileChartButton" class="mobile-chart-button"
+                type="button" aria-label="Открыть график" title="Открыть график">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 19V9h3v10H4Zm6 0V4h3v15h-3Zm6 0v-7h3v7h-3Z"/>
+                </svg>
+              </button>
 
               <div class="terminal-stat">
                 <span>Цена открытия</span>
@@ -626,6 +632,28 @@
           </article>
         </section>
       </main>
+    </div>
+  </div>
+
+  <div id="mobileChartModal" class="mobile-chart-modal hidden">
+    <div class="mobile-chart-modal-card">
+      <header class="mobile-chart-modal-head">
+        <div>
+          <strong id="mobileChartSymbol">BTCUSDT</strong>
+          <span>График в реальном времени</span>
+        </div>
+        <button id="closeMobileChartButton" type="button" aria-label="Закрыть">✕</button>
+      </header>
+
+      <div class="mobile-chart-timeframes">
+        <button data-mobile-chart-interval="1m">1м</button>
+        <button data-mobile-chart-interval="5m">5м</button>
+        <button data-mobile-chart-interval="15m" class="active">15м</button>
+        <button data-mobile-chart-interval="1h">1ч</button>
+        <button data-mobile-chart-interval="4h">4ч</button>
+      </div>
+
+      <div id="mobileChartContainer" class="mobile-chart-container"></div>
     </div>
   </div>
 

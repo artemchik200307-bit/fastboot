@@ -25,6 +25,10 @@ const state = {
   tradeSocket: null,
   terminalSocketReconnectTimer: null,
   terminalSocketGeneration: 0,
+  mobileChart: null,
+  mobileChartSeries: null,
+  mobileChartVolumeSeries: null,
+  mobileChartInterval: "15m",
   currentSymbol: "BTCUSDT",
   orderSide: "BUY",
   marketUniverse: [],
@@ -57,6 +61,7 @@ function showToast(message) {
 
 function openSection(id) {
   state.section = id;
+  localStorage.setItem("fastboot-active-section", id);
   document.body.classList.toggle("trading-mode", id === "trading");
   document.querySelectorAll(".dashboard-section").forEach((el) => el.classList.toggle("active", el.id === id));
   document.querySelectorAll(".nav-item[data-section]").forEach((el) => el.classList.toggle("active", el.dataset.section === id));
@@ -1240,7 +1245,12 @@ $("saveProfileButton").addEventListener("click",()=>{
   localStorage.setItem("fastboot-users",JSON.stringify(users)); session.name=name; localStorage.setItem("fastboot-session",JSON.stringify(session)); initializeUser(); showToast("Профиль обновлён");
 });
 
-initializeUser(); loadPrices(); renderOrders(); renderJournal();
+const restoredSection = localStorage.getItem("fastboot-active-section") || "overview";
+initializeUser();
+loadPrices();
+renderOrders();
+renderJournal();
+openSection(titles[restoredSection] ? restoredSection : "overview");
 
 
 $("tradingHomeButton")?.addEventListener("click", () => {
@@ -1368,5 +1378,138 @@ document.querySelectorAll("[data-mobile-bottom]").forEach((button) => {
     document.querySelectorAll("[data-mobile-bottom]").forEach((item) => {
       item.classList.toggle("active", item === button);
     });
+  });
+});
+
+
+async function openMobileChart() {
+  if (!window.matchMedia("(max-width: 760px)").matches) return;
+
+  $("mobileChartSymbol").textContent = state.currentSymbol;
+  $("mobileChartModal").classList.remove("hidden");
+
+  await loadMobileChartData();
+}
+
+function closeMobileChart() {
+  $("mobileChartModal").classList.add("hidden");
+}
+
+async function loadMobileChartData() {
+  const container = $("mobileChartContainer");
+  if (!container) return;
+
+  try {
+    const rows = await fetchJson(
+      `${REST_BASE}/api/v3/klines?symbol=${state.currentSymbol}` +
+      `&interval=${state.mobileChartInterval}&limit=300`
+    );
+
+    if (!state.mobileChart) {
+      state.mobileChart = LightweightCharts.createChart(container, {
+        width: Math.max(container.clientWidth, 320),
+        height: Math.max(container.clientHeight, 360),
+        layout: {
+          background: { type: "solid", color: "#101620" },
+          textColor: "#8793a5",
+          attributionLogo: false,
+        },
+        grid: {
+          vertLines: { color: "rgba(135,147,165,.10)" },
+          horzLines: { color: "rgba(135,147,165,.10)" },
+        },
+        rightPriceScale: {
+          borderColor: "#2c3544",
+          scaleMargins: { top: .07, bottom: .22 },
+        },
+        timeScale: {
+          borderColor: "#2c3544",
+          timeVisible: true,
+          secondsVisible: false,
+        },
+      });
+
+      state.mobileChartSeries = state.mobileChart.addSeries(
+        LightweightCharts.CandlestickSeries,
+        {
+          upColor: "#20c987",
+          downColor: "#ff5f78",
+          borderVisible: false,
+          wickUpColor: "#20c987",
+          wickDownColor: "#ff5f78",
+        }
+      );
+
+      state.mobileChartVolumeSeries = state.mobileChart.addSeries(
+        LightweightCharts.HistogramSeries,
+        {
+          priceFormat: { type: "volume" },
+          priceScaleId: "mobile-volume",
+          priceLineVisible: false,
+          lastValueVisible: false,
+        }
+      );
+
+      state.mobileChartVolumeSeries.priceScale().applyOptions({
+        scaleMargins: { top: .82, bottom: 0 },
+      });
+
+      new ResizeObserver(() => {
+        if (!state.mobileChart || $("mobileChartModal").classList.contains("hidden")) {
+          return;
+        }
+
+        state.mobileChart.resize(
+          Math.max(container.clientWidth, 320),
+          Math.max(container.clientHeight, 360)
+        );
+      }).observe(container);
+    }
+
+    state.mobileChartSeries.setData(
+      rows.map((row) => ({
+        time: Math.floor(Number(row[0]) / 1000),
+        open: Number(row[1]),
+        high: Number(row[2]),
+        low: Number(row[3]),
+        close: Number(row[4]),
+      }))
+    );
+
+    state.mobileChartVolumeSeries.setData(
+      rows.map((row) => ({
+        time: Math.floor(Number(row[0]) / 1000),
+        value: Number(row[5]),
+        color:
+          Number(row[4]) >= Number(row[1])
+            ? "rgba(32,201,135,.50)"
+            : "rgba(255,95,120,.50)",
+      }))
+    );
+
+    requestAnimationFrame(() => {
+      state.mobileChart.resize(
+        Math.max(container.clientWidth, 320),
+        Math.max(container.clientHeight, 360)
+      );
+      state.mobileChart.timeScale().fitContent();
+    });
+  } catch (error) {
+    console.error("Ошибка мобильного графика:", error);
+    showToast("Не удалось открыть график");
+  }
+}
+
+$("mobileChartButton")?.addEventListener("click", openMobileChart);
+$("closeMobileChartButton")?.addEventListener("click", closeMobileChart);
+
+document.querySelectorAll("[data-mobile-chart-interval]").forEach((button) => {
+  button.addEventListener("click", async () => {
+    document.querySelectorAll("[data-mobile-chart-interval]").forEach((item) => {
+      item.classList.toggle("active", item === button);
+    });
+
+    state.mobileChartInterval = button.dataset.mobileChartInterval;
+    await loadMobileChartData();
   });
 });
