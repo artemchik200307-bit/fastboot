@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
   <meta name="theme-color" content="#0b1018">
   <title>FASTBOOT Terminal</title>
-  <link rel="stylesheet" href="terminal.css?v=2">
+  <link rel="stylesheet" href="terminal.css?v=2-2">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://unpkg.com/lightweight-charts@5.0.8/dist/lightweight-charts.standalone.production.js"></script>
 </head>
@@ -45,6 +45,18 @@
       </div>
     </header>
 
+    <nav class="mobile-terminal-navigation" aria-label="Навигация терминала">
+      <button id="mobileTerminalHomeButton" class="mobile-terminal-home active" type="button" aria-label="Главная терминала">
+        <span aria-hidden="true">⌂</span>
+        <small>Терминал</small>
+      </button>
+
+      <button id="mobileOpenChartButton" class="mobile-terminal-chart-button" type="button">
+        <span aria-hidden="true">▥</span>
+        <small>График</small>
+      </button>
+    </nav>
+
     <section class="terminal-market-stats">
       <div><span>Открытие 24ч</span><strong id="statOpen">—</strong></div>
       <div><span>Макс. 24ч</span><strong id="statHigh">—</strong></div>
@@ -53,7 +65,19 @@
     </section>
 
     <section class="terminal-workspace">
-      <article class="chart-panel terminal-panel">
+      <article class="chart-panel terminal-panel" id="mobileChartView">
+        <div class="mobile-chart-header">
+          <button id="mobileChartHomeButton" class="mobile-chart-home-button" type="button" aria-label="Вернуться в терминал">
+            <span aria-hidden="true">⌂</span>
+            <strong>Терминал</strong>
+          </button>
+
+          <div>
+            <span>График</span>
+            <strong id="mobileChartSymbol">BTCUSDT</strong>
+          </div>
+        </div>
+
         <div class="panel-toolbar">
           <div class="interval-tabs">
             <button data-interval="1m">1м</button>
@@ -68,7 +92,7 @@
         <div id="terminalChart" class="terminal-chart"></div>
       </article>
 
-      <article class="orderbook-panel terminal-panel">
+      <article class="orderbook-panel terminal-panel mobile-main-panel">
         <div class="panel-heading">
           <div>
             <h3>Биржевой стакан</h3>
@@ -101,7 +125,7 @@
         </div>
       </article>
 
-      <article class="order-panel terminal-panel">
+      <article class="order-panel terminal-panel mobile-main-panel">
         <div class="order-type-tabs">
           <button data-order-type="LIMIT" class="active">Лимит</button>
           <button data-order-type="MARKET">Рынок</button>
@@ -227,6 +251,6 @@
   <div id="toast" class="toast hidden"></div>
 
   <script src="supabase-config.js"></script>
-  <script src="terminal.js?v=2"></script>
+  <script src="terminal.js?v=2-2"></script>
 </body>
 </html>

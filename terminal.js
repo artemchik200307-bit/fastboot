@@ -629,10 +629,68 @@
     }
   }
 
+  function isMobileTerminal() {
+    return window.matchMedia("(max-width: 760px)").matches;
+  }
+
+  function resizeChartToContainer() {
+    if (!chart) return;
+
+    const container = $("terminalChart");
+
+    requestAnimationFrame(() => {
+      chart.resize(
+        Math.max(container.clientWidth, 320),
+        Math.max(container.clientHeight, 300)
+      );
+
+      chart.timeScale().fitContent();
+    });
+  }
+
+  function openMobileChart() {
+    if (!isMobileTerminal()) return;
+
+    document.body.classList.add("mobile-chart-open");
+
+    $("mobileTerminalHomeButton")?.classList.remove("active");
+    $("mobileOpenChartButton")?.classList.add("active");
+
+    if ($("mobileChartSymbol")) {
+      $("mobileChartSymbol").textContent = currentSymbol;
+    }
+
+    resizeChartToContainer();
+  }
+
+  function closeMobileChart() {
+    document.body.classList.remove("mobile-chart-open");
+
+    $("mobileOpenChartButton")?.classList.remove("active");
+    $("mobileTerminalHomeButton")?.classList.add("active");
+  }
+
   function bindEvents() {
+    $("mobileOpenChartButton")?.addEventListener("click", openMobileChart);
+    $("mobileChartHomeButton")?.addEventListener("click", closeMobileChart);
+    $("mobileTerminalHomeButton")?.addEventListener("click", closeMobileChart);
+
+    window.addEventListener("resize", () => {
+      if (!isMobileTerminal()) {
+        closeMobileChart();
+      }
+
+      resizeChartToContainer();
+    });
+
     $("symbolSelect").onchange = async (event) => {
       currentSymbol = event.target.value;
       $("baseAssetLabel").textContent = currentSymbol.replace("USDT", "");
+
+      if ($("mobileChartSymbol")) {
+        $("mobileChartSymbol").textContent = currentSymbol;
+      }
+
       await loadMarket();
     };
 
@@ -755,6 +813,10 @@
       bindEvents();
 
       $("baseAssetLabel").textContent = currentSymbol.replace("USDT", "");
+
+      if ($("mobileChartSymbol")) {
+        $("mobileChartSymbol").textContent = currentSymbol;
+      }
 
       await loadMarket();
 

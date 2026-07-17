@@ -297,3 +297,237 @@ body {
     min-height: 360px;
   }
 }
+
+
+/* ===== MOBILE TERMINAL VIEWS 2.2 ===== */
+.mobile-terminal-navigation,
+.mobile-chart-header {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  html,
+  body {
+    width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  body {
+    min-height: 100dvh;
+  }
+
+  .terminal-app {
+    width: 100%;
+    min-width: 0;
+    transform: none;
+  }
+
+  .terminal-topbar {
+    position: relative;
+    grid-template-columns: minmax(72px, auto) minmax(120px, 1fr) minmax(92px, auto);
+  }
+
+  .mobile-terminal-navigation {
+    position: sticky;
+    top: 0;
+    z-index: 12;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(11, 16, 24, .96);
+    backdrop-filter: blur(14px);
+  }
+
+  .mobile-terminal-navigation button {
+    display: flex;
+    min-height: 42px;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--panel);
+    color: var(--muted);
+  }
+
+  .mobile-terminal-navigation button.active {
+    border-color: rgba(111, 145, 255, .55);
+    background: rgba(111, 145, 255, .14);
+    color: #dce4ff;
+  }
+
+  .mobile-terminal-navigation button span {
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  .mobile-terminal-navigation button small {
+    font-size: 10px;
+    font-weight: 800;
+  }
+
+  .terminal-market-stats {
+    display: none;
+  }
+
+  .terminal-workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 42%) minmax(0, 58%);
+    min-height: calc(100dvh - 132px);
+  }
+
+  .chart-panel {
+    display: none;
+  }
+
+  .orderbook-panel {
+    grid-column: 1;
+    border-right: 1px solid var(--line);
+    border-bottom: 0;
+  }
+
+  .order-panel {
+    grid-column: 2;
+  }
+
+  .terminal-bottom {
+    display: none;
+  }
+
+  body.mobile-chart-open {
+    overflow: hidden;
+  }
+
+  body.mobile-chart-open .terminal-topbar,
+  body.mobile-chart-open .mobile-terminal-navigation,
+  body.mobile-chart-open .mobile-main-panel,
+  body.mobile-chart-open .terminal-bottom {
+    display: none !important;
+  }
+
+  body.mobile-chart-open .terminal-workspace {
+    display: block;
+    min-height: 100dvh;
+  }
+
+  body.mobile-chart-open .chart-panel {
+    display: block;
+    width: 100%;
+    min-height: 100dvh;
+    border: 0;
+  }
+
+  .mobile-chart-header {
+    display: none;
+  }
+
+  body.mobile-chart-open .mobile-chart-header {
+    position: sticky;
+    top: 0;
+    z-index: 14;
+    display: flex;
+    min-height: 58px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: max(9px, env(safe-area-inset-top)) 12px 9px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(11, 16, 24, .97);
+    backdrop-filter: blur(14px);
+  }
+
+  .mobile-chart-header > div {
+    text-align: right;
+  }
+
+  .mobile-chart-header > div span,
+  .mobile-chart-header > div strong {
+    display: block;
+  }
+
+  .mobile-chart-header > div span {
+    color: var(--muted);
+    font-size: 8px;
+  }
+
+  .mobile-chart-header > div strong {
+    margin-top: 3px;
+    font-size: 12px;
+  }
+
+  .mobile-chart-home-button {
+    display: inline-flex;
+    min-height: 38px;
+    align-items: center;
+    gap: 7px;
+    border: 1px solid rgba(111, 145, 255, .45);
+    border-radius: 9px;
+    padding: 0 12px;
+    background: rgba(111, 145, 255, .13);
+    color: #e6ebff;
+  }
+
+  .mobile-chart-home-button span {
+    font-size: 20px;
+    line-height: 1;
+  }
+
+  .mobile-chart-home-button strong {
+    font-size: 10px;
+  }
+
+  body.mobile-chart-open .panel-toolbar {
+    position: sticky;
+    top: 58px;
+    z-index: 13;
+    background: var(--panel);
+  }
+
+  body.mobile-chart-open .terminal-chart {
+    width: 100%;
+    height: calc(100dvh - 108px);
+    min-height: calc(100dvh - 108px);
+  }
+
+  .orderbook-head,
+  .orderbook-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, .85fr);
+  }
+
+  .panel-heading {
+    min-height: 43px;
+  }
+
+  .orderbook-mid strong {
+    font-size: 15px;
+  }
+
+  .orderbook-ratio {
+    grid-template-columns: auto minmax(20px, 1fr) auto;
+    padding: 8px 6px;
+  }
+
+  .order-panel {
+    padding: 9px;
+  }
+
+  .order-panel label {
+    font-size: 8px;
+  }
+
+  .input-shell {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .input-shell input {
+    min-height: 38px;
+    font-size: 11px;
+  }
+
+  .order-calculation > div {
+    font-size: 8px;
+  }
+}
