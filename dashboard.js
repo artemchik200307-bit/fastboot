@@ -1359,3 +1359,14 @@ window.addEventListener("resize", () => {
     }
   }
 });
+
+
+document.querySelectorAll("[data-mobile-bottom]").forEach((button) => {
+  button.addEventListener("click", () => {
+    if (!window.matchMedia("(max-width: 760px)").matches) return;
+
+    document.querySelectorAll("[data-mobile-bottom]").forEach((item) => {
+      item.classList.toggle("active", item === button);
+    });
+  });
+});

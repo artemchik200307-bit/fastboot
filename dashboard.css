@@ -3262,3 +3262,452 @@ body.trading-mode .sidebar.open {
     min-width: 278px;
   }
 }
+
+
+/* ===== MOBILE TERMINAL V12: CORRECTED BINANCE-LIKE LAYOUT ===== */
+@media (max-width: 760px) {
+  html,
+  body,
+  body.trading-mode,
+  body.trading-mode .dashboard-main,
+  body.trading-mode .dashboard-content,
+  .trading-section,
+  .pro-terminal {
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    overflow: hidden !important;
+  }
+
+  .pro-terminal {
+    position: relative;
+    background: #202632;
+  }
+
+  /* Top row: home, pair selector, daily change */
+  .terminal-market-strip {
+    position: fixed !important;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: 130;
+    display: grid !important;
+    grid-template-columns: 44px minmax(0, 1fr) 72px !important;
+    height: 64px !important;
+    min-height: 64px !important;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid #313947;
+    padding: max(8px, env(safe-area-inset-top)) 10px 8px !important;
+    background: #202632;
+  }
+
+  .mobile-trading-home-button {
+    display: grid !important;
+    width: 42px;
+    height: 42px;
+    place-items: center;
+    border: 1px solid #394456;
+    border-radius: 9px;
+    background: #293241;
+    color: #f4f7fb;
+  }
+
+  .terminal-pair,
+  .terminal-stat {
+    display: none !important;
+  }
+
+  .terminal-price-box {
+    grid-column: 3 !important;
+    align-self: center !important;
+    padding: 0 !important;
+    text-align: right;
+  }
+
+  .terminal-price-box strong {
+    display: none !important;
+  }
+
+  .terminal-price-box span {
+    margin: 0 !important;
+    font-size: 13px !important;
+    font-weight: 800;
+  }
+
+  /* Pair selector occupies the center of the fixed top bar */
+  .pro-terminal-header {
+    display: contents !important;
+  }
+
+  .pro-terminal-header > *:not(.terminal-market-select) {
+    display: none !important;
+  }
+
+  .terminal-market-select {
+    position: fixed !important;
+    top: max(8px, env(safe-area-inset-top)) !important;
+    right: 84px !important;
+    left: 62px !important;
+    z-index: 145;
+    width: auto !important;
+  }
+
+  .market-picker-button {
+    width: 100% !important;
+    min-height: 43px !important;
+    border: 1px solid #394456 !important;
+    border-radius: 9px !important;
+    padding: 6px 11px !important;
+    background: #293241 !important;
+  }
+
+  .market-picker-button strong {
+    font-size: 13px !important;
+  }
+
+  .market-picker-button small {
+    margin-top: 2px !important;
+    font-size: 9px !important;
+  }
+
+  .market-type-badge {
+    display: none !important;
+  }
+
+  .market-picker-dropdown {
+    position: fixed !important;
+    top: calc(max(8px, env(safe-area-inset-top)) + 50px) !important;
+    right: 9px !important;
+    left: 9px !important;
+    width: auto !important;
+    max-height: calc(100dvh - 70px) !important;
+  }
+
+  .market-picker-list {
+    max-height: calc(100dvh - 165px) !important;
+  }
+
+  /* Main work area fills screen between top and bottom tabs */
+  .terminal-layout {
+    position: fixed !important;
+    top: 64px;
+    right: 0;
+    bottom: 62px;
+    left: 0;
+    display: grid !important;
+    grid-template-columns: 43% 57% !important;
+    width: 100%;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    background: #202632;
+  }
+
+  .terminal-center-column {
+    display: none !important;
+  }
+
+  .terminal-market-data-column,
+  .terminal-order-column {
+    display: block !important;
+    width: auto !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    background: #202632;
+  }
+
+  .terminal-market-data-column {
+    border-right: 1px solid #313947 !important;
+  }
+
+  .terminal-market-data-column .trades-module,
+  .terminal-order-column .account-module {
+    display: none !important;
+  }
+
+  /* Orderbook: 5 asks / middle / 5 bids */
+  .orderbook-module {
+    display: flex !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    flex-direction: column;
+    overflow: hidden !important;
+    padding: 12px 9px 8px !important;
+  }
+
+  .orderbook-columns {
+    grid-template-columns: 1fr 1fr !important;
+    min-height: 28px;
+    padding: 0 1px 8px !important;
+    font-size: 10px !important;
+  }
+
+  .orderbook-columns span:nth-child(2) {
+    display: none !important;
+  }
+
+  .pro-orderbook-list {
+    display: grid !important;
+    flex: 0 0 auto !important;
+    overflow: hidden !important;
+  }
+
+  .pro-orderbook-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, .9fr) !important;
+    min-height: 34px !important;
+    padding: 6px 1px !important;
+    font-size: 13px !important;
+    line-height: 1.1;
+  }
+
+  .pro-orderbook-row span:nth-child(2) {
+    display: none !important;
+  }
+
+  .pro-orderbook-row span:nth-child(3) {
+    display: block !important;
+    overflow: hidden;
+    font-size: 12px !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pro-orderbook-mid {
+    display: grid !important;
+    min-height: 64px !important;
+    flex: 0 0 64px !important;
+    place-items: center;
+    align-content: center;
+    gap: 3px;
+    margin: 5px 0 !important;
+    padding: 4px 0 !important;
+    border: 0 !important;
+  }
+
+  .pro-orderbook-mid strong {
+    font-size: 25px !important;
+    line-height: 1;
+  }
+
+  .pro-orderbook-mid span {
+    margin: 0 !important;
+    font-size: 11px !important;
+  }
+
+  .mobile-orderbook-ratio {
+    grid-template-columns: auto 1fr auto !important;
+    gap: 5px !important;
+    margin-top: 9px !important;
+    font-size: 10px !important;
+  }
+
+  /* Order form: no blank top area and no oversized text */
+  .order-entry-module {
+    display: block !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    padding: 12px 12px 14px !important;
+    background: #202632;
+    scrollbar-width: thin;
+  }
+
+  .terminal-order-type-tabs {
+    min-height: 39px !important;
+    height: 39px;
+    gap: 26px !important;
+    margin: 0 !important;
+  }
+
+  .terminal-order-type-tabs button {
+    font-size: 14px !important;
+  }
+
+  .available-balance-row {
+    min-height: 33px !important;
+    margin: 9px 0 3px !important;
+    font-size: 12px !important;
+  }
+
+  .terminal-field {
+    margin-top: 8px !important;
+    font-size: 12px !important;
+  }
+
+  .terminal-field > div {
+    min-height: 48px !important;
+    margin-top: 4px !important;
+    border-radius: 8px !important;
+  }
+
+  .terminal-field input {
+    padding: 9px !important;
+    font-size: 14px !important;
+  }
+
+  .terminal-field strong {
+    padding-right: 9px !important;
+    font-size: 12px !important;
+  }
+
+  .order-percentage-slider {
+    margin-top: 10px !important;
+  }
+
+  .order-percentage-slider input[type="range"] {
+    height: 20px !important;
+  }
+
+  .order-percentage-slider > div {
+    margin-top: 1px !important;
+  }
+
+  .order-percentage-slider button {
+    padding: 3px 0 !important;
+    font-size: 9px !important;
+  }
+
+  .order-options {
+    display: block !important;
+    margin-top: 10px !important;
+    font-size: 13px !important;
+  }
+
+  .order-options input {
+    width: 20px !important;
+    height: 20px !important;
+  }
+
+  .tp-sl-fields {
+    grid-template-columns: 1fr !important;
+    gap: 4px !important;
+  }
+
+  .order-summary-list {
+    gap: 5px !important;
+    margin-top: 10px !important;
+    font-size: 11px !important;
+  }
+
+  .order-summary-list div {
+    padding-bottom: 4px !important;
+  }
+
+  .mobile-order-limits {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 5px !important;
+    margin-top: 9px !important;
+    font-size: 11px !important;
+  }
+
+  .mobile-order-limits div {
+    display: block !important;
+  }
+
+  .mobile-order-limits span,
+  .mobile-order-limits strong {
+    display: block;
+  }
+
+  .mobile-order-limits strong {
+    margin-top: 3px;
+  }
+
+  .dual-order-buttons {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+    margin-top: 11px !important;
+  }
+
+  .buy-order-button,
+  .sell-order-button {
+    min-height: 54px !important;
+    padding: 9px 4px !important;
+    border-radius: 9px !important;
+    font-size: 16px !important;
+  }
+
+  .mobile-sell-limits {
+    margin-top: 8px !important;
+  }
+
+  .terminal-disclaimer {
+    display: none !important;
+  }
+
+  /* Remove the huge blank drawer. Only tabs remain fixed at the bottom. */
+  .terminal-bottom-module {
+    display: none !important;
+  }
+
+  .mobile-terminal-bottom-nav {
+    position: fixed !important;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 150;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    min-height: 62px !important;
+    height: 62px;
+    padding-bottom: env(safe-area-inset-bottom);
+    border-top: 1px solid #313947;
+    background: #202632;
+  }
+
+  .mobile-terminal-bottom-nav button {
+    min-width: 0;
+    border: 0;
+    border-bottom: 3px solid transparent;
+    padding: 0 8px;
+    background: transparent;
+    color: #98a2b2;
+    font-size: 14px !important;
+    font-weight: 750;
+    white-space: nowrap;
+  }
+
+  .mobile-terminal-bottom-nav button.active {
+    border-bottom-color: #ffcc33;
+    color: #f4f7fb;
+  }
+}
+
+@media (max-width: 390px) {
+  .terminal-market-select {
+    right: 75px !important;
+    left: 58px !important;
+  }
+
+  .terminal-layout {
+    grid-template-columns: 44% 56% !important;
+  }
+
+  .pro-orderbook-row {
+    min-height: 31px !important;
+    font-size: 12px !important;
+  }
+
+  .pro-orderbook-row span:nth-child(3) {
+    font-size: 11px !important;
+  }
+
+  .order-entry-module {
+    padding: 10px 9px 12px !important;
+  }
+
+  .terminal-field > div {
+    min-height: 44px !important;
+  }
+
+  .buy-order-button,
+  .sell-order-button {
+    min-height: 49px !important;
+    font-size: 14px !important;
+  }
+
+  .mobile-terminal-bottom-nav button {
+    font-size: 13px !important;
+  }
+}
