@@ -4593,3 +4593,21 @@ body.trading-mode .sidebar.open {
 @media(max-width:1050px){.ai-hero-grid,.ai-content-grid,.admin-ai-grid{grid-template-columns:1fr}}
 @media(max-width:760px){.ai-heading{display:block}.ai-status-shell{margin-top:12px}.ai-stat-grid{grid-template-columns:1fr 1fr}.ai-open-trade-row{grid-template-columns:1fr 1fr}.ai-actions-row,.ai-transfer-actions{display:grid}}
 @media(max-width:430px){.ai-stat-grid,.ai-balance-meta,.ai-transfer-balances{grid-template-columns:1fr}}
+
+
+/* ===== AI ASSISTANT FIX 1.1 ===== */
+.ai-equity-panel-full {
+  margin-top: 14px;
+}
+
+.ai-equity-panel-full .ai-equity-chart {
+  min-height: 260px;
+}
+
+.ai-equity-panel-full .ai-equity-chart svg {
+  height: 220px;
+}
+
+html.is-admin #adminNavButton {
+  display: flex;
+}

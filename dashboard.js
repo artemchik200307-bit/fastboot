@@ -28,7 +28,6 @@ const state = {
   adminOverview: null,
   operationFilter: "all",
   aiBotAccount: null,
-  aiOpenTrades: [],
   aiTradeResults: [],
   adminAiOpenTrades: [],
   botBalance: Number(userWallet?.bot_balance || 0),
@@ -57,6 +56,7 @@ const titles = {
   trading: "Торговля",
   "market-analysis": "Анализ рынка",
   journal: "Торговый журнал",
+  admin: "Admin Panel",
   settings: "Настройки",
 };
 
@@ -97,7 +97,16 @@ function openSection(id) {
   }
   if (id === "market-analysis") loadMarketAnalysis();
   if (id === "journal") renderJournal();
-  if (id === "admin") { if (userProfile.role !== "admin") { showToast("Нет доступа"); openSection("overview"); return; } loadAdminPanel(); }
+  if (id === "admin") {
+    if (userProfile.role !== "admin") {
+      showToast("Нет доступа");
+      openSection("overview");
+      return;
+    }
+
+    loadAdminPanel();
+    loadAdminAiTrades();
+  }
   const dashboardScroller = document.querySelector(".dashboard-main");
 
   if (id !== "trading" && dashboardScroller) {
@@ -152,7 +161,9 @@ function initializeUser() {
   $("detailCreatedAt").textContent = formatDateTime(
     userProfile.created_at || authUser.created_at
   );
-  $("adminNavButton")?.classList.toggle("hidden", userProfile.role !== "admin");
+  const isAdmin = String(userProfile.role || "").toLowerCase() === "admin";
+  $("adminNavButton")?.classList.toggle("hidden", !isAdmin);
+  document.documentElement.classList.toggle("is-admin", isAdmin);
 }
 
 function applySupabaseWalletToPortfolio() {
@@ -167,15 +178,7 @@ function applySupabaseWalletToPortfolio() {
 
 
 async function loadSupabaseAccountData() {
-  const [
-    walletResult,
-    fundingResult,
-    transactionResult,
-    transferResult,
-    botAccountResult,
-    aiOpenTradesResult,
-    aiResultsResult,
-  ] = await Promise.all([
+  const coreResults = await Promise.all([
     supabaseClient
       .from("wallets")
       .select("user_id, spot_balance, bot_balance, currency, updated_at")
@@ -202,57 +205,67 @@ async function loadSupabaseAccountData() {
       .eq("user_id", authUser.id)
       .order("created_at", { ascending: false })
       .limit(100),
+  ]);
 
+  const [
+    walletResult,
+    fundingResult,
+    transactionResult,
+    transferResult,
+  ] = coreResults;
+
+  if (walletResult.error) throw walletResult.error;
+  if (fundingResult.error) throw fundingResult.error;
+  if (transactionResult.error) throw transactionResult.error;
+  if (transferResult.error) throw transferResult.error;
+
+  Object.assign(userWallet, walletResult.data || {});
+
+  state.deposits = (fundingResult.data || []).filter(
+    (item) => item.type === "deposit"
+  );
+  state.withdrawals = (fundingResult.data || []).filter(
+    (item) => item.type === "withdraw"
+  );
+  state.fundingRequests = fundingResult.data || [];
+  state.transactions = transactionResult.data || [];
+  state.transfers = transferResult.data || [];
+
+  // AI Assistant data is optional and must never block the personal cabinet.
+  const [botAccountResult, aiResultsResult] = await Promise.all([
     supabaseClient
       .from("ai_bot_accounts")
       .select("user_id, is_active, started_at, stopped_at, initial_balance, created_at, updated_at")
       .eq("user_id", authUser.id)
-      .maybeSingle(),
-
-    supabaseClient
-      .from("ai_strategy_trades")
-      .select("id, pair, side, entry_price, exit_price, opened_at, closed_at, pnl_percent, status")
-      .eq("status", "open")
-      .order("opened_at", { ascending: false }),
+      .maybeSingle()
+      .then((result) => result)
+      .catch((error) => ({ data: null, error })),
 
     supabaseClient
       .from("user_ai_trade_results")
       .select("id, pair, side, entry_price, exit_price, opened_at, closed_at, pnl_percent, balance_before, pnl_amount, balance_after, created_at")
       .eq("user_id", authUser.id)
       .order("closed_at", { ascending: false })
-      .limit(200),
+      .limit(200)
+      .then((result) => result)
+      .catch((error) => ({ data: [], error })),
   ]);
 
-  if (walletResult.error) throw walletResult.error;
-  if (fundingResult.error) throw fundingResult.error;
-  if (transactionResult.error) throw transactionResult.error;
-  if (transferResult.error) throw transferResult.error;
-  if (botAccountResult.error) throw botAccountResult.error;
-  if (aiOpenTradesResult.error) throw aiOpenTradesResult.error;
-  if (aiResultsResult.error) throw aiResultsResult.error;
+  if (botAccountResult.error) {
+    console.warn("AI account data is unavailable:", botAccountResult.error);
+  }
 
-  Object.assign(userWallet, walletResult.data);
+  if (aiResultsResult.error) {
+    console.warn("AI trade history is unavailable:", aiResultsResult.error);
+  }
 
-  state.deposits = (fundingResult.data || []).filter(
-    (item) => item.type === "deposit"
-  );
-
-  state.withdrawals = (fundingResult.data || []).filter(
-    (item) => item.type === "withdraw"
-  );
-
-  state.fundingRequests = fundingResult.data || [];
-  state.transactions = transactionResult.data || [];
-  state.transfers = transferResult.data || [];
   state.aiBotAccount = botAccountResult.data || null;
-  state.aiOpenTrades = aiOpenTradesResult.data || [];
   state.aiTradeResults = aiResultsResult.data || [];
 
   applySupabaseWalletToPortfolio();
   renderAccount();
   renderAiAssistant();
 }
-
 function formatOperationStatus(status) {
   const map = {
     pending: "Ожидает",
@@ -1027,36 +1040,8 @@ function renderAiAssistant() {
   $("botTradesCount").textContent = state.aiTradeResults.length;
   $("botWinRate").textContent = `Win rate ${winRate.toFixed(0)}%`;
 
-  renderAiOpenTrades();
   renderAiHistory();
   renderAiEquity();
-}
-
-function renderAiOpenTrades() {
-  const active = Boolean(state.aiBotAccount?.is_active);
-  const startedAt = state.aiBotAccount?.started_at;
-
-  const rows = active
-    ? state.aiOpenTrades.filter(
-        (trade) => !startedAt || new Date(trade.opened_at) >= new Date(startedAt)
-      )
-    : [];
-
-  $("botOpenTrades").innerHTML = rows.length
-    ? rows.map((trade) => `
-      <article class="ai-open-trade-row">
-        <div>
-          <strong>${escapeHtml(trade.pair)}</strong>
-          <span class="${trade.side === "LONG" ? "long" : "short"}">
-            ${escapeHtml(trade.side)}
-          </span>
-        </div>
-        <div><span>Цена входа</span><strong>${formatPrice(Number(trade.entry_price))}</strong></div>
-        <div><span>Открыта</span><strong>${formatDateTime(trade.opened_at)}</strong></div>
-        <span class="status-pill status-pending">В работе</span>
-      </article>
-    `).join("")
-    : '<div class="admin-empty">Активных сделок нет</div>';
 }
 
 function renderAiHistory() {
@@ -1158,7 +1143,7 @@ function localDateTimeValue(date = new Date()) {
     .slice(0, 16);
 }
 
-$("adminAiOpenedAt").value = localDateTimeValue();
+if ($("adminAiOpenedAt")) $("adminAiOpenedAt").value = localDateTimeValue();
 
 async function loadAdminAiTrades() {
   if (userProfile.role !== "admin") return;
@@ -1208,7 +1193,7 @@ function renderAdminAiTrades() {
   });
 }
 
-$("adminAiTradeForm").addEventListener("submit", async (event) => {
+$("adminAiTradeForm")?.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   const pair = $("adminAiPair").value.trim().toUpperCase();
@@ -1269,12 +1254,12 @@ function openCloseAiTradeModal(trade) {
   $("closeAiTradeModal").classList.remove("hidden");
 }
 
-$("closeAiTradeModalButton").addEventListener("click", () => {
+$("closeAiTradeModalButton")?.addEventListener("click", () => {
   $("closeAiTradeModal").classList.add("hidden");
   selectedAdminAiTrade = null;
 });
 
-$("confirmCloseAiTradeButton").addEventListener("click", async () => {
+$("confirmCloseAiTradeButton")?.addEventListener("click", async () => {
   if (!selectedAdminAiTrade) return;
 
   const exitPrice = Number($("closeAiExitPrice").value);
@@ -1323,7 +1308,7 @@ $("confirmCloseAiTradeButton").addEventListener("click", async () => {
   }
 });
 
-$("adminReloadAiTrades").addEventListener("click", loadAdminAiTrades);
+$("adminReloadAiTrades")?.addEventListener("click", loadAdminAiTrades);
 
 async function loadMarketAnalysis() {
   const symbol=$("analysisCoinSelect").value;

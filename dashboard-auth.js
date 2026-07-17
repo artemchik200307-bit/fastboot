@@ -54,7 +54,12 @@
 
     window.fastbootSession = session;
     window.fastbootUser = user;
-    window.fastbootProfile = profile || {
+    window.fastbootProfile = profile
+      ? {
+          ...profile,
+          role: String(profile.role || "user").toLowerCase(),
+        }
+      : {
       id: user.id,
       username:
         user.user_metadata?.username ||
@@ -63,7 +68,7 @@
       email: user.email,
       fastboot_id:
         "FB-" + user.id.replaceAll("-", "").slice(0, 10).toUpperCase(),
-      role: "user",
+      role: String(user.user_metadata?.role || "user").toLowerCase(),
       created_at: user.created_at,
     };
 
