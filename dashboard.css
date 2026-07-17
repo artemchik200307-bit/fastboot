@@ -4644,49 +4644,46 @@ html.is-admin #adminNavButton {
 }
 
 
-/* ===== ISOLATED TRADING TERMINAL V2 ===== */
-.terminal-host-section {
-  padding: 0 !important;
-}
-
-.terminal-host-head {
-  padding: 22px 26px 0;
-}
-
-.terminal-frame-shell {
+/* ===== CLEAN ISOLATED TERMINAL 2.1 ===== */
+.dashboard-section#trading {
   width: 100%;
-  height: calc(100vh - 126px);
-  min-height: 680px;
-  margin-top: 16px;
-  overflow: hidden;
-  border-top: 1px solid rgba(137,151,174,.14);
-  background: #0b1018;
-}
-
-.terminal-frame {
-  width: 100%;
+  max-width: none !important;
   height: 100%;
-  border: 0;
-  background: #0b1018;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.dashboard-section#trading.active {
+  display: block;
+}
+
+body.trading-mode .dashboard-content {
+  width: 100%;
+  max-width: none !important;
+  padding: 0 !important;
 }
 
 body.trading-mode .dashboard-main {
   overflow: hidden;
 }
 
-@media (max-width: 760px) {
-  .terminal-host-head {
-    padding: 14px 14px 0;
-  }
-
-  .terminal-frame-shell {
-    height: calc(100dvh - 110px);
-    min-height: 760px;
-  }
+.terminal-frame-shell {
+  width: 100%;
+  height: calc(100dvh - 76px);
+  min-height: 760px;
+  overflow: hidden;
+  background: #0b1018;
 }
 
+.terminal-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #0b1018;
+}
 
-/* ===== MOBILE MODAL SCROLL FIX ===== */
+/* Mobile modal scrolling */
 .modal {
   overflow-x: hidden;
   overflow-y: auto;
@@ -4694,13 +4691,10 @@ body.trading-mode .dashboard-main {
   -webkit-overflow-scrolling: touch;
   align-items: start;
   padding-top: max(16px, env(safe-area-inset-top));
-  padding-right: max(16px, env(safe-area-inset-right));
-  padding-bottom: max(32px, calc(env(safe-area-inset-bottom) + 96px));
-  padding-left: max(16px, env(safe-area-inset-left));
+  padding-bottom: max(34px, calc(env(safe-area-inset-bottom) + 96px));
 }
 
 .modal-card {
-  width: min(620px, 100%);
   max-height: none;
   margin: auto;
   overflow: visible;
@@ -4716,25 +4710,19 @@ body.modal-open .modal {
 }
 
 @media (max-width: 760px) {
+  .terminal-frame-shell {
+    height: calc(100dvh - 64px);
+    min-height: 840px;
+  }
+
   .modal {
     display: block;
-    padding-top: max(14px, env(safe-area-inset-top));
-    padding-bottom: max(120px, calc(env(safe-area-inset-bottom) + 110px));
+    padding: max(14px, env(safe-area-inset-top)) 12px
+      max(120px, calc(env(safe-area-inset-bottom) + 110px));
   }
 
   .modal-card {
     width: 100%;
-    min-height: min-content;
     margin: 0 auto;
-    border-radius: 18px;
-  }
-
-  .crypto-funding-card {
-    padding-bottom: 12px;
-  }
-
-  .crypto-qr-wrap img {
-    max-width: min(72vw, 260px);
-    height: auto;
   }
 }

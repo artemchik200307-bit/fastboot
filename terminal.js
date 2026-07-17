@@ -2,7 +2,7 @@
   "use strict";
 
   const $ = (id) => document.getElementById(id);
-  const REST_BASE = "https://api.binance.com";
+  const REST_BASES = ["https://api.binance.com", "https://data-api.binance.vision"];
   const REFRESH_MS = 3000;
 
   let supabaseClient = null;
@@ -76,37 +76,55 @@
     return new Date(value).toLocaleString("ru-RU");
   }
 
-  async function fetchJson(url) {
-    const response = await fetch(url, { cache: "no-store" });
-    if (!response.ok) {
-      throw new Error(`Market API ${response.status}`);
+  async function fetchJson(path) {
+    let lastError = null;
+
+    for (const base of REST_BASES) {
+      try {
+        const response = await fetch(`${base}${path}`, {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          throw new Error(`Market API ${response.status}`);
+        }
+
+        return await response.json();
+      } catch (error) {
+        lastError = error;
+      }
     }
-    return response.json();
+
+    throw lastError || new Error("Market API недоступен");
   }
 
   async function initializeSupabase() {
-    if (!window.supabase || !window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
-      throw new Error("Supabase config не загружен");
+    const parentWindow =
+      window.parent && window.parent !== window ? window.parent : null;
+
+    supabaseClient =
+      parentWindow?.fastbootSupabase ||
+      window.fastbootSupabase ||
+      null;
+
+    currentUser =
+      parentWindow?.fastbootUser ||
+      window.fastbootUser ||
+      null;
+
+    if (!supabaseClient) {
+      throw new Error("Supabase-клиент терминала не найден");
     }
 
-    supabaseClient = window.supabase.createClient(
-      window.SUPABASE_URL,
-      window.SUPABASE_ANON_KEY,
-      {
-        auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-          detectSessionInUrl: false,
-        },
+    if (!currentUser) {
+      const { data, error } = await supabaseClient.auth.getUser();
+
+      if (error || !data?.user) {
+        throw new Error("Пользователь не авторизован");
       }
-    );
 
-    const { data, error } = await supabaseClient.auth.getUser();
-    if (error || !data?.user) {
-      throw new Error("Пользователь не авторизован");
+      currentUser = data.user;
     }
-
-    currentUser = data.user;
   }
 
   async function loadWalletAndAccountData() {
@@ -161,6 +179,12 @@
 
   function createChart() {
     const container = $("terminalChart");
+
+    if (!window.LightweightCharts) {
+      container.innerHTML =
+        '<div class="terminal-chart-error">Не удалось загрузить библиотеку графика</div>';
+      throw new Error("Lightweight Charts не загружен");
+    }
 
     chart = LightweightCharts.createChart(container, {
       width: Math.max(container.clientWidth, 320),
@@ -221,13 +245,13 @@
   async function loadMarket() {
     const [ticker, depth, klines] = await Promise.all([
       fetchJson(
-        `${REST_BASE}/api/v3/ticker/24hr?symbol=${encodeURIComponent(currentSymbol)}`
+        `/api/v3/ticker/24hr?symbol=${encodeURIComponent(currentSymbol)}`
       ),
       fetchJson(
-        `${REST_BASE}/api/v3/depth?symbol=${encodeURIComponent(currentSymbol)}&limit=50`
+        `/api/v3/depth?symbol=${encodeURIComponent(currentSymbol)}&limit=50`
       ),
       fetchJson(
-        `${REST_BASE}/api/v3/klines?symbol=${encodeURIComponent(currentSymbol)}` +
+        `/api/v3/klines?symbol=${encodeURIComponent(currentSymbol)}` +
         `&interval=${encodeURIComponent(currentInterval)}&limit=300`
       ),
     ]);
@@ -732,10 +756,14 @@
 
       $("baseAssetLabel").textContent = currentSymbol.replace("USDT", "");
 
-      await Promise.all([
-        loadWalletAndAccountData(),
-        loadMarket(),
-      ]);
+      await loadMarket();
+
+      try {
+        await loadWalletAndAccountData();
+      } catch (accountError) {
+        console.error("Terminal account data error:", accountError);
+        showToast("График работает, но торговый счёт временно недоступен");
+      }
 
       refreshTimer = setInterval(refreshLoop, REFRESH_MS);
     } catch (error) {
