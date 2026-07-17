@@ -4065,3 +4065,76 @@ body.trading-mode .sidebar.open {
     overflow: hidden !important;
   }
 }
+
+
+/* ===== MOBILE SCROLL CONTAINER FIX V16 ===== */
+@media (max-width: 760px) {
+  /*
+   * iOS Safari may keep body locked after the full-screen terminal.
+   * Normal dashboard pages therefore use dashboard-main as the scroll container.
+   */
+  body:not(.trading-mode) {
+    position: static !important;
+    width: 100%;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    overflow: hidden !important;
+    touch-action: pan-y;
+  }
+
+  body:not(.trading-mode) .dashboard-shell {
+    display: block !important;
+    width: 100%;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    overflow: hidden !important;
+  }
+
+  body:not(.trading-mode) .dashboard-main {
+    position: relative;
+    width: 100%;
+    height: 100dvh !important;
+    min-height: 0 !important;
+    max-height: 100dvh !important;
+    overflow-x: hidden !important;
+    overflow-y: scroll !important;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+
+  body:not(.trading-mode) .dashboard-content {
+    width: min(100% - 24px, 1380px) !important;
+    height: auto !important;
+    min-height: calc(100dvh - 82px) !important;
+    max-height: none !important;
+    margin: 20px auto 0 !important;
+    padding-bottom: calc(90px + env(safe-area-inset-bottom)) !important;
+    overflow: visible !important;
+  }
+
+  body:not(.trading-mode) .dashboard-section,
+  body:not(.trading-mode) .dashboard-section.active {
+    position: static !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    touch-action: pan-y;
+  }
+
+  body:not(.trading-mode) .dashboard-header {
+    position: sticky !important;
+    top: 0;
+    z-index: 45;
+  }
+
+  /* The sidebar remains independent from the scrolling content. */
+  body:not(.trading-mode) .sidebar {
+    position: fixed !important;
+    top: 0;
+    bottom: 0;
+    height: 100dvh !important;
+    overflow-y: auto !important;
+  }
+}

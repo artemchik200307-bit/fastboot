@@ -84,7 +84,13 @@ function openSection(id) {
   }
   if (id === "market-analysis") loadMarketAnalysis();
   if (id === "journal") renderJournal();
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  const dashboardScroller = document.querySelector(".dashboard-main");
+
+  if (id !== "trading" && dashboardScroller) {
+    dashboardScroller.scrollTo({ top: 0, behavior: "auto" });
+  } else {
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }
 }
 
 document.querySelectorAll("[data-section]").forEach((btn) => btn.addEventListener("click", () => openSection(btn.dataset.section)));
