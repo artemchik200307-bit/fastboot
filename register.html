@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#080c12">
   <title>FASTBOOT — Регистрация</title>
-  <link rel="stylesheet" href="auth.css">
+  <link rel="stylesheet" href="auth.css?v=referral-v1">
 </head>
 <body>
   <main class="auth-page">
@@ -40,6 +40,12 @@
             <input id="registerPassword" type="password" required minlength="8" autocomplete="new-password">
           </label>
 
+          <label id="referralCodeField" class="referral-register-field">
+            Реферальный код
+            <input id="registerReferralCode" type="text" maxlength="20" placeholder="Необязательно">
+            <small id="registerReferralHint">Можно оставить пустым.</small>
+          </label>
+
           <label>
             Повторите пароль
             <input id="registerPasswordRepeat" type="password" required minlength="8" autocomplete="new-password">
@@ -58,6 +64,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
-  <script src="register.js"></script>
+  <script src="register.js?v=referral-v1"></script>
 </body>
 </html>

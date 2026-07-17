@@ -5,6 +5,8 @@ const usernameInput = document.getElementById("registerName");
 const emailInput = document.getElementById("registerEmail");
 const passwordInput = document.getElementById("registerPassword");
 const repeatPasswordInput = document.getElementById("registerPasswordRepeat");
+const referralCodeInput = document.getElementById("registerReferralCode");
+const referralHint = document.getElementById("registerReferralHint");
 const messageElement = document.getElementById("authError");
 const submitButton = registerForm?.querySelector('button[type="submit"]');
 
@@ -45,6 +47,32 @@ function translateError(error) {
   }
 
   return message || "Не удалось создать аккаунт.";
+}
+
+
+function normalizeReferralCode(value) {
+  return String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9-]/g, "")
+    .slice(0, 20);
+}
+
+function initializeReferralCode() {
+  const params = new URLSearchParams(window.location.search);
+  const code = normalizeReferralCode(
+    params.get("ref") || localStorage.getItem("fastboot-referral-code")
+  );
+
+  if (!code || !referralCodeInput) return;
+
+  referralCodeInput.value = code;
+  localStorage.setItem("fastboot-referral-code", code);
+
+  if (referralHint) {
+    referralHint.textContent = `Регистрация по приглашению: ${code}`;
+    referralHint.classList.add("active");
+  }
 }
 
 async function checkSession() {
@@ -89,6 +117,7 @@ registerForm?.addEventListener("submit", async (event) => {
   const email = emailInput?.value.trim().toLowerCase() || "";
   const password = passwordInput?.value || "";
   const repeatedPassword = repeatPasswordInput?.value || "";
+  const referralCode = normalizeReferralCode(referralCodeInput?.value);
 
   if (!/^[a-zA-Z0-9_]{3,24}$/.test(username)) {
     showMessage("Имя: 3–24 латинские буквы, цифры или _.");
@@ -114,7 +143,10 @@ registerForm?.addEventListener("submit", async (event) => {
       email,
       password,
       options: {
-        data: { username },
+        data: {
+          username,
+          referral_code: referralCode || null,
+        },
         emailRedirectTo: redirectUrl,
       },
     });
@@ -140,4 +172,5 @@ registerForm?.addEventListener("submit", async (event) => {
   }
 });
 
+initializeReferralCode();
 checkSession();

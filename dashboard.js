@@ -31,6 +31,10 @@ const state = {
   aiTradeResults: [],
   adminAiOpenTrades: [],
   adminBotStatuses: [],
+  referralOverview: null,
+  referralUsers: [],
+  adminReferralOverview: null,
+  adminReferralPartners: [],
   terminalJournalTrades: [],
   botBalance: Number(userWallet?.bot_balance || 0),
   botRunning: localStorage.getItem(storageKey("bot-running")) === "true",
@@ -58,6 +62,7 @@ const titles = {
   assistant: "AI Assistant",
   trading: "Торговый терминал",
   "market-analysis": "Анализ рынка",
+  referral: "Referral",
   admin: "Admin Panel",
   settings: "Настройки",
 };
@@ -101,6 +106,7 @@ function openSection(id) {
   }
 
   if (id === "market-analysis") loadMarketAnalysis();
+  if (id === "referral") loadReferralProgram();
 
   if (id === "admin") {
     if (String(userProfile.role || "").toLowerCase() !== "admin") {
@@ -180,6 +186,178 @@ function applySupabaseWalletToPortfolio() {
   state.botBalance = Number(userWallet?.bot_balance || 0);
 }
 
+
+
+function referralTier(activeCount) {
+  const count = Number(activeCount || 0);
+
+  if (count >= 50) return "PLATINUM";
+  if (count >= 20) return "GOLD";
+  if (count >= 5) return "SILVER";
+  return "START";
+}
+
+async function ensureReferralAccount() {
+  const metadataCode =
+    authUser.user_metadata?.referral_code ||
+    localStorage.getItem("fastboot-referral-code") ||
+    null;
+
+  const { error } = await supabaseClient.rpc(
+    "ensure_referral_account",
+    {
+      p_referral_code: metadataCode,
+    }
+  );
+
+  if (error) {
+    console.warn("Referral account initialization skipped:", error);
+    return;
+  }
+
+  localStorage.removeItem("fastboot-referral-code");
+}
+
+async function loadReferralProgram() {
+  if ($("referralUsersList")) {
+    $("referralUsersList").innerHTML =
+      '<div class="admin-empty">Загрузка…</div>';
+  }
+
+  try {
+    await ensureReferralAccount();
+
+    const [overviewResult, usersResult] = await Promise.all([
+      supabaseClient.rpc("get_my_referral_dashboard"),
+      supabaseClient.rpc("list_my_referrals"),
+    ]);
+
+    if (overviewResult.error) throw overviewResult.error;
+    if (usersResult.error) throw usersResult.error;
+
+    state.referralOverview =
+      overviewResult.data?.[0] || overviewResult.data || null;
+
+    state.referralUsers = usersResult.data || [];
+    renderReferralProgram();
+  } catch (error) {
+    console.error("Referral program load error:", error);
+
+    if ($("referralUsersList")) {
+      $("referralUsersList").innerHTML =
+        '<div class="admin-empty">Реферальная программа временно недоступна</div>';
+    }
+
+    showToast(error.message || "Не удалось загрузить Referral");
+  }
+}
+
+function renderReferralProgram() {
+  const data = state.referralOverview || {};
+  const code = data.referral_code || "—";
+  const link =
+    code === "—"
+      ? ""
+      : `${window.location.origin}/register.html?ref=${encodeURIComponent(code)}`;
+
+  $("referralCode").textContent = code;
+  $("referralLink").value = link;
+  $("referralTotalCount").textContent = Number(
+    data.total_referrals || 0
+  ).toLocaleString("ru-RU");
+
+  $("referralActiveCount").textContent = Number(
+    data.active_referrals || 0
+  ).toLocaleString("ru-RU");
+
+  $("referralTotalEarned").textContent =
+    `${Number(data.total_earned || 0).toFixed(2)} USDT`;
+
+  $("referralAvailableBalance").textContent =
+    `${Number(data.available_balance || 0).toFixed(2)} USDT`;
+
+  $("referralPaidOut").textContent =
+    `${Number(data.paid_out || 0).toFixed(2)} USDT`;
+
+  const tier = referralTier(data.active_referrals);
+  $("referralTierBadge").textContent = tier;
+  $("referralTierBadge").dataset.tier = tier.toLowerCase();
+
+  $("transferReferralBalanceButton").disabled =
+    Number(data.available_balance || 0) <= 0;
+
+  $("referralUsersList").innerHTML = state.referralUsers.length
+    ? state.referralUsers.map((user) => `
+      <div class="referral-user-row">
+        <div>
+          <strong>${escapeHtml(user.username || "User")}</strong>
+          <small>${escapeHtml(user.fastboot_id || "")}</small>
+        </div>
+
+        <span>${formatDateTime(user.registered_at)}</span>
+
+        <span class="referral-user-status ${
+          user.ai_active ? "active" : ""
+        }">
+          ${user.ai_active ? "Активен" : "Неактивен"}
+        </span>
+
+        <span>
+          ${Number(user.spot_balance || 0).toFixed(2)} /
+          ${Number(user.bot_balance || 0).toFixed(2)} USDT
+        </span>
+
+        <strong class="positive">
+          ${Number(user.referrer_earned || 0).toFixed(2)} USDT
+        </strong>
+      </div>
+    `).join("")
+    : '<div class="admin-empty">Приглашённых пользователей пока нет</div>';
+}
+
+async function transferReferralBalance() {
+  const available = Number(
+    state.referralOverview?.available_balance || 0
+  );
+
+  if (available <= 0) {
+    showToast("Нет доступного реферального вознаграждения");
+    return;
+  }
+
+  const raw = window.prompt(
+    `Доступно ${available.toFixed(2)} USDT. Введите сумму перевода:`,
+    available.toFixed(2)
+  );
+
+  if (raw === null) return;
+
+  const amount = Number(raw);
+
+  if (!(amount > 0) || amount > available) {
+    showToast("Введите корректную сумму");
+    return;
+  }
+
+  try {
+    const { error } = await supabaseClient.rpc(
+      "transfer_referral_balance",
+      { p_amount: amount }
+    );
+
+    if (error) throw error;
+
+    showToast("Вознаграждение переведено на основной баланс");
+
+    await Promise.all([
+      loadReferralProgram(),
+      loadSupabaseAccountData(),
+    ]);
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || "Не удалось выполнить перевод");
+  }
+}
 
 async function loadSupabaseAccountData() {
   const [
@@ -273,6 +451,10 @@ async function loadSupabaseAccountData() {
   applySupabaseWalletToPortfolio();
   renderAccount();
   renderAiAssistant();
+
+  ensureReferralAccount().catch((error) => {
+    console.warn("Referral initialization error:", error);
+  });
 }
 function formatOperationStatus(status) {
   const map = {
@@ -869,8 +1051,14 @@ async function loadAdminPanel(search = "") {
     '<div class="admin-empty">Загрузка…</div>';
 
   try {
-    const [overview, users, funding, botStatuses] =
-      await Promise.all([
+    const [
+      overview,
+      users,
+      funding,
+      botStatuses,
+      referralOverview,
+      referralPartners,
+    ] = await Promise.all([
         supabaseClient.rpc("admin_platform_overview"),
         supabaseClient.rpc("admin_list_users", {
           p_search: search || null,
@@ -884,12 +1072,18 @@ async function loadAdminPanel(search = "") {
         supabaseClient.rpc("admin_list_ai_bot_statuses", {
           p_search: search || null,
         }),
+        supabaseClient.rpc("admin_referral_overview"),
+        supabaseClient.rpc("admin_list_referral_partners", {
+          p_limit: 20,
+        }),
       ]);
 
     if (overview.error) throw overview.error;
     if (users.error) throw users.error;
     if (funding.error) throw funding.error;
     if (botStatuses.error) throw botStatuses.error;
+    if (referralOverview.error) throw referralOverview.error;
+    if (referralPartners.error) throw referralPartners.error;
 
     state.adminOverview =
       overview.data?.[0] || overview.data || {};
@@ -897,6 +1091,10 @@ async function loadAdminPanel(search = "") {
     state.adminUsers = users.data || [];
     state.adminFundingRequests = funding.data || [];
     state.adminBotStatuses = botStatuses.data || [];
+    state.adminReferralOverview =
+      referralOverview.data?.[0] || referralOverview.data || {};
+
+    state.adminReferralPartners = referralPartners.data || [];
 
     const botMap = new Map(
       state.adminBotStatuses.map((item) => [
@@ -913,6 +1111,7 @@ async function loadAdminPanel(search = "") {
     renderAdminOverview();
     renderAdminUsers();
     renderAdminFunding();
+    renderAdminReferral();
   } catch (error) {
     console.error(error);
     showToast(error.message || "Ошибка Admin Panel");
@@ -972,6 +1171,33 @@ function renderAdminUsers() {
         users.find((item) => item.id === button.dataset.adminRole)
       );
   });
+}
+
+
+function renderAdminReferral() {
+  const overview = state.adminReferralOverview || {};
+
+  $("adminReferralCount").textContent = Number(
+    overview.total_referrals || 0
+  ).toLocaleString("ru-RU");
+
+  $("adminReferralRewards").textContent =
+    `${Number(overview.total_rewards || 0).toFixed(2)} USDT`;
+
+  $("adminReferralPartners").innerHTML =
+    state.adminReferralPartners.length
+      ? state.adminReferralPartners.map((partner, index) => `
+        <div class="admin-referral-partner-row">
+          <span>${index + 1}</span>
+          <div>
+            <strong>${escapeHtml(partner.username || "User")}</strong>
+            <small>${escapeHtml(partner.fastboot_id || "")}</small>
+          </div>
+          <span>${Number(partner.referrals_count || 0)} реф.</span>
+          <strong>${Number(partner.total_earned || 0).toFixed(2)} USDT</strong>
+        </div>
+      `).join("")
+      : '<div class="admin-empty">Партнёров пока нет</div>';
 }
 
 function renderAdminFunding(){
@@ -1389,6 +1615,99 @@ async function renderJournal() {
   $("journalOrders").classList.toggle("empty-list", !rows.length);
 }
 
+
+
+$("copyReferralCodeButton")?.addEventListener("click", async () => {
+  const code = $("referralCode")?.textContent || "";
+
+  if (!code || code === "—") return;
+
+  try {
+    await navigator.clipboard.writeText(code);
+    showToast("Реферальный код скопирован");
+  } catch {
+    showToast("Не удалось скопировать код");
+  }
+});
+
+$("copyReferralLinkButton")?.addEventListener("click", async () => {
+  const link = $("referralLink")?.value || "";
+
+  if (!link) return;
+
+  try {
+    await navigator.clipboard.writeText(link);
+    showToast("Реферальная ссылка скопирована");
+  } catch {
+    showToast("Не удалось скопировать ссылку");
+  }
+});
+
+$("transferReferralBalanceButton")?.addEventListener(
+  "click",
+  transferReferralBalance
+);
+
+$("adminReferralRewardForm")?.addEventListener(
+  "submit",
+  async (event) => {
+    event.preventDefault();
+
+    const referredFastbootId =
+      $("adminReferralUserId").value.trim().toUpperCase();
+
+    const platformFee = Number(
+      $("adminReferralPlatformFee").value || 0
+    );
+
+    const sourceReference =
+      $("adminReferralSourceReference").value.trim();
+
+    const note = $("adminReferralNote").value.trim();
+
+    if (!referredFastbootId || !(platformFee > 0) || !sourceReference) {
+      showToast("Заполните обязательные поля");
+      return;
+    }
+
+    const button = event.currentTarget.querySelector(
+      'button[type="submit"]'
+    );
+
+    button.disabled = true;
+
+    try {
+      const { data, error } = await supabaseClient.rpc(
+        "admin_credit_referral_reward",
+        {
+          p_referred_fastboot_id: referredFastbootId,
+          p_platform_fee_amount: platformFee,
+          p_source_reference: sourceReference,
+          p_note: note || null,
+        }
+      );
+
+      if (error) throw error;
+
+      const reward = Number(data || 0);
+      showToast(
+        reward > 0
+          ? `Партнёру начислено ${reward.toFixed(2)} USDT`
+          : "У пользователя нет реферера — начисление не создано"
+      );
+
+      event.currentTarget.reset();
+      await loadAdminPanel(
+        $("adminUserSearch")?.value.trim() || ""
+      );
+    } catch (error) {
+      console.error(error);
+      showToast(error.message || "Не удалось начислить вознаграждение");
+    } finally {
+      button.disabled = false;
+    }
+  }
+);
 
 $("saveProfileButton").addEventListener("click", async () => {
   const name = $("settingsName").value.trim();

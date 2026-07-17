@@ -134,3 +134,16 @@ button, input { font: inherit; }
   .auth-page { grid-template-columns: 1fr; }
   .auth-info { display: none; }
 }
+
+
+/* ===== REFERRAL REGISTRATION V1 ===== */
+.referral-register-field small {
+  display: block;
+  margin-top: 6px;
+  color: #7d899c;
+  font-size: 11px;
+}
+
+.referral-register-field small.active {
+  color: #20c987;
+}

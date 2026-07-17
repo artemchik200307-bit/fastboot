@@ -10,7 +10,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#080c12">
   <title>FASTBOOT — Личный кабинет</title>
-  <link rel="stylesheet" href="dashboard.css?v=admin-fix-3-3">
+  <link rel="stylesheet" href="dashboard.css?v=referral-v1">
   <script src="https://unpkg.com/lightweight-charts@5.2.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
@@ -30,6 +30,9 @@
         </button>
         <button class="nav-item" data-section="market-analysis">
           <span class="nav-icon">A</span><span>Анализ рынка</span>
+        </button>
+        <button class="nav-item" data-section="referral">
+          <span class="nav-icon">R</span><span>Referral</span>
         </button>
       </nav>
 
@@ -386,6 +389,113 @@
           </article>
         </section>
 
+        <section class="dashboard-section referral-section" id="referral">
+          <div class="section-heading referral-heading">
+            <div>
+              <span class="section-kicker">FASTBOOT PARTNER PROGRAM</span>
+              <h2>Реферальная программа</h2>
+              <p>Получайте 5% от комиссии платформы по приглашённым пользователям.</p>
+            </div>
+            <span id="referralTierBadge" class="referral-tier-badge">START</span>
+          </div>
+
+          <div class="referral-hero">
+            <article class="panel referral-link-card">
+              <span class="referral-label">Ваш реферальный код</span>
+              <div class="referral-copy-row">
+                <strong id="referralCode">—</strong>
+                <button id="copyReferralCodeButton" class="secondary-action" type="button">Копировать</button>
+              </div>
+
+              <span class="referral-label">Реферальная ссылка</span>
+              <div class="referral-copy-row referral-link-row">
+                <input id="referralLink" type="text" readonly value="">
+                <button id="copyReferralLinkButton" class="primary-action" type="button">Копировать ссылку</button>
+              </div>
+
+              <small>
+                Вознаграждение начисляется только от подтверждённой комиссии платформы.
+              </small>
+            </article>
+
+            <article class="panel referral-balance-card">
+              <span>Доступно</span>
+              <strong id="referralAvailableBalance">0.00 USDT</strong>
+              <small>Реферальный баланс</small>
+
+              <button id="transferReferralBalanceButton" class="primary-action" type="button">
+                Перевести на основной баланс
+              </button>
+            </article>
+          </div>
+
+          <div class="referral-stat-grid">
+            <article class="referral-stat-card">
+              <span>Всего приглашено</span>
+              <strong id="referralTotalCount">0</strong>
+              <small>Прямые рефералы</small>
+            </article>
+
+            <article class="referral-stat-card">
+              <span>Активных</span>
+              <strong id="referralActiveCount">0</strong>
+              <small>AI или баланс активны</small>
+            </article>
+
+            <article class="referral-stat-card">
+              <span>Заработано</span>
+              <strong id="referralTotalEarned">0.00 USDT</strong>
+              <small>За всё время</small>
+            </article>
+
+            <article class="referral-stat-card">
+              <span>Переведено</span>
+              <strong id="referralPaidOut">0.00 USDT</strong>
+              <small>На основной баланс</small>
+            </article>
+          </div>
+
+          <div class="referral-layout">
+            <article class="panel referral-users-panel">
+              <div class="panel-head">
+                <div>
+                  <h3>Приглашённые пользователи</h3>
+                  <span>Статусы и начисления</span>
+                </div>
+              </div>
+
+              <div class="referral-table">
+                <div class="referral-table-head">
+                  <span>Пользователь</span>
+                  <span>Регистрация</span>
+                  <span>AI</span>
+                  <span>Баланс</span>
+                  <span>Ваш доход</span>
+                </div>
+                <div id="referralUsersList">
+                  <div class="admin-empty">Загрузка…</div>
+                </div>
+              </div>
+            </article>
+
+            <article class="panel referral-levels-panel">
+              <div class="panel-head">
+                <div>
+                  <h3>Партнёрские статусы</h3>
+                  <span>Статус зависит от числа активных рефералов</span>
+                </div>
+              </div>
+
+              <div class="referral-level-list">
+                <div><strong>START</strong><span>0–4 активных</span></div>
+                <div><strong>SILVER</strong><span>5–19 активных</span></div>
+                <div><strong>GOLD</strong><span>20–49 активных</span></div>
+                <div><strong>PLATINUM</strong><span>50+ активных</span></div>
+              </div>
+            </article>
+          </div>
+        </section>
+
         <section class="dashboard-section admin-section" id="admin">
   <div class="section-heading"><div><span class="section-kicker">FASTBOOT CONTROL CENTER</span><h2>Admin Panel</h2><p>Управление пользователями, балансами и финансовыми заявками.</p></div><button id="adminRefreshButton" class="secondary-action" type="button">Обновить</button></div>
   <div class="admin-stat-grid">
@@ -393,10 +503,59 @@
     <article class="admin-stat-card"><span>Средства</span><strong id="adminTotalBalance">—</strong><small>Spot + AI Bot</small></article>
     <article class="admin-stat-card"><span>Ожидают</span><strong id="adminPendingCount">—</strong><small>Финансовые заявки</small></article>
     <article class="admin-stat-card"><span>Администраторов</span><strong id="adminAdminsCount">—</strong><small>Роль admin</small></article>
+    <article class="admin-stat-card"><span>Рефералов</span><strong id="adminReferralCount">—</strong><small>Всего приглашений</small></article>
+    <article class="admin-stat-card"><span>Партнёрам</span><strong id="adminReferralRewards">—</strong><small>Начислено USDT</small></article>
   </div>
   <div class="admin-layout">
     <article class="panel admin-users-panel"><div class="panel-head admin-head"><div><h3>Пользователи</h3><p>Поиск по email, username или FASTBOOT ID</p></div><div class="admin-search"><input id="adminUserSearch" type="search" placeholder="Поиск"><button id="adminSearchButton" class="secondary-action" type="button">Найти</button></div></div><div class="admin-table"><div class="admin-table-head"><span>Пользователь</span><span>Роль</span><span>Статус AI</span><span>Spot</span><span>AI Bot</span><span>Дата</span><span>Действия</span></div><div id="adminUsersList"><div class="admin-empty">Загрузка…</div></div></div></article>
     <article class="panel admin-funding-panel"><div class="panel-head"><div><h3>Финансовые заявки</h3><p>Пополнения и выводы</p></div></div><div id="adminFundingList" class="admin-funding-list"><div class="admin-empty">Загрузка…</div></div></article>
+  </div>
+
+  <div class="admin-referral-grid">
+    <article class="panel admin-referral-panel">
+      <div class="panel-head">
+        <div>
+          <h3>ТОП партнёров</h3>
+          <p>Рефералы и начисления</p>
+        </div>
+      </div>
+      <div id="adminReferralPartners" class="admin-referral-partners">
+        <div class="admin-empty">Загрузка…</div>
+      </div>
+    </article>
+
+    <article class="panel admin-referral-credit-panel">
+      <div class="panel-head">
+        <div>
+          <h3>Начислить реферальное вознаграждение</h3>
+          <p>5% от подтверждённой комиссии платформы</p>
+        </div>
+      </div>
+
+      <form id="adminReferralRewardForm" class="admin-referral-form">
+        <label>
+          FASTBOOT ID приглашённого пользователя
+          <input id="adminReferralUserId" type="text" placeholder="FB-..." required>
+        </label>
+
+        <label>
+          Комиссия платформы, USDT
+          <input id="adminReferralPlatformFee" type="number" min="0.01" step="0.01" required>
+        </label>
+
+        <label>
+          Уникальный номер операции
+          <input id="adminReferralSourceReference" type="text" maxlength="100" placeholder="FEE-2026-0001" required>
+        </label>
+
+        <label>
+          Комментарий
+          <input id="adminReferralNote" type="text" maxlength="200" placeholder="Комиссия за период">
+        </label>
+
+        <button class="primary-action" type="submit">Начислить 5%</button>
+      </form>
+    </article>
   </div>
 
   <article class="panel admin-ai-panel">
