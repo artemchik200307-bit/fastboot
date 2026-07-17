@@ -37,11 +37,7 @@
         .eq("id", user.id)
         .maybeSingle(),
 
-      client
-        .from("wallets")
-        .select("user_id, spot_balance, bot_balance, currency, created_at, updated_at")
-        .eq("user_id", user.id)
-        .maybeSingle(),
+      client.rpc("get_my_wallet"),
     ]);
 
     if (profileError) {
@@ -72,10 +68,14 @@
       created_at: user.created_at,
     };
 
-    window.fastbootWallet = wallet || {
+    const resolvedWallet =
+      Array.isArray(wallet) ? wallet[0] : wallet;
+
+    window.fastbootWallet = resolvedWallet || {
       user_id: user.id,
       spot_balance: 0,
       bot_balance: 0,
+      trading_balance: 0,
       currency: "USDT",
     };
 
@@ -84,7 +84,7 @@
     if (window.fastbootProfile?.role === "admin") document.documentElement.classList.add("is-admin");
 
     const script = document.createElement("script");
-    script.src = "dashboard.js?v=admin-visible-2-4";
+    script.src = "dashboard.js?v=balance-fix-2-5";
     script.async = false;
 
     script.onerror = () => {

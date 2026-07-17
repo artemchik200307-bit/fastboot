@@ -136,11 +136,7 @@
   async function loadAccountData() {
     const [walletResult, positionsResult, ordersResult, tradesResult] =
       await Promise.all([
-        supabaseClient
-          .from("wallets")
-          .select("spot_balance, trading_balance")
-          .eq("user_id", currentUser.id)
-          .single(),
+        supabaseClient.rpc("get_my_wallet"),
 
         supabaseClient
           .from("terminal_positions")
@@ -169,8 +165,12 @@
     if (ordersResult.error) throw ordersResult.error;
     if (tradesResult.error) throw tradesResult.error;
 
-    tradingBalance = Number(walletResult.data?.trading_balance || 0);
-    spotBalance = Number(walletResult.data?.spot_balance || 0);
+    const loadedWallet = Array.isArray(walletResult.data)
+      ? walletResult.data[0]
+      : walletResult.data;
+
+    tradingBalance = Number(loadedWallet?.trading_balance || 0);
+    spotBalance = Number(loadedWallet?.spot_balance || 0);
     state.positions = positionsResult.data || [];
     state.orders = ordersResult.data || [];
     state.trades = tradesResult.data || [];

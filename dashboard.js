@@ -377,11 +377,7 @@ async function loadSupabaseAccountData() {
     transactionResult,
     transferResult,
   ] = await Promise.all([
-    supabaseClient
-      .from("wallets")
-      .select("user_id, spot_balance, bot_balance, currency, updated_at")
-      .eq("user_id", authUser.id)
-      .maybeSingle(),
+    supabaseClient.rpc("get_my_wallet"),
 
     supabaseClient
       .from("funding_requests")
@@ -410,16 +406,25 @@ async function loadSupabaseAccountData() {
   if (transactionResult.error) console.error("Transaction load error:", transactionResult.error);
   if (transferResult.error) console.error("Transfer load error:", transferResult.error);
 
-  Object.assign(
-    userWallet,
-    walletResult.data ||
-      window.fastbootWallet || {
-        user_id: authUser.id,
-        spot_balance: 0,
-        bot_balance: 0,
-        currency: "USDT",
-      }
-  );
+  const loadedWallet = Array.isArray(walletResult.data)
+    ? walletResult.data[0]
+    : walletResult.data;
+
+  const walletSource =
+    loadedWallet ||
+    window.fastbootWallet ||
+    userWallet;
+
+  if (walletSource) {
+    Object.assign(userWallet, {
+      user_id: walletSource.user_id || authUser.id,
+      spot_balance: Number(walletSource.spot_balance || 0),
+      bot_balance: Number(walletSource.bot_balance || 0),
+      trading_balance: Number(walletSource.trading_balance || 0),
+      currency: walletSource.currency || "USDT",
+      updated_at: walletSource.updated_at || null,
+    });
+  }
 
   state.deposits = (fundingResult.data || []).filter(
     (item) => item.type === "deposit"
@@ -441,7 +446,7 @@ async function loadSupabaseAccountData() {
 
       supabaseClient
         .from("user_ai_trade_results")
-        .select("id, pair, side, entry_price, exit_price, opened_at, closed_at, pnl_percent, balance_before, pnl_amount, balance_after, gross_pnl_amount, platform_fee_amount, net_pnl_amount, commission_percent, created_at")
+        .select("*")
         .eq("user_id", authUser.id)
         .order("closed_at", { ascending: false })
         .limit(200),
