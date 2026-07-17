@@ -5336,3 +5336,169 @@ html.is-admin #adminNavButton,
 #admin.dashboard-section.active {
   display: block !important;
 }
+
+
+/* ===== MOBILE HORIZONTAL SCROLL FIX 2.9 ===== */
+
+/* Prevent grid children from forcing the whole page wider than the viewport. */
+.dashboard-main,
+.dashboard-content,
+.dashboard-section,
+.panel,
+.admin-section,
+.referral-section,
+.modal-card {
+  min-width: 0;
+}
+
+/* Generic horizontal-scroll containers. */
+.admin-stat-grid,
+.admin-table,
+.admin-users-panel,
+.admin-funding-panel,
+.admin-referral-panel,
+.admin-ai-panel,
+.referral-table,
+.ai-history-table,
+.partner-referrals-table,
+.operations-table,
+.order-history-table,
+.modal-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  touch-action: pan-x pan-y;
+}
+
+/* Keep content width so the user can swipe horizontally instead of clipping. */
+.admin-stat-grid {
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(210px, 82vw);
+}
+
+.admin-table-head,
+.admin-user-row {
+  min-width: 1180px;
+}
+
+.admin-funding-head,
+.admin-funding-row {
+  min-width: 920px;
+}
+
+.admin-referral-partner-row {
+  min-width: 650px;
+}
+
+.referral-table-head,
+.referral-user-row {
+  min-width: 720px;
+}
+
+.ai-history-head,
+.ai-history-row,
+.ai-history-row-fees {
+  min-width: 1040px;
+}
+
+.partner-referrals-head,
+.partner-referral-row {
+  min-width: 680px;
+}
+
+/* Make modal content itself scrollable on small screens. */
+.modal {
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal-card {
+  max-width: calc(100vw - 20px);
+  max-height: calc(100dvh - 20px);
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Small hint at the bottom edge of wide blocks. */
+.mobile-scroll-hint {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .admin-stat-grid {
+    display: grid;
+    grid-template-columns: none !important;
+    gap: 12px;
+    padding-bottom: 8px;
+  }
+
+  .admin-users-panel,
+  .admin-funding-panel,
+  .admin-referral-panel,
+  .admin-ai-panel,
+  .referral-users-panel,
+  .ai-history-panel {
+    overflow: hidden;
+  }
+
+  .admin-table,
+  .referral-table,
+  .ai-history-table,
+  .partner-referrals-table {
+    position: relative;
+    padding-bottom: 8px;
+  }
+
+  .admin-table::after,
+  .referral-table::after,
+  .ai-history-table::after,
+  .partner-referrals-table::after {
+    content: "← Проведите в сторону →";
+    position: sticky;
+    left: 12px;
+    display: inline-block;
+    margin: 8px 12px 2px;
+    border: 1px solid rgba(111,145,255,.25);
+    border-radius: 999px;
+    padding: 5px 9px;
+    background: rgba(111,145,255,.08);
+    color: #8e9bb0;
+    font-size: 9px;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  .partner-details-card {
+    width: calc(100vw - 20px);
+  }
+}
+
+/* On very small phones, keep cards readable while still swipable. */
+@media (max-width: 560px) {
+  .admin-stat-grid {
+    grid-auto-columns: minmax(220px, 86vw);
+  }
+
+  .admin-table-head,
+  .admin-user-row {
+    min-width: 1120px;
+  }
+
+  .admin-funding-head,
+  .admin-funding-row {
+    min-width: 880px;
+  }
+
+  .referral-table-head,
+  .referral-user-row {
+    min-width: 680px;
+  }
+
+  .partner-referrals-head,
+  .partner-referral-row {
+    min-width: 640px;
+  }
+}
