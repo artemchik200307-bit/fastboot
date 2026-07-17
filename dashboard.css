@@ -1818,3 +1818,250 @@ body.trading-mode .sidebar.open {
     font-size: 19px;
   }
 }
+
+
+/* ===== COMPACT DESKTOP TERMINAL + TOP-100 SEARCH V6 ===== */
+
+.hidden-native-select {
+  display: none !important;
+}
+
+.terminal-market-select {
+  position: relative;
+  min-width: 0;
+}
+
+.market-picker-button {
+  display: flex;
+  width: 200px;
+  min-height: 40px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid #2a3340;
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: #0a0e14;
+  color: #eef2f8;
+  text-align: left;
+}
+
+.market-picker-button:hover {
+  border-color: #4b5870;
+  background: #111720;
+}
+
+.market-picker-button span,
+.market-picker-button strong,
+.market-picker-button small {
+  display: block;
+  min-width: 0;
+}
+
+.market-picker-button strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.market-picker-button small {
+  margin-top: 2px;
+  overflow: hidden;
+  color: #748095;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.market-picker-button b {
+  color: #8792a3;
+  font-size: 16px;
+}
+
+.market-picker-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 160;
+  width: min(430px, calc(100vw - 24px));
+  overflow: hidden;
+  border: 1px solid #2b3442;
+  border-radius: 11px;
+  background: #111720;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, .6);
+}
+
+.market-search-wrap {
+  padding: 10px;
+  border-bottom: 1px solid #242b36;
+}
+
+.market-search-wrap input {
+  width: 100%;
+  margin: 0;
+  border: 1px solid #303a49;
+  border-radius: 8px;
+  padding: 10px 11px;
+  background: #090d13;
+  color: #f3f6fa;
+  font-size: 11px;
+}
+
+.market-picker-head,
+.market-picker-row {
+  display: grid;
+  grid-template-columns: minmax(145px, 1fr) minmax(90px, .8fr) 65px;
+  align-items: center;
+  gap: 10px;
+}
+
+.market-picker-head {
+  min-height: 32px;
+  padding: 0 12px;
+  color: #6f7b8e;
+  font-size: 8px;
+}
+
+.market-picker-head span:not(:first-child) {
+  text-align: right;
+}
+
+.market-picker-list {
+  max-height: 430px;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+
+.market-picker-row {
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  border-top: 1px solid rgba(36, 43, 54, .55);
+  padding: 7px 12px;
+  background: transparent;
+  color: #eef2f8;
+  text-align: left;
+}
+
+.market-picker-row:hover,
+.market-picker-row.selected {
+  background: #19212c;
+}
+
+.market-picker-coin strong,
+.market-picker-coin small {
+  display: block;
+}
+
+.market-picker-coin strong {
+  font-size: 11px;
+}
+
+.market-picker-coin small {
+  margin-top: 3px;
+  color: #748095;
+  font-size: 8px;
+}
+
+.market-picker-price,
+.market-picker-change {
+  text-align: right;
+  font-size: 10px;
+}
+
+.market-picker-loading,
+.market-picker-empty {
+  padding: 35px 12px;
+  color: #748095;
+  text-align: center;
+}
+
+/* Компактные размеры компьютерного терминала */
+@media (min-width: 761px) {
+  .terminal-layout {
+    grid-template-columns: minmax(620px, 1fr) 300px 322px;
+    min-height: auto;
+  }
+
+  .terminal-center-column {
+    grid-template-rows: 560px 220px;
+  }
+
+  .terminal-chart {
+    height: 492px;
+    min-height: 492px;
+  }
+
+  .terminal-market-data-column {
+    display: block;
+    min-height: 780px;
+    border-right: 1px solid #242b36;
+  }
+
+  .terminal-market-data-column .orderbook-module {
+    height: 100%;
+    min-height: 780px;
+  }
+
+  .pro-orderbook-row {
+    min-height: 25px;
+  }
+
+  .terminal-order-column {
+    grid-template-rows: 545px 235px;
+  }
+
+  .terminal-bottom-content {
+    height: 180px;
+  }
+}
+
+@media (min-width: 761px) and (max-height: 850px) {
+  .terminal-center-column {
+    grid-template-rows: 470px 200px;
+  }
+
+  .terminal-chart {
+    height: 402px;
+    min-height: 402px;
+  }
+
+  .terminal-market-data-column,
+  .terminal-market-data-column .orderbook-module {
+    min-height: 670px;
+  }
+
+  .terminal-order-column {
+    grid-template-rows: 500px 170px;
+  }
+}
+
+/* На мобильном поиск остаётся удобным и открывается на всю ширину */
+@media (max-width: 760px) {
+  .terminal-market-select {
+    width: 100%;
+  }
+
+  .market-picker-button {
+    width: 100%;
+    min-height: 46px;
+  }
+
+  .market-picker-dropdown {
+    position: fixed;
+    top: 72px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-height: calc(100vh - 90px);
+  }
+
+  .market-picker-list {
+    max-height: calc(100vh - 180px);
+  }
+
+  .market-type-badge {
+    display: none;
+  }
+}

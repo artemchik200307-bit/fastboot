@@ -218,14 +218,37 @@
               <div class="terminal-logo">FASTBOOT <span>TRADE</span></div>
 
               <div class="terminal-market-select">
-                <select id="tradeSymbolSelect">
-                  <option value="BTCUSDT">BTCUSDT</option>
-                  <option value="ETHUSDT">ETHUSDT</option>
-                  <option value="SOLUSDT">SOLUSDT</option>
-                  <option value="BNBUSDT">BNBUSDT</option>
-                  <option value="XRPUSDT">XRPUSDT</option>
-                </select>
+                <button id="marketPickerButton" class="market-picker-button" type="button">
+                  <span>
+                    <strong id="marketPickerSymbol">BTCUSDT</strong>
+                    <small id="marketPickerName">Bitcoin / Tether</small>
+                  </span>
+                  <b>⌄</b>
+                </button>
+
                 <span class="market-type-badge">SPOT</span>
+
+                <div id="marketPickerDropdown" class="market-picker-dropdown hidden">
+                  <div class="market-search-wrap">
+                    <input id="marketSearchInput" type="search"
+                      placeholder="Поиск монеты: BTC, ETH, SOL…"
+                      autocomplete="off">
+                  </div>
+
+                  <div class="market-picker-head">
+                    <span>Инструмент</span>
+                    <span>Цена</span>
+                    <span>24ч</span>
+                  </div>
+
+                  <div id="marketPickerList" class="market-picker-list">
+                    <div class="market-picker-loading">Загрузка топ‑100…</div>
+                  </div>
+                </div>
+
+                <select id="tradeSymbolSelect" class="hidden-native-select" aria-hidden="true">
+                  <option value="BTCUSDT">BTCUSDT</option>
+                </select>
               </div>
 
               <nav class="terminal-main-nav">
@@ -397,19 +420,6 @@
                     <div><i id="mobileBidRatioBar"></i><b id="mobileAskRatioBar"></b></div>
                     <span id="mobileAskRatio" class="negative">50.00%</span>
                   </div>
-                </section>
-
-                <section class="terminal-side-module trades-module">
-                  <div class="terminal-module-header">
-                    <div>
-                      <strong>Сделки</strong>
-                      <span>Последние рыночные операции</span>
-                    </div>
-                  </div>
-                  <div class="recent-columns">
-                    <span>Цена</span><span>Количество</span><span>Время</span>
-                  </div>
-                  <div id="recentTradesList" class="pro-recent-trades"></div>
                 </section>
               </aside>
 

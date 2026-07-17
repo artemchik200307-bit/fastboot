@@ -24,6 +24,7 @@ const state = {
   tradeSocket: null,
   currentSymbol: "BTCUSDT",
   orderSide: "BUY",
+  marketUniverse: [],
 };
 
 const titles = {
@@ -233,8 +234,175 @@ const COIN_DISPLAY_NAMES = {
   XRPUSDT: "XRP / Tether",
 };
 
+
+const EXCLUDED_MARKET_ASSETS = new Set([
+  "USDC", "FDUSD", "TUSD", "USDP", "DAI", "EUR", "AEUR", "TRY", "BRL"
+]);
+
+const EXCLUDED_MARKET_SUFFIXES = ["UP", "DOWN", "BULL", "BEAR"];
+
+const MARKET_NAMES = {
+  BTC: "Bitcoin",
+  ETH: "Ethereum",
+  BNB: "BNB",
+  SOL: "Solana",
+  XRP: "XRP",
+  DOGE: "Dogecoin",
+  ADA: "Cardano",
+  AVAX: "Avalanche",
+  LINK: "Chainlink",
+  SUI: "Sui",
+  TRX: "TRON",
+  LTC: "Litecoin",
+  TON: "Toncoin",
+  DOT: "Polkadot",
+  BCH: "Bitcoin Cash",
+  SHIB: "Shiba Inu",
+  XLM: "Stellar",
+  HBAR: "Hedera",
+  UNI: "Uniswap",
+  AAVE: "Aave",
+  NEAR: "NEAR Protocol",
+  APT: "Aptos",
+  FIL: "Filecoin",
+  ICP: "Internet Computer",
+  ATOM: "Cosmos",
+  ARB: "Arbitrum",
+  OP: "Optimism",
+  ETC: "Ethereum Classic",
+  ALGO: "Algorand",
+  VET: "VeChain",
+  INJ: "Injective",
+  RENDER: "Render",
+  FET: "Artificial Superintelligence",
+  PEPE: "Pepe",
+  WIF: "dogwifhat",
+  BONK: "Bonk"
+};
+
+function isAllowedMarketInstrument(info) {
+  const base = info.baseAsset;
+
+  return (
+    info.status === "TRADING" &&
+    info.quoteAsset === "USDT" &&
+    info.isSpotTradingAllowed !== false &&
+    !EXCLUDED_MARKET_ASSETS.has(base) &&
+    !EXCLUDED_MARKET_SUFFIXES.some((suffix) => base.endsWith(suffix))
+  );
+}
+
+async function loadMarketUniverse() {
+  if (state.marketUniverse.length) {
+    renderMarketPicker();
+    return;
+  }
+
+  try {
+    const [exchangeInfo, tickers] = await Promise.all([
+      fetchJson(`${REST_BASE}/api/v3/exchangeInfo`),
+      fetchJson(`${REST_BASE}/api/v3/ticker/24hr`)
+    ]);
+
+    const allowed = new Map(
+      exchangeInfo.symbols
+        .filter(isAllowedMarketInstrument)
+        .map((info) => [info.symbol, info])
+    );
+
+    state.marketUniverse = tickers
+      .filter((ticker) => allowed.has(ticker.symbol))
+      .sort((a, b) => Number(b.quoteVolume) - Number(a.quoteVolume))
+      .slice(0, 100)
+      .map((ticker) => {
+        const info = allowed.get(ticker.symbol);
+
+        return {
+          symbol: ticker.symbol,
+          baseAsset: info.baseAsset,
+          name: MARKET_NAMES[info.baseAsset] || info.baseAsset,
+          price: Number(ticker.lastPrice),
+          change: Number(ticker.priceChangePercent),
+          volume: Number(ticker.quoteVolume)
+        };
+      });
+
+    const select = $("tradeSymbolSelect");
+    select.innerHTML = state.marketUniverse
+      .map((item) => `<option value="${item.symbol}">${item.symbol}</option>`)
+      .join("");
+
+    if (state.marketUniverse.some((item) => item.symbol === state.currentSymbol)) {
+      select.value = state.currentSymbol;
+    } else if (state.marketUniverse.length) {
+      state.currentSymbol = state.marketUniverse[0].symbol;
+      select.value = state.currentSymbol;
+    }
+
+    renderMarketPicker();
+    updateMarketPickerLabel();
+  } catch (error) {
+    console.error(error);
+    $("marketPickerList").innerHTML =
+      '<div class="market-picker-empty">Не удалось загрузить инструменты.</div>';
+  }
+}
+
+function renderMarketPicker() {
+  const query = ($("marketSearchInput")?.value || "").trim().toLowerCase();
+
+  const filtered = state.marketUniverse.filter((item) =>
+    `${item.symbol} ${item.baseAsset} ${item.name}`
+      .toLowerCase()
+      .includes(query)
+  );
+
+  $("marketPickerList").innerHTML = filtered.length
+    ? filtered.map((item) => `
+        <button type="button"
+          class="market-picker-row ${item.symbol === state.currentSymbol ? "selected" : ""}"
+          data-market-symbol="${item.symbol}">
+          <span class="market-picker-coin">
+            <strong>${item.baseAsset}/USDT</strong>
+            <small>${item.name}</small>
+          </span>
+          <span class="market-picker-price">${formatPrice(item.price)}</span>
+          <span class="market-picker-change ${item.change >= 0 ? "positive" : "negative"}">
+            ${item.change >= 0 ? "+" : ""}${item.change.toFixed(2)}%
+          </span>
+        </button>
+      `).join("")
+    : '<div class="market-picker-empty">Монета не найдена.</div>';
+
+  document.querySelectorAll("[data-market-symbol]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const symbol = button.dataset.marketSymbol;
+      state.currentSymbol = symbol;
+      $("tradeSymbolSelect").value = symbol;
+      $("marketPickerDropdown").classList.add("hidden");
+      $("marketSearchInput").value = "";
+      updateMarketPickerLabel();
+      renderMarketPicker();
+      await loadTradingTerminal();
+    });
+  });
+}
+
+function updateMarketPickerLabel() {
+  const item = state.marketUniverse.find(
+    (market) => market.symbol === state.currentSymbol
+  );
+
+  const base = state.currentSymbol.replace("USDT", "");
+  $("marketPickerSymbol").textContent = state.currentSymbol;
+  $("marketPickerName").textContent =
+    item?.name ? `${item.name} / Tether` : `${base} / Tether`;
+}
+
 async function loadTradingTerminal() {
-  const symbol = $("tradeSymbolSelect").value;
+  const symbol = $("tradeSymbolSelect").value || state.currentSymbol;
+  state.currentSymbol = symbol;
+  updateMarketPickerLabel();
   const activeInterval =
     document.querySelector("[data-chart-interval].active")?.dataset.chartInterval || "15m";
 
@@ -250,6 +418,12 @@ async function loadTradingTerminal() {
 
     const lastPrice = Number(ticker.lastPrice);
     const change = Number(ticker.priceChangePercent);
+
+    const marketItem = state.marketUniverse.find((item) => item.symbol === symbol);
+    if (marketItem) {
+      marketItem.price = lastPrice;
+      marketItem.change = change;
+    }
     const base = symbol.replace("USDT", "");
 
     $("terminalSymbolLabel").textContent = symbol;
@@ -662,7 +836,11 @@ function renderTerminalAssets() {
   `).join("");
 }
 
-$("tradeSymbolSelect").addEventListener("change", loadTradingTerminal);
+$("tradeSymbolSelect").addEventListener("change", () => {
+  state.currentSymbol = $("tradeSymbolSelect").value;
+  updateMarketPickerLabel();
+  loadTradingTerminal();
+});
 
 document.querySelectorAll("[data-chart-interval]").forEach((button) => {
   button.addEventListener("click", () => {
@@ -849,3 +1027,35 @@ function updateFundingCountdown() {
 
 updateFundingCountdown();
 setInterval(updateFundingCountdown, 1000);
+
+
+$("marketPickerButton")?.addEventListener("click", async (event) => {
+  event.stopPropagation();
+  const dropdown = $("marketPickerDropdown");
+  const willOpen = dropdown.classList.contains("hidden");
+
+  dropdown.classList.toggle("hidden");
+
+  if (willOpen) {
+    await loadMarketUniverse();
+    $("marketSearchInput")?.focus();
+  }
+});
+
+$("marketSearchInput")?.addEventListener("input", renderMarketPicker);
+
+$("marketPickerDropdown")?.addEventListener("click", (event) => {
+  event.stopPropagation();
+});
+
+document.addEventListener("click", () => {
+  $("marketPickerDropdown")?.classList.add("hidden");
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    $("marketPickerDropdown")?.classList.add("hidden");
+  }
+});
+
+loadMarketUniverse();
