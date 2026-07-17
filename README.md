@@ -534,3 +534,20 @@ SQL выполнять не нужно.
 1. Выполните `supabase-ai-history-sync-fix.sql` в Supabase SQL Editor.
 2. Загрузите остальные файлы в GitHub с заменой.
 3. Не заменяйте `supabase-config.js`.
+
+
+## Market Universe Fix
+
+Исправлена ошибка:
+
+`ReferenceError: loadMarketUniverse is not defined`
+
+Что сделано:
+
+- добавлена безопасная функция загрузки списка рынков;
+- если старые элементы выбора рынка отсутствуют, функция просто завершается;
+- добавлен резервный список популярных USDT-пар;
+- ошибка Binance API больше не останавливает Dashboard;
+- изменена версия dashboard.js для сброса кэша.
+
+SQL выполнять не нужно.

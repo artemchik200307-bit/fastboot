@@ -1417,6 +1417,66 @@ updateFundingCountdown();
 setInterval(updateFundingCountdown, 1000);
 
 
+async function loadMarketUniverse() {
+  const dropdown = $("marketPickerDropdown");
+  const searchInput = $("marketSearchInput");
+
+  // В актуальной версии торговый терминал работает в отдельном iframe.
+  // Если старых элементов выбора рынка уже нет, просто ничего не делаем.
+  if (!dropdown && !searchInput) {
+    return [];
+  }
+
+  const fallbackSymbols = [
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT",
+    "BNBUSDT",
+    "XRPUSDT",
+    "DOGEUSDT",
+    "ADAUSDT",
+    "AVAXUSDT",
+    "LINKUSDT",
+    "TRXUSDT",
+  ];
+
+  try {
+    const response = await fetch(
+      "https://api.binance.com/api/v3/exchangeInfo",
+      { cache: "no-store" }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Market API ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    state.marketUniverse = (data.symbols || [])
+      .filter((item) =>
+        item.status === "TRADING" &&
+        item.quoteAsset === "USDT" &&
+        item.isSpotTradingAllowed !== false
+      )
+      .map((item) => item.symbol)
+      .filter((symbol) => /^[A-Z0-9]{5,20}$/.test(symbol))
+      .slice(0, 300);
+
+    if (!state.marketUniverse.length) {
+      state.marketUniverse = fallbackSymbols;
+    }
+  } catch (error) {
+    console.warn("Market universe fallback:", error);
+    state.marketUniverse = fallbackSymbols;
+  }
+
+  if (typeof renderMarketPicker === "function") {
+    renderMarketPicker();
+  }
+
+  return state.marketUniverse;
+}
+
 $("marketPickerButton")?.addEventListener("click", async (event) => {
   event.stopPropagation();
   const dropdown = $("marketPickerDropdown");
@@ -1446,9 +1506,9 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-loadMarketUniverse();
-
-
+loadMarketUniverse().catch((error) => {
+  console.warn("Market universe startup skipped:", error);
+});
 $("mobileTradingHomeButton")?.addEventListener("click", () => {
   $("sidebar").classList.toggle("open");
 });
