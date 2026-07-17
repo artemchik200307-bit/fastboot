@@ -98,7 +98,7 @@ function openSection(id) {
   if (id === "market-analysis") loadMarketAnalysis();
   if (id === "journal") renderJournal();
   if (id === "admin") {
-    if (userProfile.role !== "admin") {
+    if (String(userProfile.role || "").toLowerCase() !== "admin") {
       showToast("Нет доступа");
       openSection("overview");
       return;
@@ -178,16 +178,21 @@ function applySupabaseWalletToPortfolio() {
 
 
 async function loadSupabaseAccountData() {
-  const coreResults = await Promise.all([
+  const [
+    walletResult,
+    fundingResult,
+    transactionResult,
+    transferResult,
+  ] = await Promise.all([
     supabaseClient
       .from("wallets")
       .select("user_id, spot_balance, bot_balance, currency, updated_at")
       .eq("user_id", authUser.id)
-      .single(),
+      .maybeSingle(),
 
     supabaseClient
       .from("funding_requests")
-      .select("id, type, amount, asset, network, txid, wallet_address, status, details, created_at, processed_at")
+      .select("id, type, amount, asset, network, txid, wallet_address, status, details, created_at")
       .eq("user_id", authUser.id)
       .order("created_at", { ascending: false })
       .limit(50),
@@ -207,19 +212,21 @@ async function loadSupabaseAccountData() {
       .limit(100),
   ]);
 
-  const [
-    walletResult,
-    fundingResult,
-    transactionResult,
-    transferResult,
-  ] = coreResults;
+  if (walletResult.error) console.error("Wallet load error:", walletResult.error);
+  if (fundingResult.error) console.error("Funding load error:", fundingResult.error);
+  if (transactionResult.error) console.error("Transaction load error:", transactionResult.error);
+  if (transferResult.error) console.error("Transfer load error:", transferResult.error);
 
-  if (walletResult.error) throw walletResult.error;
-  if (fundingResult.error) throw fundingResult.error;
-  if (transactionResult.error) throw transactionResult.error;
-  if (transferResult.error) throw transferResult.error;
-
-  Object.assign(userWallet, walletResult.data || {});
+  Object.assign(
+    userWallet,
+    walletResult.data ||
+      window.fastbootWallet || {
+        user_id: authUser.id,
+        spot_balance: 0,
+        bot_balance: 0,
+        currency: "USDT",
+      }
+  );
 
   state.deposits = (fundingResult.data || []).filter(
     (item) => item.type === "deposit"
@@ -231,37 +238,34 @@ async function loadSupabaseAccountData() {
   state.transactions = transactionResult.data || [];
   state.transfers = transferResult.data || [];
 
-  // AI Assistant data is optional and must never block the personal cabinet.
-  const [botAccountResult, aiResultsResult] = await Promise.all([
-    supabaseClient
-      .from("ai_bot_accounts")
-      .select("user_id, is_active, started_at, stopped_at, initial_balance, created_at, updated_at")
-      .eq("user_id", authUser.id)
-      .maybeSingle()
-      .then((result) => result)
-      .catch((error) => ({ data: null, error })),
+  try {
+    const [botAccountResult, aiResultsResult] = await Promise.all([
+      supabaseClient
+        .from("ai_bot_accounts")
+        .select("user_id, is_active, started_at, stopped_at, initial_balance, created_at, updated_at")
+        .eq("user_id", authUser.id)
+        .maybeSingle(),
 
-    supabaseClient
-      .from("user_ai_trade_results")
-      .select("id, pair, side, entry_price, exit_price, opened_at, closed_at, pnl_percent, balance_before, pnl_amount, balance_after, created_at")
-      .eq("user_id", authUser.id)
-      .order("closed_at", { ascending: false })
-      .limit(200)
-      .then((result) => result)
-      .catch((error) => ({ data: [], error })),
-  ]);
+      supabaseClient
+        .from("user_ai_trade_results")
+        .select("id, pair, side, entry_price, exit_price, opened_at, closed_at, pnl_percent, balance_before, pnl_amount, balance_after, created_at")
+        .eq("user_id", authUser.id)
+        .order("closed_at", { ascending: false })
+        .limit(200),
+    ]);
 
-  if (botAccountResult.error) {
-    console.warn("AI account data is unavailable:", botAccountResult.error);
+    if (botAccountResult.error) console.warn("AI account unavailable:", botAccountResult.error);
+    if (aiResultsResult.error) console.warn("AI history unavailable:", aiResultsResult.error);
+
+    state.aiBotAccount = botAccountResult.data || null;
+    state.aiTradeResults = aiResultsResult.data || [];
+  } catch (error) {
+    console.warn("AI data load skipped:", error);
+    state.aiBotAccount = null;
+    state.aiTradeResults = [];
   }
 
-  if (aiResultsResult.error) {
-    console.warn("AI trade history is unavailable:", aiResultsResult.error);
-  }
-
-  state.aiBotAccount = botAccountResult.data || null;
-  state.aiTradeResults = aiResultsResult.data || [];
-
+  initializeUser();
   applySupabaseWalletToPortfolio();
   renderAccount();
   renderAiAssistant();
@@ -1467,14 +1471,23 @@ renderJournal();
 loadSupabaseAccountData()
   .catch((error) => {
     console.error("Ошибка загрузки аккаунта:", error);
-    showToast("Не удалось загрузить данные аккаунта");
+    showToast("Не удалось обновить данные. Показаны сохранённые значения.");
+
+    Object.assign(userWallet, window.fastbootWallet || {});
+    initializeUser();
+    applySupabaseWalletToPortfolio();
     renderAccount();
+    renderAiAssistant();
   })
   .finally(() => {
     loadPrices();
   });
 
 openSection(titles[restoredSection] ? restoredSection : "overview");
+
+$("tradingHomeButton")?.addEventListener("click", () => {
+  openSection("overview");
+});
 
 
 $("tradingHomeButton")?.addEventListener("click", () => {
