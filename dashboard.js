@@ -1073,7 +1073,7 @@ function renderAiAssistant() {
 
   $("botStatus").textContent = active ? "Активен" : "Остановлен";
   $("aiStatusDot").classList.toggle("active", active);
-  $("startBotButton").disabled = active || bot < 50;
+  $("startBotButton").disabled = active;
   $("stopBotButton").disabled = !active;
 
   const day = aiPeriod(1);
@@ -1171,7 +1171,10 @@ function renderAiEquity() {
 
 async function setAiBotStatus(active) {
   if (active && Number(userWallet?.bot_balance || 0) < 50) {
-    showToast("Для запуска AI Assistant нужно минимум 50 USDT на AI-счёте");
+    showToast(
+      `Для запуска AI Assistant нужно минимум 50 USDT. ` +
+      `Сейчас на AI-счёте: ${Number(userWallet?.bot_balance || 0).toFixed(2)} USDT`
+    );
     return;
   }
 
