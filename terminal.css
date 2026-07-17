@@ -673,3 +673,42 @@ body {
     font-size: 8px;
   }
 }
+
+/* Убираем отображение цены возле пары */
+
+.ticker-box {
+    display: none !important;
+}
+
+/* Выравниваем верхнюю панель */
+
+.topbar {
+    min-height: 54px;
+    padding: 8px 14px;
+}
+
+.topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.home-button {
+    height: 38px;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    height: 38px;
+}
+
+.symbol-picker {
+    display: flex;
+    align-items: center;
+}
+
+.symbol-picker select {
+    height: 38px;
+    min-width: 220px;
+}
