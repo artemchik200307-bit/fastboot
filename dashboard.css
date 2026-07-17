@@ -2620,3 +2620,36 @@ body.trading-mode .sidebar.open {
     height: 160px;
   }
 }
+
+
+/* ===== TERMINAL V9: COMPLETE 10 + 10 ORDERBOOK ===== */
+@media (min-width: 761px) {
+  .terminal-market-data-column,
+  .terminal-market-data-column .orderbook-module {
+    overflow: visible;
+  }
+
+  .terminal-market-data-column .orderbook-module {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .pro-orderbook-list {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+
+  .pro-orderbook-row {
+    min-height: 23px;
+    padding: 2px 3px;
+  }
+
+  .pro-orderbook-mid {
+    flex: 0 0 38px;
+    min-height: 38px;
+  }
+
+  .mobile-orderbook-ratio {
+    margin-top: 8px;
+  }
+}

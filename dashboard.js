@@ -414,11 +414,10 @@ async function loadTradingTerminal() {
   state.currentSymbol = symbol;
 
   try {
-    const [klines, ticker, depth, trades] = await Promise.all([
+    const [klines, ticker, depth] = await Promise.all([
       fetchJson(`${REST_BASE}/api/v3/klines?symbol=${symbol}&interval=${activeInterval}&limit=500`),
       fetchJson(`${REST_BASE}/api/v3/ticker/24hr?symbol=${symbol}`),
-      fetchJson(`${REST_BASE}/api/v3/depth?symbol=${symbol}&limit=20`),
-      fetchJson(`${REST_BASE}/api/v3/trades?symbol=${symbol}&limit=50`)
+      fetchJson(`${REST_BASE}/api/v3/depth?symbol=${symbol}&limit=20`)
     ]);
 
     const lastPrice = Number(ticker.lastPrice);
@@ -452,15 +451,25 @@ async function loadTradingTerminal() {
 
     updateTerminalBalances();
     renderProOrderbook(depth);
-    renderProRecentTrades(trades);
     renderProfessionalChart(klines);
     renderOrders();
     renderTerminalAssets();
     renderTerminalTradeHistory();
     updateOrderCalculation();
   } catch (error) {
-    console.error(error);
-    showToast("Не удалось загрузить данные торгового терминала");
+    console.error("Ошибка торгового терминала:", error);
+
+    const chartContainer = $("terminalChart");
+    if (chartContainer && !state.chart) {
+      chartContainer.innerHTML = `
+        <div class="terminal-empty-state">
+          <strong>Не удалось загрузить график</strong>
+          <span>${escapeHtml(error?.message || "Ошибка рыночного API")}</span>
+        </div>
+      `;
+    }
+
+    showToast(`Не удалось загрузить терминал: ${error?.message || "неизвестная ошибка"}`);
   }
 }
 
@@ -653,7 +662,11 @@ function updateChartOhlc(row) {
 }
 
 function renderProOrderbook(depth) {
-  const precision = Number($("orderbookPrecision").value) || .1;
+  if (!depth || !Array.isArray(depth.asks) || !Array.isArray(depth.bids)) {
+    throw new Error("Некорректные данные стакана");
+  }
+
+  const precision = Number($("orderbookPrecision")?.value) || .1;
 
   const prepareRows = (rows) => {
     let cumulative = 0;
@@ -673,8 +686,8 @@ function renderProOrderbook(depth) {
     }));
   };
 
-  const asks = prepareRows([...depth.asks].reverse().slice(0, 13));
-  const bids = prepareRows(depth.bids.slice(0, 13));
+  const asks = prepareRows([...depth.asks].reverse().slice(0, 10));
+  const bids = prepareRows(depth.bids.slice(0, 10));
 
   $("asksList").innerHTML = asks.map((item) => `
     <div class="pro-orderbook-row" style="--depth-width:${item.depth}%">
@@ -1106,3 +1119,13 @@ loadMarketUniverse();
 $("mobileTradingHomeButton")?.addEventListener("click", () => {
   $("sidebar").classList.toggle("open");
 });
+
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
