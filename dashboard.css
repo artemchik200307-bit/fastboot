@@ -4186,3 +4186,34 @@ body.trading-mode .sidebar.open {
 
 /* ADMIN PANEL */
 .nav-item small{margin-left:auto;padding:3px 6px;border-radius:5px;background:rgba(111,145,255,.16);color:#8fa8ff;font-size:8px;font-weight:900}.admin-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:14px;margin-bottom:18px}.admin-stat-card{border:1px solid rgba(137,151,174,.16);border-radius:14px;padding:18px;background:linear-gradient(145deg,rgba(111,145,255,.08),transparent 60%),var(--panel)}.admin-stat-card span,.admin-stat-card strong,.admin-stat-card small{display:block}.admin-stat-card span,.admin-stat-card small{color:var(--muted)}.admin-stat-card strong{margin-top:9px;font-size:25px}.admin-stat-card small{margin-top:6px;font-size:9px}.admin-layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(320px,.75fr);gap:16px}.admin-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.admin-search{display:flex;gap:7px}.admin-search input{width:230px;margin:0}.admin-table{overflow-x:auto}.admin-table-head,.admin-user-row{display:grid;grid-template-columns:minmax(180px,1.5fr) 70px 80px 80px 110px 145px;gap:10px;align-items:center;min-width:760px}.admin-table-head{min-height:38px;padding:0 14px;color:var(--muted);font-size:9px}.admin-user-row{min-height:68px;border-top:1px solid rgba(137,151,174,.16);padding:9px 14px;font-size:10px}.admin-user-identity strong,.admin-user-identity span,.admin-user-identity small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.admin-user-identity span{margin-top:4px;color:var(--muted)}.admin-user-identity small{margin-top:3px;color:#71809a;font-size:8px}.admin-role-badge{width:max-content;border-radius:999px;padding:5px 8px;background:rgba(137,151,174,.12);color:#9aa6b9;font-size:9px;font-weight:800}.admin-role-badge.admin{background:rgba(111,145,255,.16);color:#8fa8ff}.admin-row-actions{display:flex;gap:6px}.compact{min-height:30px!important;padding:6px 9px!important;font-size:9px!important}.danger-action{border:1px solid rgba(255,95,120,.34);border-radius:8px;background:rgba(255,95,120,.12);color:#ff7890}.admin-funding-list{max-height:620px;overflow-y:auto}.admin-funding-item{display:flex;justify-content:space-between;gap:12px;border-top:1px solid rgba(137,151,174,.16);padding:15px}.admin-funding-item strong,.admin-funding-item span,.admin-funding-item small{display:block}.admin-funding-item strong{margin-top:7px}.admin-funding-item span:not(.admin-funding-type){margin-top:5px;color:var(--muted);font-size:10px}.admin-funding-item small{margin-top:4px;color:#71809a;font-size:8px}.admin-funding-item p{color:var(--muted);font-size:10px}.admin-funding-type{width:max-content;border-radius:6px;padding:4px 7px;font-size:8px;font-weight:900}.admin-funding-type.deposit{background:rgba(32,201,135,.13);color:#20c987}.admin-funding-type.withdraw{background:rgba(255,189,102,.13);color:#ffbd66}.admin-funding-actions{display:grid;gap:7px}.admin-empty{padding:40px 18px;color:var(--muted);text-align:center}.admin-modal-card{width:min(480px,calc(100vw - 28px))}.admin-modal-user{margin-bottom:14px;border:1px solid rgba(137,151,174,.16);border-radius:10px;padding:12px}.admin-modal-user strong,.admin-modal-user span{display:block}.admin-modal-user span{margin-top:4px;color:var(--muted);font-size:10px}@media(max-width:1050px){.admin-stat-grid{grid-template-columns:1fr 1fr}.admin-layout{grid-template-columns:1fr}}@media(max-width:760px){.admin-stat-grid{grid-template-columns:1fr 1fr;gap:9px}.admin-stat-card{padding:13px}.admin-head{display:block}.admin-search{margin-top:12px}.admin-search input{width:100%}.admin-funding-item{display:block}.admin-funding-actions{grid-template-columns:1fr 1fr;margin-top:12px}}
+
+
+/* ===== USDT TRC20 FUNDING V1 ===== */
+.crypto-funding-card{display:grid;gap:16px}
+.crypto-funding-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.crypto-funding-summary>div{border:1px solid rgba(137,151,174,.16);border-radius:10px;padding:10px;background:rgba(255,255,255,.025)}
+.crypto-funding-summary span,.crypto-funding-summary strong{display:block}
+.crypto-funding-summary span{color:var(--muted);font-size:9px}
+.crypto-funding-summary strong{margin-top:5px;font-size:12px}
+.crypto-qr-wrap{display:grid;place-items:center}
+.crypto-qr-wrap img{width:190px;height:190px;border:8px solid #fff;border-radius:13px;background:#fff}
+.crypto-address-box>span{display:block;margin-bottom:7px;color:var(--muted);font-size:10px}
+.crypto-address-button{width:100%;border:1px solid rgba(111,145,255,.35);border-radius:10px;padding:12px;background:rgba(111,145,255,.08);color:var(--text);text-align:left}
+.crypto-address-button strong,.crypto-address-button small{display:block}
+.crypto-address-button strong{overflow-wrap:anywhere;font-size:12px}
+.crypto-address-button small{margin-top:5px;color:#8fa8ff;font-size:9px}
+.crypto-warning{border:1px solid rgba(255,189,102,.25);border-radius:10px;padding:12px;background:rgba(255,189,102,.07)}
+.crypto-warning strong{color:#ffbd66}
+.crypto-warning p{margin:6px 0 0;color:var(--muted);font-size:10px;line-height:1.45}
+.crypto-confirm-form{border-top:1px solid rgba(137,151,174,.14);padding-top:14px}
+.crypto-processing-note{display:block;color:var(--muted);text-align:center}
+.admin-funding-main{min-width:0}
+.admin-funding-meta{display:grid;gap:5px;margin-top:10px}
+.admin-funding-meta span{display:block;color:var(--muted);font-size:9px}
+.admin-funding-meta code{overflow-wrap:anywhere;color:#dbe3f3;font-size:9px}
+.tronscan-link{display:inline-block;margin-top:10px;color:#8fa8ff;font-size:10px;font-weight:800;text-decoration:none}
+.tronscan-link:hover{text-decoration:underline}
+@media(max-width:520px){
+  .crypto-funding-summary{grid-template-columns:1fr}
+  .crypto-qr-wrap img{width:170px;height:170px}
+}

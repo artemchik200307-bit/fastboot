@@ -333,55 +333,130 @@ function renderOperations() {
   $("withdrawHistory").innerHTML = operationHtml(state.withdrawals);
 }
 
+
+const FASTBOOT_TRC20_ADDRESS = "TVwAj44gxbPFTDH3KifsmqjfCtF54tj4DC";
+const FASTBOOT_MIN_DEPOSIT = 10;
+const FASTBOOT_MIN_WITHDRAW = 10;
+
+function copyText(value, successMessage = "Скопировано") {
+  navigator.clipboard.writeText(value)
+    .then(() => showToast(successMessage))
+    .catch(() => showToast("Не удалось скопировать"));
+}
+
 function openMoneyModal(type) {
-  const config = {
-    deposit: ["Заявка на пополнение", "Отправить заявку"],
-    withdraw: ["Заявка на вывод", "Отправить заявку"],
-    exchange: ["Перевод между счетами", "Выполнить перевод"],
-  }[type];
-
-  $("modalTitle").textContent = config[0];
-
   if (type === "exchange") {
+    $("modalTitle").textContent = "Перевод между счетами";
     $("modalBody").innerHTML = `
       <div class="modal-form">
-        <label>
-          Направление
+        <label>Направление
           <select id="modalTransferDirection">
             <option value="spot_to_bot">Основной счёт → AI Bot</option>
             <option value="bot_to_spot">AI Bot → Основной счёт</option>
           </select>
         </label>
-        <label>
-          Сумма USDT
+        <label>Сумма USDT
           <input id="modalAmount" type="number" step="0.01" min="0.01">
         </label>
         <button id="confirmModalAction" class="primary-action" type="button">
-          ${config[1]}
+          Выполнить перевод
         </button>
       </div>
     `;
-  } else {
+  } else if (type === "deposit") {
+    const qrUrl =
+      "https://api.qrserver.com/v1/create-qr-code/" +
+      `?size=220x220&data=${encodeURIComponent(FASTBOOT_TRC20_ADDRESS)}`;
+
+    $("modalTitle").textContent = "Пополнение USDT";
+
     $("modalBody").innerHTML = `
-      <div class="modal-form">
-        <label>
-          Сумма USDT
-          <input id="modalAmount" type="number" step="0.01" min="0.01">
-        </label>
-        <label>
-          Комментарий или реквизиты
-          <input
-            id="modalDetails"
-            type="text"
-            maxlength="300"
-            placeholder="${type === "deposit"
-              ? "Например: сеть TRC20"
-              : "Например: адрес кошелька"}"
-          >
-        </label>
-        <button id="confirmModalAction" class="primary-action" type="button">
-          ${config[1]}
-        </button>
+      <div class="crypto-funding-card">
+        <div class="crypto-funding-summary">
+          <div><span>Монета</span><strong>USDT</strong></div>
+          <div><span>Сеть</span><strong>TRC20</strong></div>
+          <div><span>Минимум</span><strong>${FASTBOOT_MIN_DEPOSIT} USDT</strong></div>
+        </div>
+
+        <div class="crypto-qr-wrap">
+          <img src="${qrUrl}" alt="QR-код USDT TRC20" width="220" height="220">
+        </div>
+
+        <div class="crypto-address-box">
+          <span>Адрес для пополнения</span>
+          <button id="copyDepositAddressButton" type="button" class="crypto-address-button">
+            <strong>${FASTBOOT_TRC20_ADDRESS}</strong>
+            <small>Нажмите, чтобы скопировать</small>
+          </button>
+        </div>
+
+        <div class="crypto-warning">
+          <strong>Важно</strong>
+          <p>Отправляйте только USDT в сети TRC20.</p>
+          <p>Перевод в другой сети может быть потерян.</p>
+          <p>Зачисление выполняется после проверки администратора.</p>
+        </div>
+
+        <div class="modal-form crypto-confirm-form">
+          <label>Отправленная сумма USDT
+            <input id="modalAmount" type="number" step="0.01"
+              min="${FASTBOOT_MIN_DEPOSIT}"
+              placeholder="Минимум ${FASTBOOT_MIN_DEPOSIT}">
+          </label>
+
+          <label>TXID / Hash транзакции
+            <input id="modalTxid" type="text" minlength="20" maxlength="150"
+              autocomplete="off" placeholder="Вставьте TXID после перевода">
+          </label>
+
+          <button id="confirmModalAction" class="primary-action" type="button">
+            Отправить заявку
+          </button>
+        </div>
+
+        <small class="crypto-processing-note">
+          Ручная обработка обычно занимает 5–30 минут.
+        </small>
+      </div>
+    `;
+
+    $("copyDepositAddressButton").addEventListener(
+      "click",
+      () => copyText(FASTBOOT_TRC20_ADDRESS, "Адрес скопирован")
+    );
+  } else {
+    $("modalTitle").textContent = "Вывод USDT TRC20";
+
+    $("modalBody").innerHTML = `
+      <div class="crypto-funding-card">
+        <div class="crypto-funding-summary">
+          <div><span>Монета</span><strong>USDT</strong></div>
+          <div><span>Сеть</span><strong>TRC20</strong></div>
+          <div><span>Минимум</span><strong>${FASTBOOT_MIN_WITHDRAW} USDT</strong></div>
+        </div>
+
+        <div class="crypto-warning">
+          <strong>Проверьте адрес</strong>
+          <p>Вывод выполняется только в сети TRC20.</p>
+          <p>Средства должны находиться на основном счёте.</p>
+        </div>
+
+        <div class="modal-form">
+          <label>Адрес USDT TRC20
+            <input id="modalWalletAddress" type="text" maxlength="60"
+              autocomplete="off" placeholder="T...">
+          </label>
+
+          <label>Сумма USDT
+            <input id="modalAmount" type="number" step="0.01"
+              min="${FASTBOOT_MIN_WITHDRAW}"
+              placeholder="Минимум ${FASTBOOT_MIN_WITHDRAW}">
+          </label>
+
+          <button id="confirmModalAction" class="primary-action" type="button">
+            Создать заявку
+          </button>
+        </div>
       </div>
     `;
   }
@@ -396,50 +471,73 @@ function openMoneyModal(type) {
 
 async function processMoneyAction(type) {
   const amount = Number($("modalAmount")?.value);
+  const button = $("confirmModalAction");
 
   if (!(amount > 0)) {
     showToast("Введите корректную сумму");
     return;
   }
 
-  const button = $("confirmModalAction");
+  if (type === "deposit" && amount < FASTBOOT_MIN_DEPOSIT) {
+    showToast(`Минимальное пополнение — ${FASTBOOT_MIN_DEPOSIT} USDT`);
+    return;
+  }
+
+  if (type === "withdraw" && amount < FASTBOOT_MIN_WITHDRAW) {
+    showToast(`Минимальный вывод — ${FASTBOOT_MIN_WITHDRAW} USDT`);
+    return;
+  }
+
   button.disabled = true;
 
   try {
     if (type === "exchange") {
-      const direction = $("modalTransferDirection").value;
-
       const { error } = await supabaseClient.rpc(
         "transfer_wallet_balance",
         {
-          p_direction: direction,
+          p_direction: $("modalTransferDirection").value,
           p_amount: amount,
         }
       );
 
       if (error) throw error;
-
       showToast("Перевод выполнен");
-    } else {
-      const details = $("modalDetails")?.value.trim() || null;
+    } else if (type === "deposit") {
+      const txid = $("modalTxid")?.value.trim();
+
+      if (!txid || txid.length < 20) {
+        showToast("Введите корректный TXID");
+        return;
+      }
 
       const { error } = await supabaseClient.rpc(
-        "request_funding_operation",
+        "request_trc20_deposit",
         {
-          p_type: type,
           p_amount: amount,
-          p_asset: "USDT",
-          p_details: details,
+          p_txid: txid,
         }
       );
 
       if (error) throw error;
+      showToast("Заявка на пополнение отправлена");
+    } else {
+      const walletAddress = $("modalWalletAddress")?.value.trim();
 
-      showToast(
-        type === "deposit"
-          ? "Заявка на пополнение создана"
-          : "Заявка на вывод создана"
+      if (!/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(walletAddress || "")) {
+        showToast("Введите корректный TRC20-адрес");
+        return;
+      }
+
+      const { error } = await supabaseClient.rpc(
+        "request_trc20_withdrawal",
+        {
+          p_amount: amount,
+          p_wallet_address: walletAddress,
+        }
       );
+
+      if (error) throw error;
+      showToast("Заявка на вывод создана");
     }
 
     $("actionModal").classList.add("hidden");
@@ -1508,7 +1606,56 @@ async function loadAdminPanel(search=""){
 }
 function renderAdminOverview(){const d=state.adminOverview||{};$("adminUsersCount").textContent=Number(d.users_count||0).toLocaleString("ru-RU");$("adminTotalBalance").textContent=`${Number(d.total_platform_balance||0).toFixed(2)} USDT`;$("adminPendingCount").textContent=Number(d.pending_requests_count||0);$("adminAdminsCount").textContent=Number(d.admins_count||0);}
 function renderAdminUsers(){const r=state.adminUsers;$("adminUsersList").innerHTML=r.length?r.map(u=>`<div class="admin-user-row"><div class="admin-user-identity"><strong>${escapeHtml(u.username||"User")}</strong><span>${escapeHtml(u.email||"")}</span><small>${escapeHtml(u.fastboot_id||"")}</small></div><span class="admin-role-badge ${u.role==="admin"?"admin":""}">${escapeHtml(u.role||"user")}</span><strong>${Number(u.spot_balance||0).toFixed(2)}</strong><strong>${Number(u.bot_balance||0).toFixed(2)}</strong><span>${formatDateTime(u.created_at)}</span><div class="admin-row-actions"><button class="secondary-action compact" data-admin-balance="${u.id}">Баланс</button><button class="secondary-action compact" data-admin-role="${u.id}">Роль</button></div></div>`).join(""):'<div class="admin-empty">Пользователи не найдены</div>';document.querySelectorAll("[data-admin-balance]").forEach(b=>b.onclick=()=>openAdminBalanceModal(r.find(x=>x.id===b.dataset.adminBalance)));document.querySelectorAll("[data-admin-role]").forEach(b=>b.onclick=()=>openAdminRoleModal(r.find(x=>x.id===b.dataset.adminRole)));}
-function renderAdminFunding(){const a=state.adminFundingRequests;$("adminFundingList").innerHTML=a.length?a.map(x=>`<article class="admin-funding-item"><div><span class="admin-funding-type ${x.type}">${x.type==="deposit"?"Пополнение":"Вывод"}</span><strong>${Number(x.amount).toFixed(2)} ${escapeHtml(x.asset||"USDT")}</strong><span>${escapeHtml(x.username||x.email||"")}</span><small>${formatDateTime(x.created_at)}</small>${x.details?`<p>${escapeHtml(x.details)}</p>`:""}</div><div class="admin-funding-actions"><button class="primary-action compact" data-fa="approve" data-fid="${x.id}">Одобрить</button><button class="danger-action compact" data-fa="reject" data-fid="${x.id}">Отклонить</button></div></article>`).join(""):'<div class="admin-empty">Ожидающих заявок нет</div>';document.querySelectorAll("[data-fa]").forEach(b=>b.onclick=()=>processAdminFunding(b.dataset.fid,b.dataset.fa));}
+function renderAdminFunding(){
+  const a=state.adminFundingRequests;
+
+  $("adminFundingList").innerHTML=a.length
+    ?a.map(x=>{
+      const txLink=x.txid
+        ?`https://tronscan.org/#/transaction/${encodeURIComponent(x.txid)}`
+        :null;
+
+      return `<article class="admin-funding-item">
+        <div class="admin-funding-main">
+          <span class="admin-funding-type ${x.type}">
+            ${x.type==="deposit"?"Пополнение":"Вывод"}
+          </span>
+          <strong>${Number(x.amount).toFixed(2)} ${escapeHtml(x.asset||"USDT")}</strong>
+          <span>${escapeHtml(x.username||x.email||"")}</span>
+          <small>${escapeHtml(x.fastboot_id||"")}</small>
+          <small>${formatDateTime(x.created_at)}</small>
+
+          <div class="admin-funding-meta">
+            <span>Сеть: <strong>${escapeHtml(x.network||"TRC20")}</strong></span>
+            ${x.wallet_address
+              ?`<span>Адрес: <code>${escapeHtml(x.wallet_address)}</code></span>`
+              :""}
+            ${x.txid
+              ?`<span>TXID: <code>${escapeHtml(x.txid)}</code></span>`
+              :""}
+          </div>
+
+          ${txLink
+            ?`<a class="tronscan-link" href="${txLink}" target="_blank" rel="noopener">
+                Проверить TXID в Tronscan
+              </a>`
+            :""}
+        </div>
+
+        <div class="admin-funding-actions">
+          <button class="primary-action compact"
+            data-fa="approve" data-fid="${x.id}">Одобрить</button>
+          <button class="danger-action compact"
+            data-fa="reject" data-fid="${x.id}">Отклонить</button>
+        </div>
+      </article>`;
+    }).join("")
+    :'<div class="admin-empty">Ожидающих заявок нет</div>';
+
+  document.querySelectorAll("[data-fa]").forEach(
+    b=>b.onclick=()=>processAdminFunding(b.dataset.fid,b.dataset.fa)
+  );
+}
 function openAdminBalanceModal(u){if(!u)return;$("adminModalTitle").textContent="Изменение баланса";$("adminModalBody").innerHTML=`<div class="admin-modal-user"><strong>${escapeHtml(u.username||"User")}</strong><span>${escapeHtml(u.email||"")}</span></div><div class="modal-form"><label>Счёт<select id="adminWalletType"><option value="spot">Основной</option><option value="bot">AI Bot</option></select></label><label>Операция<select id="adminBalanceOperation"><option value="credit">Начислить</option><option value="debit">Списать</option></select></label><label>Сумма USDT<input id="adminBalanceAmount" type="number" min="0.01" step="0.01"></label><label>Причина<input id="adminBalanceReason" maxlength="300"></label><button id="confirmAdminBalanceButton" class="primary-action">Применить</button></div>`;$("adminModal").classList.remove("hidden");$("confirmAdminBalanceButton").onclick=async()=>{const amount=Number($("adminBalanceAmount").value);if(!(amount>0))return showToast("Введите сумму");try{const {error}=await supabaseClient.rpc("admin_adjust_user_balance",{p_user_id:u.id,p_wallet:$("adminWalletType").value,p_operation:$("adminBalanceOperation").value,p_amount:amount,p_reason:$("adminBalanceReason").value.trim()||null});if(error)throw error;$("adminModal").classList.add("hidden");showToast("Баланс обновлён");await loadAdminPanel($("adminUserSearch").value.trim());}catch(e){showToast(e.message||"Ошибка");}};}
 function openAdminRoleModal(u){if(!u)return;$("adminModalTitle").textContent="Изменение роли";$("adminModalBody").innerHTML=`<div class="admin-modal-user"><strong>${escapeHtml(u.username||"User")}</strong><span>${escapeHtml(u.email||"")}</span></div><div class="modal-form"><label>Роль<select id="adminNewRole"><option value="user" ${u.role==="user"?"selected":""}>user</option><option value="admin" ${u.role==="admin"?"selected":""}>admin</option></select></label><button id="confirmAdminRoleButton" class="primary-action">Сохранить</button></div>`;$("adminModal").classList.remove("hidden");$("confirmAdminRoleButton").onclick=async()=>{try{const {error}=await supabaseClient.rpc("admin_set_user_role",{p_user_id:u.id,p_role:$("adminNewRole").value});if(error)throw error;$("adminModal").classList.add("hidden");showToast("Роль изменена");await loadAdminPanel($("adminUserSearch").value.trim());}catch(e){showToast(e.message||"Ошибка");}};}
 async function processAdminFunding(id,action){if(!confirm(action==="approve"?"Одобрить заявку?":"Отклонить заявку?"))return;try{const {error}=await supabaseClient.rpc("admin_process_funding_request",{p_request_id:id,p_action:action,p_note:null});if(error)throw error;showToast(action==="approve"?"Заявка одобрена":"Заявка отклонена");await loadAdminPanel($("adminUserSearch").value.trim());}catch(e){showToast(e.message||"Ошибка");}}

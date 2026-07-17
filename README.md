@@ -310,3 +310,21 @@ AI-экосистеме:
 1. Выполните `supabase-admin-panel.sql` в Supabase SQL Editor.
 2. Загрузите остальные файлы в GitHub с заменой.
 3. Выйдите и войдите в аккаунт снова.
+
+
+## USDT TRC20 Funding v1
+
+Адрес SafePal: `TVwAj44gxbPFTDH3KifsmqjfCtF54tj4DC`
+
+- Пополнение только USDT TRC20.
+- QR-код и копирование адреса.
+- Минимум 10 USDT.
+- Обязательный уникальный TXID.
+- Проверка TXID через Tronscan.
+- Вывод только USDT TRC20.
+- Обработка заявок через Admin Panel.
+
+### Установка
+1. Выполните `supabase-trc20-funding.sql` в Supabase SQL Editor.
+2. Загрузите остальные файлы в GitHub с заменой.
+3. Не заменяйте `supabase-config.js`.
