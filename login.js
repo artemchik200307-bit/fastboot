@@ -6,47 +6,84 @@ const passwordInput = document.getElementById("loginPassword");
 const messageElement = document.getElementById("authError");
 const submitButton = loginForm?.querySelector('button[type="submit"]');
 
+let redirectStarted = false;
+
 function showMessage(message, type = "error") {
   if (!messageElement) return;
-
   messageElement.textContent = message;
-  messageElement.style.display = "block";
-  messageElement.style.color =
-    type === "success" ? "#20c987" : "#ff5f78";
+  messageElement.style.display = message ? "block" : "none";
+  messageElement.style.color = type === "success" ? "#20c987" : "#ff5f78";
 }
 
-function setLoading(isLoading) {
+function setLoading(loading) {
   if (!submitButton) return;
-
-  submitButton.disabled = isLoading;
-  submitButton.textContent = isLoading ? "Выполняется вход..." : "Войти";
+  submitButton.disabled = loading;
+  submitButton.textContent = loading ? "Выполняется вход..." : "Войти";
 }
 
-async function checkExistingSession() {
-  if (!window.fastbootSupabase) {
-    showMessage("Не удалось подключиться к Supabase.");
+function goToDashboard() {
+  if (redirectStarted) return;
+  redirectStarted = true;
+  window.location.replace("dashboard.html");
+}
+
+function translateError(error) {
+  const message = error?.message || "";
+
+  if (message === "Email not confirmed") {
+    return "Сначала подтвердите email через письмо.";
+  }
+
+  if (
+    message === "Invalid login credentials" ||
+    message === "Invalid email or password"
+  ) {
+    return "Неверный email или пароль.";
+  }
+
+  return message || "Не удалось выполнить вход.";
+}
+
+async function checkSession() {
+  const client = window.fastbootSupabase;
+
+  if (!client) {
+    showMessage("Не удалось подключиться к Supabase. Проверьте supabase-config.js.");
     return;
   }
 
-  const {
-    data: { session },
-  } = await window.fastbootSupabase.auth.getSession();
+  try {
+    const {
+      data: { session },
+      error,
+    } = await client.auth.getSession();
 
-  if (session) {
-    window.location.replace("dashboard.html");
+    if (error) {
+      console.error("Ошибка проверки сессии:", error);
+      return;
+    }
+
+    if (session?.user) {
+      goToDashboard();
+    }
+  } catch (error) {
+    console.error("Ошибка проверки сессии:", error);
   }
 }
 
 loginForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
+  showMessage("");
 
-  if (!window.fastbootSupabase) {
+  const client = window.fastbootSupabase;
+
+  if (!client) {
     showMessage("Supabase не подключён.");
     return;
   }
 
-  const email = emailInput?.value.trim().toLowerCase();
-  const password = passwordInput?.value;
+  const email = emailInput?.value.trim().toLowerCase() || "";
+  const password = passwordInput?.value || "";
 
   if (!email || !password) {
     showMessage("Введите email и пароль.");
@@ -56,38 +93,22 @@ loginForm?.addEventListener("submit", async (event) => {
   setLoading(true);
 
   try {
-    const { data, error } =
-      await window.fastbootSupabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+    const { data, error } = await client.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-    if (error) {
-      throw error;
-    }
-
-    if (!data.session) {
-      throw new Error("Сессия не была создана.");
-    }
+    if (error) throw error;
+    if (!data.session?.user) throw new Error("Сессия не создана.");
 
     showMessage("Вход выполнен. Открываем кабинет...", "success");
-
-    setTimeout(() => {
-      window.location.replace("dashboard.html");
-    }, 500);
+    goToDashboard();
   } catch (error) {
     console.error("Ошибка входа:", error);
-
-    if (error.message === "Email not confirmed") {
-      showMessage("Сначала подтвердите email через письмо.");
-    } else {
-      showMessage(
-        "Не удалось войти. Проверьте email и пароль."
-      );
-    }
+    showMessage(translateError(error));
   } finally {
     setLoading(false);
   }
 });
 
-checkExistingSession();
+checkSession();

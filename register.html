@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080c12">
   <title>FASTBOOT — Регистрация</title>
   <link rel="stylesheet" href="auth.css">
 </head>
@@ -13,41 +14,38 @@
       <div class="auth-info-main">
         <span class="auth-kicker">CREATE FASTBOOT ACCOUNT</span>
         <h1>Создайте единый аккаунт для торговли и AI-бота</h1>
-        <p>
-          После регистрации откроется личный кабинет с портфелем,
-          терминалом и настройками торгового бота.
-        </p>
+        <p>После регистрации откроется личный кабинет с портфелем, терминалом и настройками торгового бота.</p>
       </div>
-      <span class="auth-note">Регистрация в тестовой локальной версии</span>
+      <span class="auth-note">Регистрация защищена Supabase Auth</span>
     </section>
 
     <section class="auth-form-wrap">
       <article class="auth-card">
         <h2>Регистрация</h2>
-        <p>Создайте аккаунт FASTBOOT.</p>
+        <p>Создайте новый аккаунт FASTBOOT.</p>
 
         <form id="registerForm" class="auth-form">
           <label>
             Имя пользователя
-            <input id="registerName" type="text" required minlength="2">
+            <input id="registerName" type="text" required minlength="3" maxlength="24" autocomplete="username">
           </label>
 
           <label>
             Email
-            <input id="registerEmail" type="email" required autocomplete="email">
+            <input id="registerEmail" type="email" required autocomplete="email" inputmode="email">
           </label>
 
           <label>
             Пароль
-            <input id="registerPassword" type="password" required minlength="8">
+            <input id="registerPassword" type="password" required minlength="8" autocomplete="new-password">
           </label>
 
           <label>
             Повторите пароль
-            <input id="registerPasswordRepeat" type="password" required minlength="8">
+            <input id="registerPasswordRepeat" type="password" required minlength="8" autocomplete="new-password">
           </label>
 
-          <div id="authError" class="auth-error"></div>
+          <div id="authError" class="auth-error" role="alert"></div>
           <button class="auth-submit" type="submit">Создать аккаунт</button>
         </form>
 
@@ -57,8 +55,9 @@
       </article>
     </section>
   </main>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js"></script>
-<script src="register.js"></script>
+  <script src="supabase-config.js"></script>
+  <script src="register.js"></script>
 </body>
 </html>

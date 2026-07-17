@@ -4,78 +4,94 @@ const registerForm = document.getElementById("registerForm");
 const usernameInput = document.getElementById("registerName");
 const emailInput = document.getElementById("registerEmail");
 const passwordInput = document.getElementById("registerPassword");
-const repeatPasswordInput = document.getElementById(
-  "registerPasswordRepeat"
-);
+const repeatPasswordInput = document.getElementById("registerPasswordRepeat");
 const messageElement = document.getElementById("authError");
-const submitButton = registerForm?.querySelector(
-  'button[type="submit"]'
-);
+const submitButton = registerForm?.querySelector('button[type="submit"]');
+
+let redirectStarted = false;
 
 function showMessage(message, type = "error") {
+  if (!messageElement) return;
   messageElement.textContent = message;
-  messageElement.style.display = "block";
-  messageElement.style.color =
-    type === "success" ? "#20c987" : "#ff5f78";
+  messageElement.style.display = message ? "block" : "none";
+  messageElement.style.color = type === "success" ? "#20c987" : "#ff5f78";
 }
 
 function setLoading(loading) {
+  if (!submitButton) return;
   submitButton.disabled = loading;
-  submitButton.textContent = loading
-    ? "Создание аккаунта..."
-    : "Создать аккаунт";
+  submitButton.textContent = loading ? "Создание аккаунта..." : "Создать аккаунт";
 }
 
-function translateAuthError(message) {
-  const errors = {
-    "User already registered":
-      "Пользователь с таким email уже зарегистрирован.",
-    "Password should be at least 6 characters":
-      "Пароль слишком короткий.",
-    "Unable to validate email address: invalid format":
-      "Введите правильный адрес электронной почты.",
-    "Signup is disabled":
-      "Регистрация новых пользователей временно отключена.",
+function goToDashboard() {
+  if (redirectStarted) return;
+  redirectStarted = true;
+  window.location.replace("dashboard.html");
+}
+
+function translateError(error) {
+  const message = error?.message || "";
+
+  const map = {
+    "User already registered": "Пользователь с таким email уже зарегистрирован.",
+    "Password should be at least 6 characters": "Пароль слишком короткий.",
+    "Unable to validate email address: invalid format": "Введите правильный email.",
+    "Signup is disabled": "Регистрация новых пользователей отключена.",
   };
 
-  return errors[message] || message || "Не удалось создать аккаунт.";
+  if (map[message]) return map[message];
+  if (message.toLowerCase().includes("duplicate key")) {
+    return "Такое имя пользователя уже занято.";
+  }
+
+  return message || "Не удалось создать аккаунт.";
 }
 
-async function redirectAuthenticatedUser() {
-  if (!window.fastbootSupabase) {
-    showMessage(
-      "Не удалось подключиться к Supabase. Проверьте файл supabase-config.js."
-    );
+async function checkSession() {
+  const client = window.fastbootSupabase;
+
+  if (!client) {
+    showMessage("Не удалось подключиться к Supabase. Проверьте supabase-config.js.");
     return;
   }
 
-  const {
-    data: { session },
-  } = await window.fastbootSupabase.auth.getSession();
+  try {
+    const {
+      data: { session },
+      error,
+    } = await client.auth.getSession();
 
-  if (session) {
-    window.location.replace("dashboard.html");
+    if (error) {
+      console.error("Ошибка проверки сессии:", error);
+      return;
+    }
+
+    if (session?.user) {
+      goToDashboard();
+    }
+  } catch (error) {
+    console.error("Ошибка проверки сессии:", error);
   }
 }
 
 registerForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
-  messageElement.textContent = "";
+  showMessage("");
 
-  if (!window.fastbootSupabase) {
+  const client = window.fastbootSupabase;
+
+  if (!client) {
     showMessage("Supabase не подключён.");
     return;
   }
 
-  const username = usernameInput.value.trim();
-  const email = emailInput.value.trim().toLowerCase();
-  const password = passwordInput.value;
-  const repeatedPassword = repeatPasswordInput.value;
+  const username = usernameInput?.value.trim() || "";
+  const email = emailInput?.value.trim().toLowerCase() || "";
+  const password = passwordInput?.value || "";
+  const repeatedPassword = repeatPasswordInput?.value || "";
 
   if (!/^[a-zA-Z0-9_]{3,24}$/.test(username)) {
-    showMessage(
-      "Имя должно содержать от 3 до 24 латинских букв, цифр или символов _. "
-    );
+    showMessage("Имя: 3–24 латинские буквы, цифры или _.");
     return;
   }
 
@@ -92,50 +108,36 @@ registerForm?.addEventListener("submit", async (event) => {
   setLoading(true);
 
   try {
-    const { data, error } =
-      await window.fastbootSupabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            username,
-          },
-          emailRedirectTo: new URL(
-            "dashboard.html",
-            window.location.href
-          ).href,
-        },
-      });
+    const redirectUrl = new URL("dashboard.html", window.location.href).href;
 
-    if (error) {
-      throw error;
-    }
+    const { data, error } = await client.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { username },
+        emailRedirectTo: redirectUrl,
+      },
+    });
 
-    if (data.session) {
-      showMessage(
-        "Аккаунт успешно создан. Открываем личный кабинет...",
-        "success"
-      );
+    if (error) throw error;
 
-      setTimeout(() => {
-        window.location.replace("dashboard.html");
-      }, 700);
-
+    if (data.session?.user) {
+      showMessage("Аккаунт создан. Открываем кабинет...", "success");
+      goToDashboard();
       return;
     }
 
     showMessage(
-      "Аккаунт создан. Проверьте почту и подтвердите регистрацию.",
+      "Аккаунт создан. Подтвердите email через письмо, затем войдите.",
       "success"
     );
-
     registerForm.reset();
   } catch (error) {
     console.error("Ошибка регистрации:", error);
-    showMessage(translateAuthError(error.message));
+    showMessage(translateError(error));
   } finally {
     setLoading(false);
   }
 });
 
-redirectAuthenticatedUser();
+checkSession();

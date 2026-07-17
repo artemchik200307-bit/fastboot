@@ -2,19 +2,21 @@ const REST_BASE = "https://data-api.binance.vision";
 const WS_BASE = "wss://stream.binance.com:9443/ws";
 const $ = (id) => document.getElementById(id);
 
-const session = (() => {
-  try { return JSON.parse(localStorage.getItem("fastboot-session") || "null"); }
-  catch { return null; }
-})();
+const supabaseClient = window.fastbootSupabase;
+const authUser = window.fastbootUser;
+const userProfile = window.fastbootProfile;
+const userWallet = window.fastbootWallet;
 
-if (!session) window.location.href = "login.html";
+if (!supabaseClient || !authUser || !userProfile) {
+  throw new Error("Dashboard запущен до завершения авторизации.");
+}
 
 const state = {
   section: "overview",
   portfolio: JSON.parse(localStorage.getItem("fastboot-portfolio") || '[{"asset":"USDT","name":"Tether","amount":0},{"asset":"BTC","name":"Bitcoin","amount":0},{"asset":"ETH","name":"Ethereum","amount":0},{"asset":"SOL","name":"Solana","amount":0}]'),
   deposits: JSON.parse(localStorage.getItem("fastboot-deposits") || "[]"),
   withdrawals: JSON.parse(localStorage.getItem("fastboot-withdrawals") || "[]"),
-  botBalance: Number(localStorage.getItem("fastboot-bot-balance") || 0),
+  botBalance: Number(userWallet?.bot_balance || 0),
   botRunning: localStorage.getItem("fastboot-bot-running") === "true",
   orders: JSON.parse(localStorage.getItem("fastboot-orders") || "[]"),
   prices: {},
@@ -95,17 +97,49 @@ function openSection(id) {
 
 document.querySelectorAll("[data-section]").forEach((btn) => btn.addEventListener("click", () => openSection(btn.dataset.section)));
 $("menuButton").addEventListener("click", () => $("sidebar").classList.toggle("open"));
-$("logoutButton").addEventListener("click", () => { localStorage.removeItem("fastboot-session"); window.location.href = "login.html"; });
+$("logoutButton").addEventListener("click", async () => {
+  $("logoutButton").disabled = true;
+
+  try {
+    await supabaseClient.auth.signOut();
+  } catch (error) {
+    console.error("Ошибка выхода:", error);
+  } finally {
+    window.location.replace("login.html");
+  }
+});
 
 function initializeUser() {
-  $("profileName").textContent = session.name;
-  $("profileId").textContent = `ID: ${session.id}`;
-  $("profileAvatar").textContent = session.name.charAt(0).toUpperCase();
-  $("accountOwner").textContent = session.name;
-  $("accountEmail").textContent = `${session.email}${session.role === "admin" ? " · Administrator" : ""}`;
-  $("accountId").textContent = session.id;
-  $("settingsName").value = session.name;
-  $("settingsEmail").value = session.email;
+  const username =
+    userProfile.username ||
+    authUser.user_metadata?.username ||
+    authUser.email?.split("@")[0] ||
+    "User";
+
+  const email = userProfile.email || authUser.email || "";
+  const publicId =
+    userProfile.fastboot_id ||
+    `FB-${authUser.id.replaceAll("-", "").slice(0, 10).toUpperCase()}`;
+
+  $("profileName").textContent = username;
+  $("profileId").textContent = `ID: ${publicId}`;
+  $("profileAvatar").textContent = username.charAt(0).toUpperCase();
+
+  $("accountOwner").textContent = username;
+  $("accountEmail").textContent =
+    `${email}${userProfile.role === "admin" ? " · Administrator" : ""}`;
+  $("accountId").textContent = publicId;
+
+  $("settingsName").value = username;
+  $("settingsEmail").value = email;
+}
+
+function applySupabaseWalletToPortfolio() {
+  const usdt = state.portfolio.find((item) => item.asset === "USDT");
+
+  if (usdt) {
+    usdt.amount = Number(userWallet?.spot_balance || 0);
+  }
 }
 
 async function fetchJson(url) {
@@ -1250,11 +1284,39 @@ function renderJournal() {
   $("journalOrders").classList.toggle("empty-list",!state.orders.length);
 }
 
-$("saveProfileButton").addEventListener("click",()=>{
-  const name=$("settingsName").value.trim(); if(!name)return;
-  const users=JSON.parse(localStorage.getItem("fastboot-users")||"[]");
-  const user=users.find(u=>u.id===session.id); if(user)user.name=name;
-  localStorage.setItem("fastboot-users",JSON.stringify(users)); session.name=name; localStorage.setItem("fastboot-session",JSON.stringify(session)); initializeUser(); showToast("Профиль обновлён");
+$("saveProfileButton").addEventListener("click", async () => {
+  const name = $("settingsName").value.trim();
+
+  if (!/^[a-zA-Z0-9_]{3,24}$/.test(name)) {
+    showToast("Имя: 3–24 латинские буквы, цифры или _");
+    return;
+  }
+
+  $("saveProfileButton").disabled = true;
+
+  try {
+    const { data, error } = await supabaseClient
+      .from("profiles")
+      .update({ username: name })
+      .eq("id", authUser.id)
+      .select("username")
+      .single();
+
+    if (error) throw error;
+
+    userProfile.username = data.username;
+    initializeUser();
+    showToast("Профиль обновлён");
+  } catch (error) {
+    console.error("Ошибка обновления профиля:", error);
+    showToast(
+      error?.code === "23505"
+        ? "Такое имя пользователя уже занято"
+        : "Не удалось обновить профиль"
+    );
+  } finally {
+    $("saveProfileButton").disabled = false;
+  }
 });
 
 const restoredSection = localStorage.getItem("fastboot-active-section") || "overview";
@@ -1262,6 +1324,7 @@ document.documentElement.style.overflow = "";
 document.body.style.overflow = "";
 document.body.classList.remove("mobile-bottom-drawer-open");
 initializeUser();
+applySupabaseWalletToPortfolio();
 loadPrices();
 renderOrders();
 renderJournal();

@@ -3,33 +3,98 @@
 (async function protectDashboard() {
   const client = window.fastbootSupabase;
 
-  if (!client) {
-    console.error("Supabase client не загружен");
+  const redirectToLogin = () => {
     window.location.replace("login.html");
+  };
+
+  if (!client) {
+    console.error("Supabase client не загружен.");
+    redirectToLogin();
     return;
   }
 
   try {
     const {
       data: { session },
-      error,
+      error: sessionError,
     } = await client.auth.getSession();
 
-    if (error) {
-      throw error;
-    }
-
-    if (!session) {
-      window.location.replace("login.html");
+    if (sessionError) throw sessionError;
+    if (!session?.user) {
+      redirectToLogin();
       return;
     }
 
+    const user = session.user;
+
+    const [
+      { data: profile, error: profileError },
+      { data: wallet, error: walletError },
+    ] = await Promise.all([
+      client
+        .from("profiles")
+        .select("id, username, email, fastboot_id, role, created_at")
+        .eq("id", user.id)
+        .maybeSingle(),
+
+      client
+        .from("wallets")
+        .select("user_id, spot_balance, bot_balance, currency, created_at, updated_at")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+    ]);
+
+    if (profileError) {
+      console.error("Ошибка загрузки профиля:", profileError);
+    }
+
+    if (walletError) {
+      console.error("Ошибка загрузки кошелька:", walletError);
+    }
+
     window.fastbootSession = session;
-    window.fastbootUser = session.user;
+    window.fastbootUser = user;
+    window.fastbootProfile = profile || {
+      id: user.id,
+      username:
+        user.user_metadata?.username ||
+        user.email?.split("@")[0] ||
+        "user",
+      email: user.email,
+      fastboot_id:
+        "FB-" + user.id.replaceAll("-", "").slice(0, 10).toUpperCase(),
+      role: "user",
+      created_at: user.created_at,
+    };
+
+    window.fastbootWallet = wallet || {
+      user_id: user.id,
+      spot_balance: 0,
+      bot_balance: 0,
+      currency: "USDT",
+    };
 
     document.documentElement.classList.add("auth-ready");
+
+    const script = document.createElement("script");
+    script.src = "dashboard.js?v=supabase-clean-1";
+    script.async = false;
+
+    script.onerror = () => {
+      console.error("Не удалось загрузить dashboard.js.");
+      document.body.style.visibility = "visible";
+    };
+
+    document.body.appendChild(script);
   } catch (error) {
-    console.error("Ошибка проверки авторизации:", error);
-    window.location.replace("login.html");
+    console.error("Ошибка авторизации Dashboard:", error);
+
+    try {
+      await client.auth.signOut({ scope: "local" });
+    } catch {
+      // Ignore recovery sign-out error.
+    }
+
+    redirectToLogin();
   }
 })();
