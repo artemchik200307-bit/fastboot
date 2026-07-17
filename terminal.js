@@ -175,9 +175,16 @@
     state.orders = ordersResult.data || [];
     state.trades = tradesResult.data || [];
 
-    $("tradingBalance").textContent = `${tradingBalance.toFixed(2)} USDT`;
-    $("spotBalance").textContent = `${spotBalance.toFixed(2)} USDT`;
-    $("availableBalance").textContent = `${tradingBalance.toFixed(2)} USDT`;
+    if ($("tradingBalance")) {
+      $("tradingBalance").textContent = `${tradingBalance.toFixed(2)} USDT`;
+    }
+
+    if ($("spotBalance")) {
+      $("spotBalance").textContent = `${spotBalance.toFixed(2)} USDT`;
+    }
+
+    $("availableBalance").textContent =
+      `${tradingBalance.toFixed(2)} USDT`;
 
     renderPositions();
     renderOrders();

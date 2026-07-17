@@ -592,3 +592,84 @@ body {
     min-height: 38px;
   }
 }
+
+
+/* ===== TRANSFER BUTTON LAYOUT 3.4 ===== */
+.topbar {
+  justify-content: flex-start;
+}
+
+.topbar-left {
+  width: 100%;
+}
+
+.wallet-box {
+  display: none !important;
+}
+
+.available {
+  display: flex;
+  min-height: 43px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.available-balance {
+  min-width: 0;
+}
+
+.available-balance span,
+.available-balance strong {
+  display: block;
+}
+
+.available-balance span {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.available-balance strong {
+  margin-top: 3px;
+  font-size: 12px;
+}
+
+.available-transfer-button {
+  min-height: 34px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(111, 145, 255, .42);
+  border-radius: 8px;
+  padding: 0 13px;
+  background: var(--blue);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.available-transfer-button:hover {
+  filter: brightness(1.06);
+}
+
+@media (max-width: 760px) {
+  .topbar {
+    grid-template-columns: 1fr;
+  }
+
+  .available {
+    min-height: 46px;
+    gap: 7px;
+    margin: 9px 0 11px;
+  }
+
+  .available-balance strong {
+    font-size: 11px;
+  }
+
+  .available-transfer-button {
+    min-height: 36px;
+    padding: 0 10px;
+    font-size: 8px;
+  }
+}

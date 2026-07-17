@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
   <meta name="theme-color" content="#0a1019">
   <title>FASTBOOT Terminal</title>
-  <link rel="stylesheet" href="terminal.css?v=3-2">
+  <link rel="stylesheet" href="terminal.css?v=3-4">
   <script src="https://unpkg.com/lightweight-charts@5.0.8/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
@@ -40,19 +40,6 @@
           <strong id="marketPrice">—</strong>
           <span id="marketChange">0.00%</span>
         </div>
-      </div>
-
-      <div class="wallet-box">
-        <div class="wallet-value">
-          <small>Торговый счёт</small>
-          <strong id="tradingBalance">0.00 USDT</strong>
-        </div>
-        <i></i>
-        <div class="wallet-value">
-          <small>Основной баланс</small>
-          <strong id="spotBalance">0.00 USDT</strong>
-        </div>
-        <button id="openTransferButton" type="button">Перевести</button>
       </div>
     </header>
 
@@ -153,8 +140,14 @@
         </div>
 
         <div class="available">
-          <span>Доступно</span>
-          <strong id="availableBalance">0.00 USDT</strong>
+          <div class="available-balance">
+            <span>Доступно</span>
+            <strong id="availableBalance">0.00 USDT</strong>
+          </div>
+
+          <button id="openTransferButton" class="available-transfer-button" type="button">
+            Перевести
+          </button>
         </div>
 
         <label id="priceField">
@@ -294,6 +287,6 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script src="terminal.js?v=3-2"></script>
+  <script src="terminal.js?v=3-4"></script>
 </body>
 </html>
