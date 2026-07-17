@@ -277,10 +277,17 @@
     currentPrice = Number(ticker.lastPrice || 0);
     const change = Number(ticker.priceChangePercent || 0);
 
-    $("marketPrice").textContent = formatPrice(currentPrice);
-    $("marketChange").textContent =
-      `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`;
-    $("marketChange").className = change >= 0 ? "positive" : "negative";
+    if ($("marketPrice")) {
+      $("marketPrice").textContent = formatPrice(currentPrice);
+    }
+
+    if ($("marketChange")) {
+      $("marketChange").textContent =
+        `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`;
+
+      $("marketChange").className =
+        change >= 0 ? "positive" : "negative";
+    }
 
     $("statOpen").textContent = formatPrice(ticker.openPrice);
     $("statHigh").textContent = formatPrice(ticker.highPrice);

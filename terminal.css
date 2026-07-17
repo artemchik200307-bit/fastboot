@@ -674,41 +674,49 @@ body {
   }
 }
 
-/* Убираем отображение цены возле пары */
 
+/* ===== SYMBOL HEADER PRICE CLEAN 3.5 ===== */
 .ticker-box {
-    display: none !important;
-}
-
-/* Выравниваем верхнюю панель */
-
-.topbar {
-    min-height: 54px;
-    padding: 8px 14px;
+  display: none !important;
 }
 
 .topbar-left {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.home-button {
-    height: 38px;
-}
-
-.brand {
-    display: flex;
-    align-items: center;
-    height: 38px;
+  width: 100%;
+  min-width: 0;
 }
 
 .symbol-picker {
-    display: flex;
-    align-items: center;
+  margin-right: 0;
 }
 
-.symbol-picker select {
-    height: 38px;
-    min-width: 220px;
+@media (max-width: 760px) {
+  .topbar {
+    overflow: hidden;
+  }
+
+  .topbar-left {
+    display: grid;
+    grid-template-columns: 40px minmax(76px, auto) minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+  }
+
+  .home-button {
+    grid-column: 1;
+  }
+
+  .brand {
+    grid-column: 2;
+    min-width: 0;
+  }
+
+  .symbol-picker {
+    grid-column: 3;
+    min-width: 0;
+  }
+
+  .symbol-picker select {
+    width: 100%;
+    min-width: 0;
+  }
 }
