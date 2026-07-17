@@ -2,6 +2,21 @@ const REST_BASE = "https://data-api.binance.vision";
 const WS_BASE = "wss://stream.binance.com:9443/ws";
 const $ = (id) => document.getElementById(id);
 
+const setText = (id, value) => {
+  const element = $(id);
+  if (element) element.textContent = value;
+};
+
+const setValue = (id, value) => {
+  const element = $(id);
+  if (element) element.value = value;
+};
+
+const setHtml = (id, value) => {
+  const element = $(id);
+  if (element) element.innerHTML = value;
+};
+
 const supabaseClient = window.fastbootSupabase;
 const authUser = window.fastbootUser;
 const userProfile = window.fastbootProfile;
@@ -153,33 +168,44 @@ function initializeUser() {
     userProfile.fastboot_id ||
     `FB-${authUser.id.replaceAll("-", "").slice(0, 10).toUpperCase()}`;
 
-  $("profileName").textContent = username;
-  $("profileId").textContent = `ID: ${publicId}`;
-  $("profileAvatar").textContent = username.charAt(0).toUpperCase();
+  setText("profileName", username);
+  setText("profileId", `ID: ${publicId}`);
+  setText("profileAvatar", username.charAt(0).toUpperCase());
 
-  $("accountOwner").textContent = username;
-  $("accountEmail").textContent =
-    `${email}${userProfile.role === "admin" ? " · Administrator" : ""}`;
-  $("accountId").textContent = publicId;
-
-  $("settingsName").value = username;
-  $("settingsEmail").value = email;
-
-  $("detailUsername").textContent = username;
-  $("detailEmail").textContent = email;
-  $("detailFastbootId").textContent = publicId;
-  $("detailRole").textContent = userProfile.role || "user";
-  $("detailCreatedAt").textContent = formatDateTime(
-    userProfile.created_at || authUser.created_at
+  setText("accountOwner", username);
+  setText(
+    "accountEmail",
+    `${email}${
+      String(userProfile.role || "").trim().toLowerCase() === "admin"
+        ? " · Administrator"
+        : ""
+    }`
   );
-  const isAdmin = String(userProfile.role || "").trim().toLowerCase() === "admin";
+  setText("accountId", publicId);
+
+  setValue("settingsName", username);
+  setValue("settingsEmail", email);
+
+  setText("detailUsername", username);
+  setText("detailEmail", email);
+  setText("detailFastbootId", publicId);
+  setText("detailRole", userProfile.role || "user");
+  setText(
+    "detailCreatedAt",
+    formatDateTime(userProfile.created_at || authUser.created_at)
+  );
+
+  const isAdmin =
+    String(userProfile.role || "").trim().toLowerCase() === "admin";
+
   const adminButton = $("adminNavButton");
 
   if (adminButton) {
     adminButton.classList.toggle("hidden", !isAdmin);
-    adminButton.style.display = isAdmin ? "flex" : "none";
     adminButton.classList.toggle("admin-visible", isAdmin);
+    adminButton.style.display = isAdmin ? "flex" : "none";
   }
+
   document.documentElement.classList.toggle("is-admin", isAdmin);
 }
 
@@ -523,14 +549,14 @@ function renderAccount() {
   const botBalance = Number(userWallet?.bot_balance || 0);
   const total = spotBalance + botBalance;
 
-  $("totalBalance").textContent =
+  if ($("totalBalance")) $("totalBalance").textContent =
     `$${total.toLocaleString("en-US", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })}`;
 
-  $("spotBalanceCard").textContent = `${spotBalance.toFixed(2)} USDT`;
-  $("botBalanceCard").textContent = `${botBalance.toFixed(2)} USDT`;
+  if ($("spotBalanceCard")) $("spotBalanceCard").textContent = `${spotBalance.toFixed(2)} USDT`;
+  if ($("botBalanceCard")) $("botBalanceCard").textContent = `${botBalance.toFixed(2)} USDT`;
 
   const pendingDeposits = state.deposits.filter(
     (item) => item.status === "pending"
@@ -548,20 +574,20 @@ function renderAccount() {
     0
   );
 
-  $("pendingDepositCard").textContent =
+  if ($("pendingDepositCard")) $("pendingDepositCard").textContent =
     `${pendingDepositAmount.toFixed(2)} USDT`;
-  $("pendingWithdrawCard").textContent =
+  if ($("pendingWithdrawCard")) $("pendingWithdrawCard").textContent =
     `${pendingWithdrawAmount.toFixed(2)} USDT`;
-  $("pendingDepositCount").textContent =
+  if ($("pendingDepositCount")) $("pendingDepositCount").textContent =
     `${pendingDeposits.length} заявок`;
-  $("pendingWithdrawCount").textContent =
+  if ($("pendingWithdrawCount")) $("pendingWithdrawCount").textContent =
     `${pendingWithdrawals.length} заявок`;
 
-  $("detailUpdatedAt").textContent = formatDateTime(
+  if ($("detailUpdatedAt")) $("detailUpdatedAt").textContent = formatDateTime(
     userWallet?.updated_at || new Date().toISOString()
   );
 
-  $("portfolioList").innerHTML = `
+  if ($("portfolioList")) $("portfolioList").innerHTML = `
     <div class="portfolio-row">
       <span class="asset-name">
         <strong>USDT</strong>
@@ -585,7 +611,7 @@ function renderAccount() {
   const spotPercent = total > 0 ? (spotBalance / total) * 100 : 0;
   const botPercent = total > 0 ? (botBalance / total) * 100 : 0;
 
-  $("allocationBars").innerHTML = `
+  if ($("allocationBars")) $("allocationBars").innerHTML = `
     <div class="allocation-item">
       <div><span>Основной счёт</span><strong>${spotPercent.toFixed(1)}%</strong></div>
       <div class="allocation-track">
