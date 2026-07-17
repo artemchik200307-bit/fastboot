@@ -1372,7 +1372,20 @@ function aiPeriod(days) {
 
   return {
     percent: rows.reduce((sum, item) => sum + Number(item.pnl_percent || 0), 0),
-    amount: rows.reduce((sum, item) => sum + Number(item.net_pnl_amount ?? item.pnl_amount ?? 0), 0),
+    amount: rows.reduce((sum, item) => sum + Number(
+        item.net_pnl_amount ??
+        (
+          Number(item.gross_pnl_amount ?? item.pnl_amount ?? 0) -
+          Number(
+            item.platform_fee_amount ??
+            (
+              Number(item.gross_pnl_amount ?? item.pnl_amount ?? 0) > 0
+                ? Number(item.gross_pnl_amount ?? item.pnl_amount ?? 0) * 0.10
+                : 0
+            )
+          )
+        )
+      ), 0),
   };
 }
 
@@ -1384,7 +1397,20 @@ function renderAiAssistant() {
 
   const totalPnl = state.aiTradeResults.reduce(
     (sum, item) =>
-      sum + Number(item.net_pnl_amount ?? item.pnl_amount ?? 0),
+      sum + Number(
+        item.net_pnl_amount ??
+        (
+          Number(item.gross_pnl_amount ?? item.pnl_amount ?? 0) -
+          Number(
+            item.platform_fee_amount ??
+            (
+              Number(item.gross_pnl_amount ?? item.pnl_amount ?? 0) > 0
+                ? Number(item.gross_pnl_amount ?? item.pnl_amount ?? 0) * 0.10
+                : 0
+            )
+          )
+        )
+      ),
     0
   );
   const totalPercent = initial > 0 ? (totalPnl / initial) * 100 : 0;
@@ -1441,13 +1467,25 @@ function renderAiAssistant() {
 function renderAiHistory() {
   $("botHistory").innerHTML = state.aiTradeResults.length
     ? state.aiTradeResults.map((trade) => {
+        const storedPnl = Number(trade.pnl_amount || 0);
+
         const gross = Number(
-          trade.gross_pnl_amount ?? trade.pnl_amount ?? 0
+          trade.gross_pnl_amount ??
+          (
+            Number(trade.platform_fee_amount || 0) > 0
+              ? storedPnl + Number(trade.platform_fee_amount || 0)
+              : storedPnl
+          )
         );
 
-        const fee = Number(trade.platform_fee_amount || 0);
+        const fee = Number(
+          trade.platform_fee_amount ??
+          (gross > 0 ? gross * 0.10 : 0)
+        );
+
         const net = Number(
-          trade.net_pnl_amount ?? trade.pnl_amount ?? 0
+          trade.net_pnl_amount ??
+          (gross - fee)
         );
 
         return `
