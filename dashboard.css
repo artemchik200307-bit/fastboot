@@ -4020,3 +4020,48 @@ body.trading-mode .sidebar.open {
     left: 59px !important;
   }
 }
+
+
+/* ===== MOBILE DASHBOARD SCROLL FIX V15 ===== */
+@media (max-width: 760px) {
+  html,
+  body {
+    min-height: 100%;
+    height: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  body:not(.trading-mode),
+  body:not(.trading-mode) .dashboard-shell,
+  body:not(.trading-mode) .dashboard-main,
+  body:not(.trading-mode) .dashboard-content,
+  body:not(.trading-mode) .dashboard-section.active {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  body:not(.trading-mode) .dashboard-content {
+    padding-bottom: calc(42px + env(safe-area-inset-bottom));
+  }
+
+  body.trading-mode {
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    overflow: hidden !important;
+    overscroll-behavior: none;
+  }
+
+  body.trading-mode .dashboard-shell,
+  body.trading-mode .dashboard-main,
+  body.trading-mode .dashboard-content,
+  body.trading-mode .trading-section,
+  body.trading-mode .pro-terminal {
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    overflow: hidden !important;
+  }
+}

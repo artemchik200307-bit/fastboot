@@ -62,6 +62,12 @@ function showToast(message) {
 function openSection(id) {
   state.section = id;
   localStorage.setItem("fastboot-active-section", id);
+
+  if (id !== "trading") {
+    document.body.classList.remove("mobile-bottom-drawer-open");
+    document.documentElement.style.overflow = "";
+    document.body.style.overflow = "";
+  }
   document.body.classList.toggle("trading-mode", id === "trading");
   document.querySelectorAll(".dashboard-section").forEach((el) => el.classList.toggle("active", el.id === id));
   document.querySelectorAll(".nav-item[data-section]").forEach((el) => el.classList.toggle("active", el.dataset.section === id));
@@ -1246,6 +1252,9 @@ $("saveProfileButton").addEventListener("click",()=>{
 });
 
 const restoredSection = localStorage.getItem("fastboot-active-section") || "overview";
+document.documentElement.style.overflow = "";
+document.body.style.overflow = "";
+document.body.classList.remove("mobile-bottom-drawer-open");
 initializeUser();
 loadPrices();
 renderOrders();
