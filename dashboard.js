@@ -1345,6 +1345,8 @@ window.addEventListener("message", (event) => {
   }
 });
 
+window.openSection = openSection;
+
 openSection(titles[restoredSection] ? restoredSection : "overview");
 
 $("tradingHomeButton")?.addEventListener("click", () => {

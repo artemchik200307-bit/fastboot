@@ -581,3 +581,63 @@ body {
     gap: 0;
   }
 }
+
+
+/* ===== ALWAYS-VISIBLE DASHBOARD HOME 2.4 ===== */
+.desktop-terminal-home-button {
+  display: inline-flex !important;
+  width: auto;
+  min-width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 11px;
+  white-space: nowrap;
+  z-index: 20;
+}
+
+.desktop-terminal-home-button small {
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .02em;
+}
+
+@media (max-width: 760px) {
+  .terminal-topbar {
+    grid-template-columns: minmax(122px, auto) minmax(0, 1fr) minmax(94px, auto);
+  }
+
+  .terminal-brand-wrap {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .desktop-terminal-home-button {
+    display: inline-flex !important;
+    min-width: 39px;
+    width: 39px;
+    height: 39px;
+    padding: 0;
+    border-radius: 9px;
+  }
+
+  .desktop-terminal-home-button small {
+    display: none;
+  }
+
+  .desktop-terminal-home-button span {
+    font-size: 21px;
+  }
+
+  .terminal-brand {
+    min-width: 0;
+  }
+
+  .terminal-brand strong {
+    font-size: 10px;
+  }
+}

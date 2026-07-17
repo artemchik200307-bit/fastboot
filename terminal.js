@@ -672,14 +672,41 @@
 
   function bindEvents() {
     $("desktopTerminalHomeButton")?.addEventListener("click", () => {
-      if (window.parent && window.parent !== window) {
-        window.parent.postMessage(
-          { type: "FASTBOOT_OPEN_SECTION", section: "overview" },
-          window.location.origin
-        );
-      } else {
-        window.location.href = "dashboard.html";
+      try {
+        if (
+          window.parent &&
+          window.parent !== window &&
+          typeof window.parent.openSection === "function"
+        ) {
+          window.parent.openSection("overview");
+          return;
+        }
+      } catch (error) {
+        console.warn("Direct dashboard navigation unavailable:", error);
       }
+
+      try {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage(
+            { type: "FASTBOOT_OPEN_SECTION", section: "overview" },
+            window.location.origin
+          );
+
+          window.setTimeout(() => {
+            try {
+              window.top.location.href = "dashboard.html";
+            } catch {
+              window.location.href = "dashboard.html";
+            }
+          }, 250);
+
+          return;
+        }
+      } catch (error) {
+        console.warn("Dashboard message navigation unavailable:", error);
+      }
+
+      window.location.href = "dashboard.html";
     });
 
     $("mobileOpenChartButton")?.addEventListener("click", openMobileChart);
