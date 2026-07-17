@@ -58,7 +58,6 @@ const titles = {
   assistant: "AI Assistant",
   trading: "Торговый терминал",
   "market-analysis": "Анализ рынка",
-  journal: "Торговый журнал",
   admin: "Admin Panel",
   settings: "Настройки",
 };
@@ -102,7 +101,7 @@ function openSection(id) {
   }
 
   if (id === "market-analysis") loadMarketAnalysis();
-  if (id === "journal") renderJournal();
+
   if (id === "admin") {
     if (String(userProfile.role || "").toLowerCase() !== "admin") {
       showToast("Нет доступа");
@@ -1531,13 +1530,6 @@ loadSupabaseAccountData()
 
 window.addEventListener("message", (event) => {
   if (event.origin !== window.location.origin) return;
-
-  if (event.data?.type === "FASTBOOT_TERMINAL_JOURNAL_REFRESH") {
-    if (state.section === "journal") {
-      renderJournal();
-    }
-    return;
-  }
 
   if (event.data?.type === "FASTBOOT_OPEN_SECTION") {
     const section = String(event.data.section || "overview");

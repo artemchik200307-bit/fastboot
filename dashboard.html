@@ -10,7 +10,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#080c12">
   <title>FASTBOOT — Личный кабинет</title>
-  <link rel="stylesheet" href="dashboard.css?v=terminal-clean-2-1">
+  <link rel="stylesheet" href="dashboard.css?v=layout-clean-3-2">
   <script src="https://unpkg.com/lightweight-charts@5.2.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
@@ -30,9 +30,6 @@
         </button>
         <button class="nav-item" data-section="market-analysis">
           <span class="nav-icon">A</span><span>Анализ рынка</span>
-        </button>
-        <button class="nav-item" data-section="journal">
-          <span class="nav-icon">J</span><span>Торговый журнал</span>
         </button>
       </nav>
 
@@ -388,86 +385,6 @@
             <p id="analysisNarrative">Выберите монету и обновите анализ.</p>
           </article>
         </section>
-
-        <section class="dashboard-section" id="journal">
-          <div class="section-heading">
-            <span class="section-kicker">MANUAL TRADING JOURNAL</span>
-            <h2>Торговый журнал</h2>
-            <p>Здесь отображаются сделки, совершённые вручную через терминал.</p>
-          </div>
-
-          <div class="journal-summary-grid">
-            <article class="panel"><span>Всего ордеров</span><strong id="journalOrdersCount">0</strong></article>
-            <article class="panel"><span>Покупки</span><strong id="journalBuyCount">0</strong></article>
-            <article class="panel"><span>Продажи</span><strong id="journalSellCount">0</strong></article>
-            <article class="panel"><span>Оборот</span><strong id="journalTurnover">0.00 USDT</strong></article>
-          </div>
-
-          <article class="panel">
-            <div class="orders-table-head">
-              <span>Дата</span><span>Пара</span><span>Тип</span><span>Сторона</span>
-              <span>Цена</span><span>Количество</span><span>Сумма</span>
-            </div>
-            <div id="journalOrders" class="orders-history empty-list">Сделок пока нет</div>
-          </article>
-        </section>
-
-        <section class="dashboard-section admin-section" id="admin">
-  <div class="section-heading"><div><span class="section-kicker">FASTBOOT CONTROL CENTER</span><h2>Admin Panel</h2><p>Управление пользователями, балансами и финансовыми заявками.</p></div><button id="adminRefreshButton" class="secondary-action" type="button">Обновить</button></div>
-  <div class="admin-stat-grid">
-    <article class="admin-stat-card"><span>Пользователей</span><strong id="adminUsersCount">—</strong><small>Всего зарегистрировано</small></article>
-    <article class="admin-stat-card"><span>Средства</span><strong id="adminTotalBalance">—</strong><small>Spot + AI Bot</small></article>
-    <article class="admin-stat-card"><span>Ожидают</span><strong id="adminPendingCount">—</strong><small>Финансовые заявки</small></article>
-    <article class="admin-stat-card"><span>Администраторов</span><strong id="adminAdminsCount">—</strong><small>Роль admin</small></article>
-  </div>
-  <div class="admin-layout">
-    <article class="panel admin-users-panel"><div class="panel-head admin-head"><div><h3>Пользователи</h3><p>Поиск по email, username или FASTBOOT ID</p></div><div class="admin-search"><input id="adminUserSearch" type="search" placeholder="Поиск"><button id="adminSearchButton" class="secondary-action" type="button">Найти</button></div></div><div class="admin-table"><div class="admin-table-head"><span>Пользователь</span><span>Роль</span><span>Spot</span><span>AI Bot</span><span>Дата</span><span>Действия</span></div><div id="adminUsersList"><div class="admin-empty">Загрузка…</div></div></div></article>
-    <article class="panel admin-funding-panel"><div class="panel-head"><div><h3>Финансовые заявки</h3><p>Пополнения и выводы</p></div></div><div id="adminFundingList" class="admin-funding-list"><div class="admin-empty">Загрузка…</div></div></article>
-  </div>
-
-  <article class="panel admin-ai-panel">
-    <div class="panel-head admin-head">
-      <div>
-        <h3>AI Assistant — добавить сделку</h3>
-        <p>Сделка сразу появится в истории AI Assistant.</p>
-      </div>
-    </div>
-
-    <form id="adminAiCompletedTradeForm" class="admin-ai-completed-form">
-      <label>Торговая пара
-        <input id="adminAiPair" type="text" maxlength="20" placeholder="BTCUSDT" required>
-      </label>
-
-      <label>Направление
-        <select id="adminAiSide">
-          <option value="LONG">LONG</option>
-          <option value="SHORT">SHORT</option>
-        </select>
-      </label>
-
-      <label>Цена открытия
-        <input id="adminAiEntryPrice" type="number" min="0.00000001" step="any" required>
-      </label>
-
-      <label>Цена закрытия
-        <input id="adminAiExitPrice" type="number" min="0.00000001" step="any" required>
-      </label>
-
-      <label>Дата сделки
-        <input id="adminAiTradeDate" type="date" required>
-      </label>
-
-      <label>Прибыль или убыток, %
-        <input id="adminAiPnlPercent" type="number" min="-100" max="100" step="0.01"
-          placeholder="Например: 1.25 или -0.20" required>
-      </label>
-
-      <button class="primary-action" type="submit">
-        Добавить сделку
-      </button>
-    </form>
-  </article>
-</section>
 
         <section class="dashboard-section" id="settings">
           <div class="section-heading">

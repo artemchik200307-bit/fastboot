@@ -4786,3 +4786,10 @@ body.modal-open .modal {
     minmax(75px, .65fr)
     minmax(90px, .8fr);
 }
+
+
+/* ===== REMOVE JOURNAL NAV 3.2 ===== */
+.nav-item[data-section="journal"],
+#journal {
+  display: none !important;
+}

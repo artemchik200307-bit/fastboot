@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
   <meta name="theme-color" content="#0a1019">
   <title>FASTBOOT Terminal</title>
-  <link rel="stylesheet" href="terminal.css?v=3-1">
+  <link rel="stylesheet" href="terminal.css?v=3-2">
   <script src="https://unpkg.com/lightweight-charts@5.0.8/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
@@ -22,8 +22,7 @@
         </div>
 
         <label class="symbol-picker">
-          <small>Пара</small>
-          <select id="symbolSelect">
+          <select id="symbolSelect" aria-label="Торговая пара">
             <option>BTCUSDT</option>
             <option>ETHUSDT</option>
             <option>SOLUSDT</option>
@@ -295,6 +294,6 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script src="terminal.js?v=3-1"></script>
+  <script src="terminal.js?v=3-2"></script>
 </body>
 </html>
