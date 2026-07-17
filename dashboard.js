@@ -76,25 +76,15 @@ function openSection(id) {
   state.section = id;
   localStorage.setItem("fastboot-active-section", id);
 
-  if (id !== "trading") {
-    document.body.classList.remove("mobile-bottom-drawer-open");
-    document.documentElement.style.overflow = "";
-    document.body.style.overflow = "";
-  }
-  document.body.classList.toggle("trading-mode", id === "trading");
+  document.body.classList.remove("mobile-bottom-drawer-open");
+  document.documentElement.style.overflow = "";
+  document.body.style.overflow = "";
+  document.body.classList.remove("trading-mode");
   document.querySelectorAll(".dashboard-section").forEach((el) => el.classList.toggle("active", el.id === id));
   document.querySelectorAll(".nav-item[data-section]").forEach((el) => el.classList.toggle("active", el.dataset.section === id));
   $("pageTitle").textContent = titles[id] || "FASTBOOT";
   $("sidebar").classList.remove("open");
-  document.body.classList.toggle("trading-mode", id === "trading");
-  if (id === "trading") {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(loadTradingTerminal);
-    });
-  }
-  if (id !== "trading") {
-    stopTerminalRealtimeStream();
-  }
+  document.body.classList.remove("trading-mode");
   if (id === "market-analysis") loadMarketAnalysis();
   if (id === "journal") renderJournal();
   if (id === "admin") {
@@ -108,7 +98,7 @@ function openSection(id) {
   }
   const dashboardScroller = document.querySelector(".dashboard-main");
 
-  if (id !== "trading" && dashboardScroller) {
+  if (dashboardScroller) {
     dashboardScroller.scrollTo({ top: 0, behavior: "auto" });
   } else {
     window.scrollTo({ top: 0, behavior: "auto" });
@@ -399,7 +389,6 @@ function renderAccount() {
 
   renderOperations();
   renderCompleteOperationHistory();
-  updateTerminalBalances();
 }
 
 function renderOperations() {
@@ -1916,7 +1905,6 @@ startAccountAutoRefresh();
 
 initializeUser();
 applySupabaseWalletToPortfolio();
-renderOrders();
 renderJournal();
 
 loadSupabaseAccountData()

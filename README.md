@@ -446,3 +446,17 @@ SQL выполнять не нужно.
 1. Выполнить `supabase-ai-direct-trades.sql`.
 2. Загрузить остальные файлы в GitHub с заменой.
 3. `supabase-config.js` не заменять.
+
+
+## Clean No Terminal Fix v1.6
+
+Удалены последние исполняемые вызовы старого терминала:
+
+- `renderOrders()`
+- `stopTerminalRealtimeStream()`
+- `updateTerminalBalances()`
+- автоматический вызов `loadTradingTerminal()`
+
+Также удалена оставшаяся логика режима `trading-mode`.
+
+SQL повторно выполнять не нужно.
