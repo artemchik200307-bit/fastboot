@@ -783,3 +783,65 @@ body {
     padding-block: 6px;
   }
 }
+
+
+/* ===== DESKTOP TERMINAL WITHOUT ORDER BOOK 3.7 ===== */
+@media (min-width: 761px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 370px) !important;
+  }
+
+  .chart-panel {
+    grid-column: 1;
+    min-width: 0;
+    border-right: 1px solid var(--line);
+  }
+
+  .order-panel {
+    grid-column: 2;
+    min-width: 320px;
+  }
+
+  .desktop-hidden-orderbook {
+    display: none !important;
+  }
+
+  .chart-stage {
+    width: 100%;
+  }
+}
+
+/* Keep the existing mobile terminal: order book + order window. */
+@media (max-width: 760px) {
+  .desktop-hidden-orderbook {
+    display: block !important;
+  }
+
+  .workspace {
+    grid-template-columns: minmax(0, 42%) minmax(0, 58%) !important;
+  }
+
+  .chart-panel {
+    display: none;
+  }
+
+  .orderbook-panel {
+    grid-column: 1;
+  }
+
+  .order-panel {
+    grid-column: 2;
+  }
+
+  body.chart-open .workspace {
+    display: block;
+  }
+
+  body.chart-open .chart-panel {
+    display: block;
+  }
+
+  body.chart-open .desktop-hidden-orderbook {
+    display: none !important;
+  }
+}
