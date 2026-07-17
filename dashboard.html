@@ -262,15 +262,13 @@
               </div>
             </header>
 
-            <nav class="mobile-trading-nav">
-              <button class="active">USDⓢ-M</button>
-              <button>COIN-M</button>
-              <button>Опционы</button>
-              <button>Smart Money</button>
-              <button id="mobileTradingMenuButton" class="mobile-menu-button" type="button">☰</button>
-            </nav>
-
             <section class="terminal-market-strip">
+              <button id="mobileTradingHomeButton" class="mobile-trading-home-button"
+                type="button" aria-label="Открыть меню" title="Открыть меню">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3 10.5 12 3l9 7.5v9A1.5 1.5 0 0 1 19.5 21H15v-6H9v6H4.5A1.5 1.5 0 0 1 3 19.5z"/>
+                </svg>
+              </button>
               <div class="terminal-pair">
                 <strong id="terminalSymbolLabel">BTCUSDT</strong>
                 <span id="terminalBaseName">Bitcoin / Tether</span>
@@ -425,21 +423,11 @@
 
               <aside class="terminal-order-column">
                 <section class="terminal-side-module order-entry-module">
-                  <div class="order-settings-row">
-                    <button id="marginModeButton" type="button">Кросс</button>
-                    <button id="leverageButton" type="button">10x</button>
-                    <button id="feeInfoButton" type="button">M</button>
-                  </div>
-
-                  <div class="mobile-funding-line">
-                    <span>Ставка (4ч) / Отсчёт</span>
-                    <strong id="mobileFundingRate">0.0000% / 00:00:00</strong>
-                  </div>
 
                   <div class="terminal-order-type-tabs">
                     <button class="active" data-order-type="LIMIT">Лимит</button>
                     <button data-order-type="MARKET">Рынок</button>
-                    <button data-order-type="STOP">Стоп</button>
+                    
                   </div>
 
                   <input id="orderType" type="hidden" value="LIMIT">
@@ -465,14 +453,6 @@
                     </div>
                   </label>
 
-                  <label class="terminal-field stop-price-field hidden" id="stopPriceField">
-                    <span>Стоп-цена</span>
-                    <div>
-                      <input id="stopPrice" type="number" step="any">
-                      <strong>USDT</strong>
-                    </div>
-                  </label>
-
                   <div class="order-percentage-slider">
                     <input id="orderPercentSlider" type="range" min="0" max="100" value="0" step="25">
                     <div>
@@ -485,10 +465,7 @@
                   </div>
 
                   <div class="order-options">
-                    <label><input id="slippageOption" type="checkbox"> Допустимое проскальзывание</label>
                     <label><input id="takeProfitStopLoss" type="checkbox"> TP/SL</label>
-                    <label><input id="reduceOnly" type="checkbox"> Только сокращение</label>
-                    <label class="desktop-only-option"><input id="postOnly" type="checkbox"> Post Only</label>
                   </div>
 
                   <div class="tp-sl-fields hidden" id="tpSlFields">
@@ -554,14 +531,7 @@
               <button data-mobile-bottom="positions">
                 Позиции <span id="mobilePositionsCount">(0)</span>
               </button>
-              <button data-mobile-bottom="bots">Боты</button>
-              <button id="mobileOrdersIconButton" type="button">▱</button>
             </nav>
-
-            <div class="mobile-terminal-subtabs">
-              <button class="active">Базовые <span id="mobileBasicOrdersCount">(0)</span></button>
-              <button>Условные <span id="mobileConditionalOrdersCount">(0)</span></button>
-            </div>
         </section>
 
         <section class="dashboard-section" id="market-analysis">

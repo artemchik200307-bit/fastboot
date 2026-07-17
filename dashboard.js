@@ -21,6 +21,7 @@ const state = {
   chart: null,
   candleSeries: null,
   volumeSeries: null,
+  chartResizeObserver: null,
   tradeSocket: null,
   currentSymbol: "BTCUSDT",
   orderSide: "BUY",
@@ -60,7 +61,11 @@ function openSection(id) {
   $("pageTitle").textContent = titles[id] || "FASTBOOT";
   $("sidebar").classList.remove("open");
   document.body.classList.toggle("trading-mode", id === "trading");
-  if (id === "trading") loadTradingTerminal();
+  if (id === "trading") {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(loadTradingTerminal);
+    });
+  }
   if (id === "market-analysis") loadMarketAnalysis();
   if (id === "journal") renderJournal();
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -470,14 +475,31 @@ function formatRawNumber(value) {
 function renderProfessionalChart(rows) {
   const container = $("terminalChart");
 
+  if (!container || !Array.isArray(rows) || !rows.length) {
+    console.error("Нет контейнера или данных для графика");
+    return;
+  }
+
+  if (!window.LightweightCharts) {
+    container.innerHTML =
+      '<div class="terminal-empty-state"><strong>Библиотека графика не загрузилась</strong></div>';
+    return;
+  }
+
+  const containerWidth = Math.max(container.clientWidth, 320);
+  const containerHeight = Math.max(container.clientHeight, 320);
+
   if (!state.chart) {
     state.chart = LightweightCharts.createChart(container, {
-      width: container.clientWidth,
-      height: container.clientHeight,
+      width: containerWidth,
+      height: containerHeight,
       layout: {
         background: { type: "solid", color: "#0d1219" },
-        textColor: "#748095",
+        textColor: "#8490a2",
         attributionLogo: false,
+      },
+      localization: {
+        locale: "ru-RU",
       },
       grid: {
         vertLines: { color: "rgba(116,128,149,.10)" },
@@ -487,16 +509,24 @@ function renderProfessionalChart(rows) {
         mode: LightweightCharts.CrosshairMode.Normal,
       },
       rightPriceScale: {
+        visible: true,
         borderColor: "#242b36",
-        scaleMargins: { top: .06, bottom: .24 },
+        autoScale: true,
+        scaleMargins: {
+          top: 0.06,
+          bottom: 0.23,
+        },
       },
       timeScale: {
+        visible: true,
         borderColor: "#242b36",
         timeVisible: true,
         secondsVisible: false,
-        rightOffset: 7,
+        rightOffset: 8,
         barSpacing: 7,
         minBarSpacing: 1.5,
+        fixLeftEdge: false,
+        fixRightEdge: false,
       },
       handleScroll: {
         mouseWheel: true,
@@ -505,7 +535,10 @@ function renderProfessionalChart(rows) {
         vertTouchDrag: true,
       },
       handleScale: {
-        axisPressedMouseMove: { time: true, price: true },
+        axisPressedMouseMove: {
+          time: true,
+          price: true,
+        },
         mouseWheel: true,
         pinch: true,
       },
@@ -535,17 +568,21 @@ function renderProfessionalChart(rows) {
     );
 
     state.volumeSeries.priceScale().applyOptions({
-      scaleMargins: { top: .78, bottom: 0 },
+      scaleMargins: {
+        top: 0.80,
+        bottom: 0,
+      },
     });
 
     state.chart.subscribeCrosshairMove((param) => {
-      if (!param?.time || !param.seriesData) {
+      if (!param || !param.time || !param.seriesData) {
         updateChartOhlc(rows.at(-1));
         return;
       }
 
       const candle = param.seriesData.get(state.candleSeries);
       const volume = param.seriesData.get(state.volumeSeries);
+
       if (candle) {
         updateChartOhlc([
           0,
@@ -558,35 +595,50 @@ function renderProfessionalChart(rows) {
       }
     });
 
-    new ResizeObserver(() => {
-      if (state.chart) {
-        state.chart.resize(container.clientWidth, container.clientHeight);
-      }
-    }).observe(container);
+    const resizeChart = () => {
+      if (!state.chart || !container.isConnected) return;
+
+      const width = Math.max(container.clientWidth, 320);
+      const height = Math.max(container.clientHeight, 320);
+      state.chart.resize(width, height);
+    };
+
+    state.chartResizeObserver?.disconnect?.();
+    state.chartResizeObserver = new ResizeObserver(() => {
+      requestAnimationFrame(resizeChart);
+    });
+    state.chartResizeObserver.observe(container);
+
+    window.addEventListener("resize", resizeChart);
   }
 
-  state.candleSeries.setData(
-    rows.map((row) => ({
-      time: Math.floor(Number(row[0]) / 1000),
-      open: Number(row[1]),
-      high: Number(row[2]),
-      low: Number(row[3]),
-      close: Number(row[4]),
-    }))
-  );
+  const candleData = rows.map((row) => ({
+    time: Math.floor(Number(row[0]) / 1000),
+    open: Number(row[1]),
+    high: Number(row[2]),
+    low: Number(row[3]),
+    close: Number(row[4]),
+  }));
 
-  state.volumeSeries.setData(
-    rows.map((row) => ({
-      time: Math.floor(Number(row[0]) / 1000),
-      value: Number(row[5]),
-      color: Number(row[4]) >= Number(row[1])
-        ? "rgba(32,201,135,.55)"
-        : "rgba(255,95,120,.55)",
-    }))
-  );
+  const volumeData = rows.map((row) => ({
+    time: Math.floor(Number(row[0]) / 1000),
+    value: Number(row[5]),
+    color:
+      Number(row[4]) >= Number(row[1])
+        ? "rgba(32,201,135,.52)"
+        : "rgba(255,95,120,.52)",
+  }));
 
+  state.candleSeries.setData(candleData);
+  state.volumeSeries.setData(volumeData);
   updateChartOhlc(rows.at(-1));
-  state.chart.timeScale().fitContent();
+
+  requestAnimationFrame(() => {
+    const width = Math.max(container.clientWidth, 320);
+    const height = Math.max(container.clientHeight, 320);
+    state.chart.resize(width, height);
+    state.chart.timeScale().fitContent();
+  });
 }
 
 function updateChartOhlc(row) {
@@ -749,7 +801,6 @@ function placeLocalTerminalOrder(side) {
     amount,
     total,
     status: type === "MARKET" ? "Исполнен локально" : "Открыт",
-    stopPrice: Number($("stopPrice")?.value) || null,
     takeProfit: Number($("takeProfitPrice")?.value) || null,
     stopLoss: Number($("stopLossPrice")?.value) || null,
     postOnly: Boolean($("postOnly")?.checked),
@@ -786,9 +837,6 @@ function renderOrders() {
   const openCount = state.orders.filter((order) => order.status === "Открыт").length;
   $("openOrdersTabCount").textContent = `(${openCount})`;
   $("mobileOpenOrdersCount").textContent = `(${openCount})`;
-  $("mobileBasicOrdersCount").textContent = `(${openCount})`;
-  $("mobileConditionalOrdersCount").textContent =
-    `(${state.orders.filter((order) => order.type === "STOP").length})`;
 
   $("openOrdersContent").innerHTML = openCount
     ? state.orders
@@ -852,7 +900,12 @@ document.querySelectorAll("[data-chart-interval]").forEach((button) => {
 });
 
 $("fitChartButton").addEventListener("click", () => {
-  state.chart?.timeScale().fitContent();
+  if (!state.chart) {
+    loadTradingTerminal();
+    return;
+  }
+
+  state.chart.timeScale().fitContent();
 });
 
 $("refreshTerminalButton").addEventListener("click", loadTradingTerminal);
@@ -866,7 +919,6 @@ document.querySelectorAll("[data-order-type]").forEach((button) => {
 
     const type = button.dataset.orderType;
     $("orderType").value = type;
-    $("stopPriceField").classList.toggle("hidden", type !== "STOP");
     $("orderPrice").disabled = type === "MARKET";
     $("orderPrice").placeholder = type === "MARKET" ? "Рыночная цена" : "";
     updateOrderCalculation();
@@ -990,14 +1042,9 @@ document.querySelectorAll(".amount-percent-row button").forEach((button) => {
 });
 
 
-$("mobileTradingMenuButton")?.addEventListener("click", () => {
-  $("sidebar").classList.toggle("open");
-});
 
-$("mobileOrdersIconButton")?.addEventListener("click", () => {
-  document.querySelector('[data-bottom-tab="order-history"]')?.click();
-  window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
-});
+
+
 
 document.querySelectorAll("[data-mobile-bottom]").forEach((button) => {
   button.addEventListener("click", () => {
@@ -1005,13 +1052,8 @@ document.querySelectorAll("[data-mobile-bottom]").forEach((button) => {
       item.classList.toggle("active", item === button)
     );
 
-    const map = {
-      "open-orders": "open-orders",
-      positions: "positions",
-      bots: "positions",
-    };
-
-    document.querySelector(`[data-bottom-tab="${map[button.dataset.mobileBottom]}"]`)?.click();
+    const target = button.dataset.mobileBottom;
+    document.querySelector(`[data-bottom-tab="${target}"]`)?.click();
   });
 });
 
@@ -1059,3 +1101,8 @@ document.addEventListener("keydown", (event) => {
 });
 
 loadMarketUniverse();
+
+
+$("mobileTradingHomeButton")?.addEventListener("click", () => {
+  $("sidebar").classList.toggle("open");
+});
