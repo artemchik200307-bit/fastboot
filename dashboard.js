@@ -26,6 +26,7 @@ const state = {
   adminUsers: [],
   adminFundingRequests: [],
   adminOverview: null,
+  operationFilter: "all",
   botBalance: Number(userWallet?.bot_balance || 0),
   botRunning: localStorage.getItem(storageKey("bot-running")) === "true",
   orders: JSON.parse(localStorage.getItem(storageKey("orders")) || "[]"),
@@ -139,6 +140,14 @@ function initializeUser() {
 
   $("settingsName").value = username;
   $("settingsEmail").value = email;
+
+  $("detailUsername").textContent = username;
+  $("detailEmail").textContent = email;
+  $("detailFastbootId").textContent = publicId;
+  $("detailRole").textContent = userProfile.role || "user";
+  $("detailCreatedAt").textContent = formatDateTime(
+    userProfile.created_at || authUser.created_at
+  );
   $("adminNavButton")?.classList.toggle("hidden", userProfile.role !== "admin");
 }
 
@@ -168,7 +177,7 @@ async function loadSupabaseAccountData() {
 
     supabaseClient
       .from("funding_requests")
-      .select("id, type, amount, asset, status, details, created_at")
+      .select("id, type, amount, asset, network, txid, wallet_address, status, details, created_at, processed_at")
       .eq("user_id", authUser.id)
       .order("created_at", { ascending: false })
       .limit(50),
@@ -268,6 +277,38 @@ function renderAccount() {
       maximumFractionDigits: 2,
     })}`;
 
+  $("spotBalanceCard").textContent = `${spotBalance.toFixed(2)} USDT`;
+  $("botBalanceCard").textContent = `${botBalance.toFixed(2)} USDT`;
+
+  const pendingDeposits = state.deposits.filter(
+    (item) => item.status === "pending"
+  );
+  const pendingWithdrawals = state.withdrawals.filter(
+    (item) => item.status === "pending"
+  );
+
+  const pendingDepositAmount = pendingDeposits.reduce(
+    (sum, item) => sum + Number(item.amount || 0),
+    0
+  );
+  const pendingWithdrawAmount = pendingWithdrawals.reduce(
+    (sum, item) => sum + Number(item.amount || 0),
+    0
+  );
+
+  $("pendingDepositCard").textContent =
+    `${pendingDepositAmount.toFixed(2)} USDT`;
+  $("pendingWithdrawCard").textContent =
+    `${pendingWithdrawAmount.toFixed(2)} USDT`;
+  $("pendingDepositCount").textContent =
+    `${pendingDeposits.length} заявок`;
+  $("pendingWithdrawCount").textContent =
+    `${pendingWithdrawals.length} заявок`;
+
+  $("detailUpdatedAt").textContent = formatDateTime(
+    userWallet?.updated_at || new Date().toISOString()
+  );
+
   $("portfolioList").innerHTML = `
     <div class="portfolio-row">
       <span class="asset-name">
@@ -308,6 +349,7 @@ function renderAccount() {
   `;
 
   renderOperations();
+  renderCompleteOperationHistory();
   renderBot();
   updateTerminalBalances();
 }
@@ -557,6 +599,133 @@ $("closeModalButton").addEventListener(
   "click",
   () => $("actionModal").classList.add("hidden")
 );
+
+
+function getCombinedOperations() {
+  const funding = state.fundingRequests.map((item) => ({
+    id: item.id,
+    category: item.type,
+    type: item.type,
+    amount: Number(item.amount || 0),
+    asset: item.asset || "USDT",
+    status: item.status,
+    created_at: item.created_at,
+    network: item.network || "TRC20",
+    txid: item.txid || null,
+    wallet_address: item.wallet_address || null,
+    description:
+      item.type === "deposit"
+        ? "Пополнение основного счёта"
+        : "Вывод с основного счёта",
+  }));
+
+  const transfers = state.transfers.map((item) => ({
+    id: item.id,
+    category: "transfer",
+    type: item.to_wallet === "bot"
+      ? "transfer_to_bot"
+      : "transfer_to_spot",
+    amount: Number(item.amount || 0),
+    asset: "USDT",
+    status: "completed",
+    created_at: item.created_at,
+    description: item.to_wallet === "bot"
+      ? "Перевод на счёт AI-бота"
+      : "Перевод на основной счёт",
+  }));
+
+  return [...funding, ...transfers].sort(
+    (a, b) => new Date(b.created_at) - new Date(a.created_at)
+  );
+}
+
+function operationTitle(item) {
+  const map = {
+    deposit: "Пополнение",
+    withdraw: "Вывод",
+    transfer_to_bot: "Перевод на AI Bot",
+    transfer_to_spot: "Перевод на основной счёт",
+  };
+
+  return map[item.type] || item.description || item.type;
+}
+
+function operationSign(item) {
+  if (item.type === "deposit" || item.type === "transfer_to_spot") {
+    return "+";
+  }
+
+  return "−";
+}
+
+function renderCompleteOperationHistory() {
+  const filter = state.operationFilter;
+  const operations = getCombinedOperations().filter((item) => {
+    if (filter === "all") return true;
+    return item.category === filter;
+  });
+
+  $("completeOperationHistory").innerHTML = operations.length
+    ? operations.slice(0, 50).map((item) => {
+      const txUrl = item.txid
+        ? `https://tronscan.org/#/transaction/${encodeURIComponent(item.txid)}`
+        : null;
+
+      return `
+        <article class="complete-operation-row">
+          <div class="operation-symbol ${item.category}">
+            ${item.category === "deposit"
+              ? "↓"
+              : item.category === "withdraw"
+                ? "↑"
+                : "⇄"}
+          </div>
+
+          <div class="operation-main-copy">
+            <strong>${escapeHtml(operationTitle(item))}</strong>
+            <span>${formatDateTime(item.created_at)}</span>
+            ${item.network
+              ? `<small>${escapeHtml(item.asset)} · ${escapeHtml(item.network)}</small>`
+              : ""}
+          </div>
+
+          <div class="operation-extra-copy">
+            ${item.wallet_address
+              ? `<span>Адрес: ${escapeHtml(item.wallet_address)}</span>`
+              : ""}
+            ${txUrl
+              ? `<a href="${txUrl}" target="_blank" rel="noopener">Открыть TXID</a>`
+              : ""}
+          </div>
+
+          <div class="operation-amount-copy">
+            <strong class="${operationSign(item) === "+" ? "positive" : "negative"}">
+              ${operationSign(item)}${Number(item.amount).toFixed(2)} ${escapeHtml(item.asset)}
+            </strong>
+            <span class="status-pill status-${escapeHtml(item.status || "completed")}">
+              ${escapeHtml(formatOperationStatus(item.status))}
+            </span>
+          </div>
+        </article>
+      `;
+    }).join("")
+    : '<div class="empty-list">Операций по выбранному фильтру нет</div>';
+}
+
+document.querySelectorAll("[data-operation-filter]").forEach((button) => {
+  button.addEventListener("click", () => {
+    state.operationFilter = button.dataset.operationFilter;
+
+    document.querySelectorAll("[data-operation-filter]").forEach((item) => {
+      item.classList.toggle(
+        "active",
+        item.dataset.operationFilter === state.operationFilter
+      );
+    });
+
+    renderCompleteOperationHistory();
+  });
+});
 
 function renderBot() {
   $("botBalance").textContent = `$${state.botBalance.toFixed(2)}`;
@@ -1700,24 +1869,23 @@ $("saveProfileButton").addEventListener("click", async () => {
   $("saveProfileButton").disabled = true;
 
   try {
-    const { data, error } = await supabaseClient
-      .from("profiles")
-      .update({ username: name })
-      .eq("id", authUser.id)
-      .select("username")
-      .single();
+    const { data, error } = await supabaseClient.rpc(
+      "update_own_profile_username",
+      { p_username: name }
+    );
 
     if (error) throw error;
 
-    userProfile.username = data.username;
+    userProfile.username = data;
     initializeUser();
     showToast("Профиль обновлён");
   } catch (error) {
     console.error("Ошибка обновления профиля:", error);
+
     showToast(
-      error?.code === "23505"
+      error?.message?.toLowerCase().includes("занято")
         ? "Такое имя пользователя уже занято"
-        : "Не удалось обновить профиль"
+        : error?.message || "Не удалось обновить профиль"
     );
   } finally {
     $("saveProfileButton").disabled = false;
@@ -1728,6 +1896,89 @@ const restoredSection = localStorage.getItem("fastboot-active-section") || "over
 document.documentElement.style.overflow = "";
 document.body.style.overflow = "";
 document.body.classList.remove("mobile-bottom-drawer-open");
+
+$("changePasswordButton")?.addEventListener("click", async () => {
+  const password = $("settingsNewPassword").value;
+  const repeated = $("settingsRepeatPassword").value;
+
+  if (password.length < 8) {
+    showToast("Пароль должен содержать минимум 8 символов");
+    return;
+  }
+
+  if (password !== repeated) {
+    showToast("Пароли не совпадают");
+    return;
+  }
+
+  $("changePasswordButton").disabled = true;
+
+  try {
+    const { error } = await supabaseClient.auth.updateUser({
+      password,
+    });
+
+    if (error) throw error;
+
+    $("settingsNewPassword").value = "";
+    $("settingsRepeatPassword").value = "";
+    showToast("Пароль успешно изменён");
+  } catch (error) {
+    console.error("Ошибка смены пароля:", error);
+    showToast(error?.message || "Не удалось изменить пароль");
+  } finally {
+    $("changePasswordButton").disabled = false;
+  }
+});
+
+$("logoutAllButton")?.addEventListener("click", async () => {
+  if (!window.confirm("Выйти из аккаунта на всех устройствах?")) {
+    return;
+  }
+
+  $("logoutAllButton").disabled = true;
+
+  try {
+    const { error } = await supabaseClient.auth.signOut({
+      scope: "global",
+    });
+
+    if (error) throw error;
+
+    window.location.replace("login.html");
+  } catch (error) {
+    console.error("Ошибка выхода со всех устройств:", error);
+    showToast(error?.message || "Не удалось завершить все сессии");
+    $("logoutAllButton").disabled = false;
+  }
+});
+
+let accountRefreshTimer = null;
+
+function startAccountAutoRefresh() {
+  if (accountRefreshTimer) {
+    clearInterval(accountRefreshTimer);
+  }
+
+  accountRefreshTimer = setInterval(() => {
+    if (!document.hidden) {
+      loadSupabaseAccountData().catch((error) => {
+        console.error("Ошибка автоматического обновления:", error);
+      });
+    }
+  }, 30000);
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    loadSupabaseAccountData().catch((error) => {
+      console.error("Ошибка обновления после возвращения:", error);
+    });
+  }
+});
+
+startAccountAutoRefresh();
+
 initializeUser();
 applySupabaseWalletToPortfolio();
 renderOrders();

@@ -97,6 +97,32 @@
             </div>
           </div>
 
+          <div class="wallet-summary-grid">
+            <article class="wallet-summary-card">
+              <span>Основной счёт</span>
+              <strong id="spotBalanceCard">0.00 USDT</strong>
+              <small>Доступно для торговли и вывода</small>
+            </article>
+
+            <article class="wallet-summary-card">
+              <span>AI Bot Wallet</span>
+              <strong id="botBalanceCard">0.00 USDT</strong>
+              <small>Средства автоматической торговли</small>
+            </article>
+
+            <article class="wallet-summary-card">
+              <span>Ожидает пополнения</span>
+              <strong id="pendingDepositCard">0.00 USDT</strong>
+              <small id="pendingDepositCount">0 заявок</small>
+            </article>
+
+            <article class="wallet-summary-card">
+              <span>Ожидает вывода</span>
+              <strong id="pendingWithdrawCard">0.00 USDT</strong>
+              <small id="pendingWithdrawCount">0 заявок</small>
+            </article>
+          </div>
+
           <div class="account-grid">
             <article class="panel portfolio-panel">
               <div class="panel-head">
@@ -134,6 +160,46 @@
                 <div><h3>История выводов</h3><span>Последние операции</span></div>
               </div>
               <div id="withdrawHistory" class="operation-list"></div>
+            </article>
+          </div>
+
+          <div class="cabinet-detail-grid">
+            <article class="panel account-details-panel">
+              <div class="panel-head">
+                <div>
+                  <h3>Данные аккаунта</h3>
+                  <span>Информация профиля FASTBOOT</span>
+                </div>
+              </div>
+
+              <div class="account-details-list">
+                <div><span>Username</span><strong id="detailUsername">—</strong></div>
+                <div><span>Email</span><strong id="detailEmail">—</strong></div>
+                <div><span>FASTBOOT ID</span><strong id="detailFastbootId">—</strong></div>
+                <div><span>Роль</span><strong id="detailRole">user</strong></div>
+                <div><span>Дата регистрации</span><strong id="detailCreatedAt">—</strong></div>
+                <div><span>Последнее обновление</span><strong id="detailUpdatedAt">—</strong></div>
+              </div>
+            </article>
+
+            <article class="panel complete-history-panel">
+              <div class="panel-head cabinet-history-head">
+                <div>
+                  <h3>Все операции</h3>
+                  <span>Пополнения, выводы и переводы</span>
+                </div>
+
+                <div class="operation-filter-tabs">
+                  <button class="operation-filter active" data-operation-filter="all" type="button">Все</button>
+                  <button class="operation-filter" data-operation-filter="deposit" type="button">Пополнения</button>
+                  <button class="operation-filter" data-operation-filter="withdraw" type="button">Выводы</button>
+                  <button class="operation-filter" data-operation-filter="transfer" type="button">Переводы</button>
+                </div>
+              </div>
+
+              <div id="completeOperationHistory" class="complete-operation-history">
+                <div class="empty-list">Операций пока нет</div>
+              </div>
             </article>
           </div>
         </section>
@@ -650,11 +716,45 @@
             <span class="section-kicker">ACCOUNT SETTINGS</span>
             <h2>Настройки аккаунта</h2>
           </div>
-          <article class="panel settings-panel">
-            <label>Имя пользователя<input id="settingsName" type="text"></label>
-            <label>Email<input id="settingsEmail" type="email" disabled></label>
-            <button id="saveProfileButton" class="primary-action" type="button">Сохранить</button>
-          </article>
+          <div class="settings-grid">
+            <article class="panel settings-panel">
+              <div class="panel-head">
+                <div>
+                  <h3>Профиль</h3>
+                  <span>Основные данные аккаунта</span>
+                </div>
+              </div>
+
+              <label>Имя пользователя<input id="settingsName" type="text" maxlength="24"></label>
+              <label>Email<input id="settingsEmail" type="email" disabled></label>
+              <button id="saveProfileButton" class="primary-action" type="button">Сохранить профиль</button>
+            </article>
+
+            <article class="panel settings-panel">
+              <div class="panel-head">
+                <div>
+                  <h3>Безопасность</h3>
+                  <span>Изменение пароля аккаунта</span>
+                </div>
+              </div>
+
+              <label>Новый пароль
+                <input id="settingsNewPassword" type="password" minlength="8" autocomplete="new-password">
+              </label>
+
+              <label>Повторите пароль
+                <input id="settingsRepeatPassword" type="password" minlength="8" autocomplete="new-password">
+              </label>
+
+              <button id="changePasswordButton" class="primary-action" type="button">
+                Изменить пароль
+              </button>
+
+              <button id="logoutAllButton" class="secondary-action" type="button">
+                Выйти со всех устройств
+              </button>
+            </article>
+          </div>
         </section>
       </main>
     </div>
