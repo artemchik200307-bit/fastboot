@@ -54,7 +54,6 @@ const state = {
 const titles = {
   overview: "Dashboard",
   assistant: "AI Assistant",
-  trading: "Торговля",
   "market-analysis": "Анализ рынка",
   journal: "Торговый журнал",
   admin: "Admin Panel",
@@ -106,7 +105,6 @@ function openSection(id) {
     }
 
     loadAdminPanel();
-    loadAdminAiTrades();
   }
   const dashboardScroller = document.querySelector(".dashboard-main");
 
@@ -825,6 +823,32 @@ $("transferFromBotButton").addEventListener(
 
 
 
+function safeFormatPrice(value) {
+  const number = Number(value || 0);
+
+  if (!Number.isFinite(number)) return "—";
+
+  if (Math.abs(number) >= 1000) {
+    return number.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
+
+  if (Math.abs(number) >= 1) {
+    return number.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 6,
+    });
+  }
+
+  return number.toLocaleString("en-US", {
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 8,
+  });
+}
+
+if (document.getElementById("trading")) {
 function formatPrice(value) {
   const number = Number(value || 0);
 
@@ -1428,6 +1452,9 @@ $("terminalOrdersShortcut")?.addEventListener("click", () => {
 });
 
 
+
+}
+
 function assertAdmin(){if(userProfile.role!=="admin")throw new Error("Недостаточно прав администратора");}
 async function loadAdminPanel(search=""){
  assertAdmin(); $("adminUsersList").innerHTML='<div class="admin-empty">Загрузка…</div>'; $("adminFundingList").innerHTML='<div class="admin-empty">Загрузка…</div>';
@@ -1577,9 +1604,9 @@ function renderAiHistory() {
         <span>${formatDateTime(trade.opened_at)}</span>
         <span>${formatDateTime(trade.closed_at)}</span>
         <span class="ai-price-pair">
-          ${formatPrice(Number(trade.entry_price))}
+          ${safeFormatPrice(Number(trade.entry_price))}
           <small>→</small>
-          ${formatPrice(Number(trade.exit_price))}
+          ${safeFormatPrice(Number(trade.exit_price))}
         </span>
         <div class="ai-result-cell">
           <strong class="${aiClass(trade.pnl_percent)}">
@@ -1660,138 +1687,40 @@ async function setAiBotStatus(active) {
 $("startBotButton").addEventListener("click", () => setAiBotStatus(true));
 $("stopBotButton").addEventListener("click", () => setAiBotStatus(false));
 
-function localDateTimeValue(date = new Date()) {
+function localDateValue(date = new Date()) {
   const offset = date.getTimezoneOffset();
+
   return new Date(date.getTime() - offset * 60000)
     .toISOString()
-    .slice(0, 16);
+    .slice(0, 10);
 }
 
-if ($("adminAiOpenedAt")) $("adminAiOpenedAt").value = localDateTimeValue();
-
-async function loadAdminAiTrades() {
-  if (userProfile.role !== "admin") return;
-
-  try {
-    const { data, error } = await supabaseClient.rpc(
-      "admin_list_open_ai_trades"
-    );
-
-    if (error) throw error;
-
-    state.adminAiOpenTrades = data || [];
-    renderAdminAiTrades();
-  } catch (error) {
-    console.error(error);
-    showToast(error?.message || "Не удалось загрузить AI-сделки");
-  }
+if ($("adminAiTradeDate")) {
+  $("adminAiTradeDate").value = localDateValue();
 }
 
-function renderAdminAiTrades() {
-  $("adminAiOpenCount").textContent = state.adminAiOpenTrades.length;
-
-  $("adminAiOpenTrades").innerHTML = state.adminAiOpenTrades.length
-    ? state.adminAiOpenTrades.map((trade) => `
-      <article class="admin-ai-trade-row">
-        <div>
-          <strong>${escapeHtml(trade.pair)}</strong>
-          <span class="${trade.side === "LONG" ? "long" : "short"}">${escapeHtml(trade.side)}</span>
-        </div>
-        <div><span>Вход</span><strong>${formatPrice(Number(trade.entry_price))}</strong></div>
-        <div><span>Открытие</span><strong>${formatDateTime(trade.opened_at)}</strong></div>
-        <button type="button" class="primary-action compact" data-close-ai-trade="${trade.id}">
-          Закрыть
-        </button>
-      </article>
-    `).join("")
-    : '<div class="admin-empty">Открытых сделок нет</div>';
-
-  document.querySelectorAll("[data-close-ai-trade]").forEach((button) => {
-    button.addEventListener("click", () => {
-      openCloseAiTradeModal(
-        state.adminAiOpenTrades.find(
-          (item) => item.id === button.dataset.closeAiTrade
-        )
-      );
-    });
-  });
-}
-
-$("adminAiTradeForm")?.addEventListener("submit", async (event) => {
+$("adminAiCompletedTradeForm")?.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   const pair = $("adminAiPair").value.trim().toUpperCase();
   const side = $("adminAiSide").value;
   const entryPrice = Number($("adminAiEntryPrice").value);
-  const openedAt = new Date($("adminAiOpenedAt").value).toISOString();
+  const exitPrice = Number($("adminAiExitPrice").value);
+  const tradeDate = $("adminAiTradeDate").value;
+  const pnlPercent = Number($("adminAiPnlPercent").value);
 
   if (!/^[A-Z0-9]{5,20}$/.test(pair)) {
     showToast("Введите корректную торговую пару");
     return;
   }
 
-  if (!(entryPrice > 0)) {
-    showToast("Введите цену открытия");
+  if (!(entryPrice > 0) || !(exitPrice > 0)) {
+    showToast("Введите цены открытия и закрытия");
     return;
   }
 
-  try {
-    const { error } = await supabaseClient.rpc(
-      "admin_open_ai_trade",
-      {
-        p_pair: pair,
-        p_side: side,
-        p_entry_price: entryPrice,
-        p_opened_at: openedAt,
-      }
-    );
-
-    if (error) throw error;
-
-    event.target.reset();
-    $("adminAiSide").value = "LONG";
-    $("adminAiOpenedAt").value = localDateTimeValue();
-
-    showToast("Сделка AI Assistant открыта");
-    await loadAdminAiTrades();
-  } catch (error) {
-    console.error(error);
-    showToast(error?.message || "Не удалось открыть сделку");
-  }
-});
-
-let selectedAdminAiTrade = null;
-
-function openCloseAiTradeModal(trade) {
-  if (!trade) return;
-
-  selectedAdminAiTrade = trade;
-
-  $("closeAiTradeSummary").innerHTML = `
-    <strong>${escapeHtml(trade.pair)} · ${escapeHtml(trade.side)}</strong>
-    <span>Цена открытия: ${formatPrice(Number(trade.entry_price))}</span>
-  `;
-
-  $("closeAiExitPrice").value = "";
-  $("closeAiPnlPercent").value = "";
-  $("closeAiClosedAt").value = localDateTimeValue();
-  $("closeAiTradeModal").classList.remove("hidden");
-}
-
-$("closeAiTradeModalButton")?.addEventListener("click", () => {
-  $("closeAiTradeModal").classList.add("hidden");
-  selectedAdminAiTrade = null;
-});
-
-$("confirmCloseAiTradeButton")?.addEventListener("click", async () => {
-  if (!selectedAdminAiTrade) return;
-
-  const exitPrice = Number($("closeAiExitPrice").value);
-  const pnlPercent = Number($("closeAiPnlPercent").value);
-  const closedAt = new Date($("closeAiClosedAt").value).toISOString();
-
-  if (!(exitPrice > 0)) {
-    showToast("Введите цену закрытия");
+  if (!tradeDate) {
+    showToast("Выберите дату сделки");
     return;
   }
 
@@ -1800,39 +1729,41 @@ $("confirmCloseAiTradeButton")?.addEventListener("click", async () => {
     return;
   }
 
-  $("confirmCloseAiTradeButton").disabled = true;
+  const submitButton = event.submitter;
+  if (submitButton) submitButton.disabled = true;
 
   try {
     const { error } = await supabaseClient.rpc(
-      "admin_close_ai_trade",
+      "admin_publish_ai_trade",
       {
-        p_trade_id: selectedAdminAiTrade.id,
+        p_pair: pair,
+        p_side: side,
+        p_entry_price: entryPrice,
         p_exit_price: exitPrice,
-        p_closed_at: closedAt,
+        p_trade_date: tradeDate,
         p_pnl_percent: pnlPercent,
       }
     );
 
     if (error) throw error;
 
-    $("closeAiTradeModal").classList.add("hidden");
-    selectedAdminAiTrade = null;
-    showToast("Сделка закрыта, результат применён");
+    event.target.reset();
+    $("adminAiSide").value = "LONG";
+    $("adminAiTradeDate").value = localDateValue();
+
+    showToast("Сделка добавлена в историю AI Assistant");
 
     await Promise.all([
-      loadAdminAiTrades(),
-      loadAdminPanel($("adminUserSearch").value.trim()),
       loadSupabaseAccountData(),
+      loadAdminPanel($("adminUserSearch")?.value.trim() || ""),
     ]);
   } catch (error) {
-    console.error(error);
-    showToast(error?.message || "Не удалось закрыть сделку");
+    console.error("Ошибка публикации AI-сделки:", error);
+    showToast(error?.message || "Не удалось добавить сделку");
   } finally {
-    $("confirmCloseAiTradeButton").disabled = false;
+    if (submitButton) submitButton.disabled = false;
   }
 });
-
-$("adminReloadAiTrades")?.addEventListener("click", loadAdminAiTrades);
 
 async function loadMarketAnalysis() {
   const symbol=$("analysisCoinSelect").value;
@@ -1858,7 +1789,7 @@ function renderJournal() {
   $("journalBuyCount").textContent=state.orders.filter(o=>o.side==="BUY").length;
   $("journalSellCount").textContent=state.orders.filter(o=>o.side==="SELL").length;
   $("journalTurnover").textContent=`${state.orders.reduce((s,o)=>s+o.total,0).toFixed(2)} USDT`;
-  $("journalOrders").innerHTML=state.orders.length?state.orders.map(o=>`<div class="order-history-row"><span>${o.date}</span><strong>${o.symbol}</strong><span>${o.type}</span><span class="${o.side==="BUY"?"positive":"negative"}">${o.side}</span><span>${formatPrice(o.price)}</span><span>${o.amount}</span><span>${o.total.toFixed(2)}</span></div>`).join(""):"Сделок пока нет";
+  $("journalOrders").innerHTML=state.orders.length?state.orders.map(o=>`<div class="order-history-row"><span>${o.date}</span><strong>${o.symbol}</strong><span>${o.type}</span><span class="${o.side==="BUY"?"positive":"negative"}">${o.side}</span><span>${safeFormatPrice(o.price)}</span><span>${o.amount}</span><span>${o.total.toFixed(2)}</span></div>`).join(""):"Сделок пока нет";
   $("journalOrders").classList.toggle("empty-list",!state.orders.length);
 }
 

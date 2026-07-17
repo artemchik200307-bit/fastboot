@@ -10,7 +10,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#080c12">
   <title>FASTBOOT — Личный кабинет</title>
-  <link rel="stylesheet" href="dashboard.css?v=order-fix-1-4">
+  <link rel="stylesheet" href="dashboard.css?v=no-terminal-ai-trades-1-5">
   <script src="https://unpkg.com/lightweight-charts@5.2.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
@@ -24,9 +24,6 @@
         </button>
         <button class="nav-item" data-section="assistant">
           <span class="nav-icon">AI</span><span>AI Assistant</span>
-        </button>
-        <button class="nav-item" data-section="trading">
-          <span class="nav-icon">T</span><span>Торговля</span>
         </button>
         <button class="nav-item" data-section="market-analysis">
           <span class="nav-icon">A</span><span>Анализ рынка</span>
@@ -321,341 +318,6 @@
           </article>
         </section>
 
-        <section class="dashboard-section trading-section" id="trading">
-          <div class="pro-terminal">
-            <header class="pro-terminal-header">
-              <button id="tradingHomeButton" class="terminal-home-button" type="button"
-                title="Открыть меню" aria-label="Открыть меню">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M3 10.5 12 3l9 7.5v9A1.5 1.5 0 0 1 19.5 21H15v-6H9v6H4.5A1.5 1.5 0 0 1 3 19.5z"/>
-                </svg>
-              </button>
-
-              <div class="terminal-logo">FASTBOOT <span>TRADE</span></div>
-
-              <div class="terminal-market-select">
-                <button id="marketPickerButton" class="market-picker-button" type="button">
-                  <span>
-                    <strong id="marketPickerSymbol">BTCUSDT</strong>
-                    <small id="marketPickerName">Bitcoin / Tether</small>
-                  </span>
-                  <b>⌄</b>
-                </button>
-
-                <span class="market-type-badge">SPOT</span>
-
-                <div id="marketPickerDropdown" class="market-picker-dropdown hidden">
-                  <div class="market-search-wrap">
-                    <input id="marketSearchInput" type="search"
-                      placeholder="Поиск монеты: BTC, ETH, SOL…"
-                      autocomplete="off">
-                  </div>
-
-                  <div class="market-picker-head">
-                    <span>Инструмент</span>
-                    <span>Цена</span>
-                    <span>24ч</span>
-                  </div>
-
-                  <div id="marketPickerList" class="market-picker-list">
-                    <div class="market-picker-loading">Загрузка топ‑100…</div>
-                  </div>
-                </div>
-
-                <select id="tradeSymbolSelect" class="hidden-native-select" aria-hidden="true">
-                  <option value="BTCUSDT">BTCUSDT</option>
-                </select>
-              </div>
-
-              <nav class="terminal-main-nav">
-                <button class="active">Терминал</button>
-                <button id="terminalAssetsShortcut">Активы</button>
-                <button id="terminalOrdersShortcut">Ордера</button>
-              </nav>
-
-              <div class="terminal-live-status">
-                <i></i><span>LIVE</span>
-              </div>
-            </header>
-
-            <section class="terminal-market-strip">
-              <button id="mobileTradingHomeButton" class="mobile-trading-home-button"
-                type="button" aria-label="Открыть меню" title="Открыть меню">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M3 10.5 12 3l9 7.5v9A1.5 1.5 0 0 1 19.5 21H15v-6H9v6H4.5A1.5 1.5 0 0 1 3 19.5z"/>
-                </svg>
-              </button>
-              <div class="terminal-pair">
-                <strong id="terminalSymbolLabel">BTCUSDT</strong>
-                <span id="terminalBaseName">Bitcoin / Tether</span>
-              </div>
-
-              <div class="terminal-price-box">
-                <strong id="terminalPrice">—</strong>
-                <span id="terminalChange">—</span>
-              </div>
-              <button id="mobileChartButton" class="mobile-chart-button"
-                type="button" aria-label="Открыть график" title="Открыть график">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M4 19V9h3v10H4Zm6 0V4h3v15h-3Zm6 0v-7h3v7h-3Z"/>
-                </svg>
-              </button>
-
-              <div class="terminal-stat">
-                <span>Цена открытия</span>
-                <strong id="terminalOpen">—</strong>
-              </div>
-              <div class="terminal-stat">
-                <span>Макс. 24ч</span>
-                <strong id="terminalHigh">—</strong>
-              </div>
-              <div class="terminal-stat">
-                <span>Мин. 24ч</span>
-                <strong id="terminalLow">—</strong>
-              </div>
-              <div class="terminal-stat">
-                <span>Объём 24ч</span>
-                <strong id="terminalVolume">—</strong>
-              </div>
-              <div class="terminal-stat">
-                <span>Сделок 24ч</span>
-                <strong id="terminalTradeCount">—</strong>
-              </div>
-            </section>
-
-            <div class="terminal-layout">
-              <main class="terminal-center-column">
-                <section class="chart-module">
-                  <div class="chart-module-tabs">
-                    <div class="chart-primary-tabs">
-                      <button class="active">График</button>
-                      <button>Информация</button>
-                      <button>Данные</button>
-                    </div>
-
-                    <div class="chart-timeframes">
-                      <button data-chart-interval="1m">1м</button>
-                      <button data-chart-interval="5m">5м</button>
-                      <button data-chart-interval="15m" class="active">15м</button>
-                      <button data-chart-interval="1h">1ч</button>
-                      <button data-chart-interval="4h">4ч</button>
-                      <button data-chart-interval="1d">1д</button>
-                    </div>
-
-                    <div class="chart-actions">
-                      <button id="fitChartButton" type="button" title="Показать всё">⛶</button>
-                      <button id="refreshTerminalButton" type="button" title="Обновить">↻</button>
-                    </div>
-                  </div>
-
-                  <div class="chart-ohlc-line">
-                    <span>O <strong id="chartOpen">—</strong></span>
-                    <span>H <strong id="chartHigh">—</strong></span>
-                    <span>L <strong id="chartLow">—</strong></span>
-                    <span>C <strong id="chartClose">—</strong></span>
-                    <span>Vol <strong id="chartVolume">—</strong></span>
-                  </div>
-
-                  <div id="terminalChart" class="terminal-chart"></div>
-                </section>
-
-                <section class="terminal-bottom-module">
-                  <div class="terminal-bottom-tabs" id="terminalBottomTabs">
-                    <button class="active" data-bottom-tab="positions">
-                      Позиции <span id="positionsTabCount">(0)</span>
-                    </button>
-                    <button data-bottom-tab="open-orders">
-                      Открытые ордера <span id="openOrdersTabCount">(0)</span>
-                    </button>
-                    <button data-bottom-tab="order-history">История ордеров</button>
-                    <button data-bottom-tab="trade-history">История сделок</button>
-                    <button data-bottom-tab="assets">Активы</button>
-                  </div>
-
-                  <div class="terminal-bottom-content active" id="positionsContent">
-                    <div class="terminal-empty-state">
-                      <strong>Открытых позиций нет</strong>
-                      <span>Размещённые локальные сделки появятся в истории ордеров.</span>
-                    </div>
-                  </div>
-
-                  <div class="terminal-bottom-content" id="openOrdersContent">
-                    <div class="terminal-empty-state">
-                      <strong>Открытых ордеров нет</strong>
-                    </div>
-                  </div>
-
-                  <div class="terminal-bottom-content" id="orderHistoryContent">
-                    <div class="terminal-orders-head">
-                      <span>Дата</span><span>Пара</span><span>Тип</span><span>Сторона</span>
-                      <span>Цена</span><span>Количество</span><span>Статус</span>
-                    </div>
-                    <div id="ordersHistory" class="terminal-orders-list"></div>
-                  </div>
-
-                  <div class="terminal-bottom-content" id="tradeHistoryContent">
-                    <div class="terminal-orders-head">
-                      <span>Дата</span><span>Пара</span><span>Сторона</span><span>Цена</span>
-                      <span>Количество</span><span>Сумма</span><span>Статус</span>
-                    </div>
-                    <div id="terminalTradeHistory" class="terminal-orders-list"></div>
-                  </div>
-
-                  <div class="terminal-bottom-content" id="assetsContent">
-                    <div id="terminalAssetsList" class="terminal-assets-list"></div>
-                  </div>
-                </section>
-              </main>
-
-              <aside class="terminal-market-data-column">
-                <section class="terminal-side-module orderbook-module">
-                  <div class="terminal-module-header">
-                    <div>
-                      <strong>Биржевой стакан</strong>
-                      <span>Глубина рынка</span>
-                    </div>
-                    <select id="orderbookPrecision">
-                      <option value="0.01">0.01</option>
-                      <option value="0.1" selected>0.1</option>
-                      <option value="1">1</option>
-                    </select>
-                  </div>
-
-                  <div class="orderbook-columns">
-                    <span>Цена (USDT)</span>
-                    <span>Размер</span>
-                    <span>Сумма</span>
-                  </div>
-                  <div id="asksList" class="pro-orderbook-list asks"></div>
-
-                  <div class="pro-orderbook-mid">
-                    <strong id="orderbookMid">—</strong>
-                    <span id="orderbookDirection">—</span>
-                  </div>
-
-                  <div id="bidsList" class="pro-orderbook-list bids"></div>
-
-                  <div class="mobile-orderbook-ratio">
-                    <span id="mobileBidRatio" class="positive">50.00%</span>
-                    <div><i id="mobileBidRatioBar"></i><b id="mobileAskRatioBar"></b></div>
-                    <span id="mobileAskRatio" class="negative">50.00%</span>
-                  </div>
-                </section>
-              </aside>
-
-              <aside class="terminal-order-column">
-                <section class="terminal-side-module order-entry-module">
-
-                  <div class="terminal-order-type-tabs">
-                    <button class="active" data-order-type="LIMIT">Лимит</button>
-                    <button data-order-type="MARKET">Рынок</button>
-                    
-                  </div>
-
-                  <input id="orderType" type="hidden" value="LIMIT">
-
-                  <div class="available-balance-row">
-                    <span>Доступно</span>
-                    <strong id="availableUsdt">0.00 USDT</strong>
-                  </div>
-
-                  <label class="terminal-field">
-                    <span>Цена</span>
-                    <div>
-                      <input id="orderPrice" type="number" step="any">
-                      <strong>USDT</strong>
-                    </div>
-                  </label>
-
-                  <label class="terminal-field">
-                    <span>Количество</span>
-                    <div>
-                      <input id="orderAmount" type="number" step="any">
-                      <strong id="baseAssetSuffix">BTC</strong>
-                    </div>
-                  </label>
-
-                  <div class="order-percentage-slider">
-                    <input id="orderPercentSlider" type="range" min="0" max="100" value="0" step="25">
-                    <div>
-                      <button type="button" data-percent="0">0%</button>
-                      <button type="button" data-percent="25">25%</button>
-                      <button type="button" data-percent="50">50%</button>
-                      <button type="button" data-percent="75">75%</button>
-                      <button type="button" data-percent="100">100%</button>
-                    </div>
-                  </div>
-
-                  <div class="order-options">
-                    <label><input id="takeProfitStopLoss" type="checkbox"> TP/SL</label>
-                  </div>
-
-                  <div class="tp-sl-fields hidden" id="tpSlFields">
-                    <label class="terminal-field">
-                      <span>Take Profit</span>
-                      <div><input id="takeProfitPrice" type="number" step="any"><strong>USDT</strong></div>
-                    </label>
-                    <label class="terminal-field">
-                      <span>Stop Loss</span>
-                      <div><input id="stopLossPrice" type="number" step="any"><strong>USDT</strong></div>
-                    </label>
-                  </div>
-
-                  <div class="order-summary-list">
-                    <div><span>Сумма ордера</span><strong id="orderTotal">0.00 USDT</strong></div>
-                    <div><span>Ориентир. комиссия</span><strong id="estimatedFee">0.00 USDT</strong></div>
-                  </div>
-
-                  <div class="mobile-order-limits">
-                    <div><span>Макс.</span><strong id="mobileMaxBuy">0.00 USDT</strong></div>
-                    <div><span>Стоимость</span><strong id="mobileBuyCost">0.00 USDT</strong></div>
-                  </div>
-
-                  <div class="dual-order-buttons">
-                    <button id="buyOrderButton" class="buy-order-button" type="button">
-                      Купить/Лонг
-                    </button>
-                    <button id="sellOrderButton" class="sell-order-button" type="button">
-                      Продать/Шорт
-                    </button>
-                  </div>
-
-                  <div class="mobile-order-limits mobile-sell-limits">
-                    <div><span>Макс.</span><strong id="mobileMaxSell">0.00 USDT</strong></div>
-                    <div><span>Стоимость</span><strong id="mobileSellCost">0.00 USDT</strong></div>
-                  </div>
-
-                  <p class="terminal-disclaimer">
-                    Реальный биржевой API не подключён. Все ордера сохраняются локально.
-                  </p>
-                </section>
-
-                <section class="terminal-side-module account-module">
-                  <div class="terminal-module-header">
-                    <div><strong>Аккаунт</strong><span>Основной торговый счёт</span></div>
-                  </div>
-
-                  <div class="terminal-account-stats">
-                    <div><span>Общий баланс</span><strong id="terminalAccountBalance">0.00 USDT</strong></div>
-                    <div><span>Доступно</span><strong id="terminalAvailableBalance">0.00 USDT</strong></div>
-                    <div><span>В ордерах</span><strong id="terminalLockedBalance">0.00 USDT</strong></div>
-                    <div><span>Реализованный PnL</span><strong id="terminalRealizedPnl">0.00 USDT</strong></div>
-                  </div>
-                </section>
-              </aside>
-            </div>
-          </div>
-
-            <nav class="mobile-terminal-bottom-nav">
-              <button class="active" data-mobile-bottom="open-orders">
-                Открытые ордера <span id="mobileOpenOrdersCount">(0)</span>
-              </button>
-              <button data-mobile-bottom="positions">
-                Позиции <span id="mobilePositionsCount">(0)</span>
-              </button>
-            </nav>
-        </section>
-
         <section class="dashboard-section" id="market-analysis">
           <div class="section-heading">
             <span class="section-kicker">MARKET ANALYSIS</span>
@@ -752,33 +414,44 @@
   <article class="panel admin-ai-panel">
     <div class="panel-head admin-head">
       <div>
-        <h3>AI Assistant — управление сделками</h3>
-        <p>Открытие и закрытие сделок для активных AI-счетов</p>
-      </div>
-      <button id="adminReloadAiTrades" class="secondary-action" type="button">Обновить</button>
-    </div>
-
-    <div class="admin-ai-grid">
-      <form id="adminAiTradeForm" class="admin-ai-form">
-        <label>Торговая пара<input id="adminAiPair" type="text" maxlength="20" placeholder="BTCUSDT" required></label>
-        <label>Направление
-          <select id="adminAiSide">
-            <option value="LONG">LONG</option>
-            <option value="SHORT">SHORT</option>
-          </select>
-        </label>
-        <label>Цена открытия<input id="adminAiEntryPrice" type="number" min="0.00000001" step="any" required></label>
-        <label>Время открытия<input id="adminAiOpenedAt" type="datetime-local" required></label>
-        <button class="primary-action" type="submit">Открыть сделку</button>
-      </form>
-
-      <div class="admin-ai-trades-wrap">
-        <div class="admin-ai-subhead"><strong>Открытые сделки</strong><span id="adminAiOpenCount">0</span></div>
-        <div id="adminAiOpenTrades" class="admin-ai-trades-list">
-          <div class="admin-empty">Открытых сделок нет</div>
-        </div>
+        <h3>AI Assistant — добавить сделку</h3>
+        <p>Сделка сразу появится в истории AI Assistant.</p>
       </div>
     </div>
+
+    <form id="adminAiCompletedTradeForm" class="admin-ai-completed-form">
+      <label>Торговая пара
+        <input id="adminAiPair" type="text" maxlength="20" placeholder="BTCUSDT" required>
+      </label>
+
+      <label>Направление
+        <select id="adminAiSide">
+          <option value="LONG">LONG</option>
+          <option value="SHORT">SHORT</option>
+        </select>
+      </label>
+
+      <label>Цена открытия
+        <input id="adminAiEntryPrice" type="number" min="0.00000001" step="any" required>
+      </label>
+
+      <label>Цена закрытия
+        <input id="adminAiExitPrice" type="number" min="0.00000001" step="any" required>
+      </label>
+
+      <label>Дата сделки
+        <input id="adminAiTradeDate" type="date" required>
+      </label>
+
+      <label>Прибыль или убыток, %
+        <input id="adminAiPnlPercent" type="number" min="-100" max="100" step="0.01"
+          placeholder="Например: 1.25 или -0.20" required>
+      </label>
+
+      <button class="primary-action" type="submit">
+        Добавить сделку
+      </button>
+    </form>
   </article>
 </section>
 
@@ -854,23 +527,6 @@
   </div>
 
   <div id="adminModal" class="modal hidden"><div class="modal-card admin-modal-card"><button id="closeAdminModalButton" class="modal-close" type="button">×</button><h2 id="adminModalTitle">Действие администратора</h2><div id="adminModalBody"></div></div></div>
-
-  <div id="closeAiTradeModal" class="modal hidden">
-    <div class="modal-card admin-modal-card">
-      <button id="closeAiTradeModalButton" class="modal-close" type="button">×</button>
-      <h2>Закрыть сделку AI Assistant</h2>
-      <div id="closeAiTradeSummary" class="admin-modal-user"></div>
-
-      <div class="modal-form">
-        <label>Цена закрытия<input id="closeAiExitPrice" type="number" min="0.00000001" step="any"></label>
-        <label>Время закрытия<input id="closeAiClosedAt" type="datetime-local"></label>
-        <label>Результат сделки, %<input id="closeAiPnlPercent" type="number" step="0.01" min="-100" max="100"></label>
-        <button id="confirmCloseAiTradeButton" class="primary-action" type="button">
-          Закрыть и применить результат
-        </button>
-      </div>
-    </div>
-  </div>
 
   <div id="actionModal" class="modal hidden">
     <div class="modal-card">

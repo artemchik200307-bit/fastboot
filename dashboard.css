@@ -4611,3 +4611,34 @@ body.trading-mode .sidebar.open {
 html.is-admin #adminNavButton {
   display: flex;
 }
+
+/* ===== NO TERMINAL + DIRECT AI TRADE V1.5 ===== */
+.admin-ai-completed-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(150px, 1fr));
+  gap: 12px;
+  padding: 16px;
+}
+
+.admin-ai-completed-form label {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+}
+
+.admin-ai-completed-form button {
+  align-self: end;
+  min-height: 42px;
+}
+
+@media (max-width: 900px) {
+  .admin-ai-completed-form {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .admin-ai-completed-form {
+    grid-template-columns: 1fr;
+  }
+}
