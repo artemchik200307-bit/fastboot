@@ -84,7 +84,7 @@
     if (window.fastbootProfile?.role === "admin") document.documentElement.classList.add("is-admin");
 
     const script = document.createElement("script");
-    script.src = "dashboard.js?v=admin-user-split-rpc-3-7";
+    script.src = "dashboard.js?v=ai-history-date-sort-3-8";
     script.async = false;
 
     script.onerror = () => {

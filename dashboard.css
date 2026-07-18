@@ -5939,3 +5939,18 @@ html.is-admin #adminNavButton,
     font-size: 9px;
   }
 }
+
+
+/* ===== AI HISTORY DATE + SORT 3.8 ===== */
+.ai-history-head,
+.ai-history-row-fees {
+  grid-template-columns:
+    minmax(75px,.65fr)
+    minmax(80px,.65fr)
+    minmax(105px,.8fr)
+    minmax(135px,1fr)
+    minmax(105px,.8fr)
+    minmax(90px,.7fr)
+    minmax(120px,.9fr) !important;
+  min-width: 860px !important;
+}

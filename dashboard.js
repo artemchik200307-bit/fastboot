@@ -487,7 +487,7 @@ async function loadSupabaseAccountData() {
         .from("user_ai_trade_results")
         .select("*")
         .eq("user_id", authUser.id)
-        .order("closed_at", { ascending: false })
+        .order("created_at", { ascending: false })
         .limit(200),
     ]);
 
@@ -522,6 +522,16 @@ function formatOperationStatus(status) {
   };
 
   return map[status] || status || "—";
+}
+
+function formatDateOnly(value) {
+  if (!value) return "—";
+
+  return new Date(value).toLocaleDateString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 }
 
 function formatDateTime(value) {
@@ -1762,17 +1772,20 @@ function renderAdminUserDetailsTab(tab = "overview") {
 
   if (tab === "ai") {
     content.innerHTML = renderAdminDetailRows(
-      data.ai_trades,
-      "110px 90px 110px 110px 110px 100px 110px 160px",
+      [...data.ai_trades].sort((a, b) =>
+        new Date(b.created_at || b.closed_at || 0) -
+        new Date(a.created_at || a.closed_at || 0)
+      ),
+      "110px 90px 110px 110px 110px 100px 110px 130px",
       {
-        head: `<span>Пара</span><span>Сторона</span><span>Вход</span><span>Выход</span><span>Валовая</span><span>Комиссия</span><span>Чистая</span><span>Закрытие</span>`,
+        head: `<span>Пара</span><span>Сторона</span><span>Вход</span><span>Выход</span><span>Валовая</span><span>Комиссия</span><span>Чистая</span><span>Дата</span>`,
         row: (item) => {
           const gross = Number(item.gross_pnl_amount ?? item.pnl_amount ?? 0);
           const fee = Number(item.platform_fee_amount || 0);
           const net = Number(item.net_pnl_amount ?? item.pnl_amount ?? 0);
 
           return `
-            <div class="admin-detail-table-row" style="--detail-cols:110px 90px 110px 110px 110px 100px 110px 160px">
+            <div class="admin-detail-table-row" style="--detail-cols:110px 90px 110px 110px 110px 100px 110px 130px">
               <strong>${escapeHtml(item.pair || "—")}</strong>
               <span>${escapeHtml(item.side || "—")}</span>
               <span>${safeFormatPrice(item.entry_price)}</span>
@@ -1780,7 +1793,9 @@ function renderAdminUserDetailsTab(tab = "overview") {
               <strong class="${aiClass(gross)}">${gross.toFixed(2)}</strong>
               <span>${fee.toFixed(2)}</span>
               <strong class="${aiClass(net)}">${net.toFixed(2)}</strong>
-              <span>${formatDateTime(item.closed_at)}</span>
+              <span>${formatDateOnly(
+                item.created_at || item.closed_at
+              )}</span>
             </div>
           `;
         },
@@ -2146,8 +2161,20 @@ function renderAiAssistant() {
 }
 
 function renderAiHistory() {
-  $("botHistory").innerHTML = state.aiTradeResults.length
-    ? state.aiTradeResults.map((trade) => {
+  const sortedTrades = [...state.aiTradeResults].sort((a, b) => {
+    const aTime = new Date(
+      a.created_at || a.closed_at || a.opened_at || 0
+    ).getTime();
+
+    const bTime = new Date(
+      b.created_at || b.closed_at || b.opened_at || 0
+    ).getTime();
+
+    return bTime - aTime;
+  });
+
+  $("botHistory").innerHTML = sortedTrades.length
+    ? sortedTrades.map((trade) => {
         const storedPnl = Number(trade.pnl_amount || 0);
 
         const gross = Number(
@@ -2175,8 +2202,9 @@ function renderAiHistory() {
             <span class="ai-side-badge ${trade.side.toLowerCase()}">
               ${escapeHtml(trade.side)}
             </span>
-            <span>${formatDateTime(trade.opened_at)}</span>
-            <span>${formatDateTime(trade.closed_at)}</span>
+            <span>${formatDateOnly(
+              trade.created_at || trade.closed_at || trade.opened_at
+            )}</span>
             <span class="ai-price-pair">
               ${safeFormatPrice(Number(trade.entry_price))}
               <small>→</small>
