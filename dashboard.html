@@ -14,7 +14,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#080c12">
   <title>FASTBOOT — Личный кабинет</title>
-  <link rel="stylesheet" href="dashboard.css?v=terminal-balance-hard-3-4">
+  <link rel="stylesheet" href="dashboard.css?v=admin-user-full-stats-3-5">
   <script src="https://unpkg.com/lightweight-charts@5.2.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
@@ -709,6 +709,34 @@
       </div>
 
       <div id="mobileChartContainer" class="mobile-chart-container"></div>
+    </div>
+  </div>
+
+  <div id="adminUserDetailsModal" class="modal hidden">
+    <div class="modal-card admin-user-details-card">
+      <header class="admin-user-details-header">
+        <div>
+          <span>ПОЛНАЯ СТАТИСТИКА ПОЛЬЗОВАТЕЛЯ</span>
+          <h2 id="adminUserDetailsTitle">Пользователь</h2>
+          <small id="adminUserDetailsSubtitle">—</small>
+        </div>
+        <button id="closeAdminUserDetailsModal" class="modal-close" type="button">×</button>
+      </header>
+
+      <div id="adminUserDetailsSummary" class="admin-user-details-summary"></div>
+
+      <nav class="admin-user-details-tabs">
+        <button class="active" data-user-details-tab="overview" type="button">Обзор</button>
+        <button data-user-details-tab="funding" type="button">Пополнения и выводы</button>
+        <button data-user-details-tab="transfers" type="button">Переводы</button>
+        <button data-user-details-tab="terminal" type="button">Терминал</button>
+        <button data-user-details-tab="ai" type="button">AI-бот</button>
+        <button data-user-details-tab="operations" type="button">Все операции</button>
+      </nav>
+
+      <div id="adminUserDetailsContent" class="admin-user-details-content">
+        <div class="admin-empty">Загрузка…</div>
+      </div>
     </div>
   </div>
 

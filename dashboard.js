@@ -52,6 +52,8 @@ const state = {
   adminReferralOverview: null,
   adminReferralPartners: [],
   selectedReferralPartner: null,
+  selectedAdminUserDetails: null,
+  selectedAdminUserTab: "overview",
   withdrawalOverview: null,
   terminalJournalTrades: [],
   botBalance: Number(userWallet?.bot_balance || 0),
@@ -1299,11 +1301,15 @@ function renderAdminUsers() {
   $("adminUsersList").innerHTML = users.length
     ? users.map((user) => `
       <div class="admin-user-row">
-        <div class="admin-user-identity">
+        <button
+          class="admin-user-identity admin-user-open-details"
+          type="button"
+          data-admin-user-details="${user.id}"
+        >
           <strong>${escapeHtml(user.username || "User")}</strong>
           <span>${escapeHtml(user.email || "")}</span>
           <small>${escapeHtml(user.fastboot_id || "")}</small>
-        </div>
+        </button>
 
         <span class="admin-role-badge ${
           user.role === "admin" ? "admin" : ""
@@ -1350,6 +1356,13 @@ function renderAdminUsers() {
       </div>
     `).join("")
     : '<div class="admin-empty">Пользователи не найдены</div>';
+
+  document.querySelectorAll("[data-admin-user-details]").forEach((button) => {
+    button.onclick = () =>
+      openAdminUserDetails(
+        users.find((item) => item.id === button.dataset.adminUserDetails)
+      );
+  });
 
   document.querySelectorAll("[data-admin-balance]").forEach((button) => {
     button.onclick = () =>
@@ -1501,10 +1514,325 @@ function renderAdminFunding(){
     b=>b.onclick=()=>processAdminFunding(b.dataset.fid,b.dataset.fa)
   );
 }
+
+function formatAdminMoney(value) {
+  return `${Number(value || 0).toFixed(2)} USDT`;
+}
+
+function adminDetailEmpty(text = "Данных пока нет") {
+  return `<div class="admin-empty">${escapeHtml(text)}</div>`;
+}
+
+function renderAdminDetailRows(rows, columns, rowRenderer) {
+  if (!Array.isArray(rows) || !rows.length) {
+    return adminDetailEmpty();
+  }
+
+  return `
+    <div class="admin-detail-table-scroll">
+      <div class="admin-detail-table-head" style="--detail-cols:${columns}">
+        ${rowRenderer.head}
+      </div>
+      ${rows.map(rowRenderer.row).join("")}
+    </div>
+  `;
+}
+
+function getAdminUserDetailsData() {
+  return state.selectedAdminUserDetails || {};
+}
+
+function renderAdminUserDetailsSummary() {
+  const data = getAdminUserDetailsData();
+  const profile = data.profile || {};
+  const balances = data.balances || {};
+  const stats = data.statistics || {};
+
+  $("adminUserDetailsTitle").textContent =
+    profile.username || "Пользователь";
+
+  $("adminUserDetailsSubtitle").textContent =
+    `${profile.email || "—"} · ${profile.fastboot_id || "—"} · ${profile.role || "user"}`;
+
+  $("adminUserDetailsSummary").innerHTML = `
+    <article>
+      <span>Общий баланс</span>
+      <strong>${formatAdminMoney(balances.total_balance)}</strong>
+    </article>
+    <article>
+      <span>Основной счёт</span>
+      <strong>${formatAdminMoney(balances.spot_balance)}</strong>
+    </article>
+    <article>
+      <span>AI Bot</span>
+      <strong>${formatAdminMoney(balances.bot_balance)}</strong>
+    </article>
+    <article>
+      <span>Терминал</span>
+      <strong>${formatAdminMoney(balances.trading_balance)}</strong>
+    </article>
+    <article>
+      <span>Заработал AI</span>
+      <strong class="${aiClass(stats.ai_net_profit)}">
+        ${formatAdminMoney(stats.ai_net_profit)}
+      </strong>
+    </article>
+    <article>
+      <span>Комиссия AI</span>
+      <strong>${formatAdminMoney(stats.ai_fees)}</strong>
+    </article>
+  `;
+}
+
+function renderAdminUserDetailsTab(tab = "overview") {
+  state.selectedAdminUserTab = tab;
+
+  document.querySelectorAll("[data-user-details-tab]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.userDetailsTab === tab);
+  });
+
+  const data = getAdminUserDetailsData();
+  const profile = data.profile || {};
+  const balances = data.balances || {};
+  const stats = data.statistics || {};
+  const content = $("adminUserDetailsContent");
+
+  if (tab === "overview") {
+    content.innerHTML = `
+      <div class="admin-user-overview-grid">
+        <article class="panel">
+          <h3>Данные аккаунта</h3>
+          <dl class="admin-user-data-list">
+            <div><dt>ID</dt><dd>${escapeHtml(profile.fastboot_id || "—")}</dd></div>
+            <div><dt>UUID</dt><dd>${escapeHtml(profile.id || "—")}</dd></div>
+            <div><dt>Email</dt><dd>${escapeHtml(profile.email || "—")}</dd></div>
+            <div><dt>Username</dt><dd>${escapeHtml(profile.username || "—")}</dd></div>
+            <div><dt>Роль</dt><dd>${escapeHtml(profile.role || "user")}</dd></div>
+            <div><dt>Регистрация</dt><dd>${formatDateTime(profile.created_at)}</dd></div>
+            <div><dt>AI-бот</dt><dd>${data.ai_bot?.is_active ? "Включён" : "Выключен"}</dd></div>
+          </dl>
+        </article>
+
+        <article class="panel">
+          <h3>Финансовая статистика</h3>
+          <dl class="admin-user-data-list">
+            <div><dt>Общий баланс</dt><dd>${formatAdminMoney(balances.total_balance)}</dd></div>
+            <div><dt>Пополнено</dt><dd>${formatAdminMoney(stats.total_deposits)}</dd></div>
+            <div><dt>Выведено</dt><dd>${formatAdminMoney(stats.total_withdrawals)}</dd></div>
+            <div><dt>Переведено между счетами</dt><dd>${formatAdminMoney(stats.total_transfers)}</dd></div>
+            <div><dt>Чистая прибыль AI</dt><dd>${formatAdminMoney(stats.ai_net_profit)}</dd></div>
+            <div><dt>Комиссия AI</dt><dd>${formatAdminMoney(stats.ai_fees)}</dd></div>
+            <div><dt>Сделок AI</dt><dd>${Number(stats.ai_trades_count || 0)}</dd></div>
+            <div><dt>Сделок терминала</dt><dd>${Number(stats.terminal_trades_count || 0)}</dd></div>
+          </dl>
+        </article>
+      </div>
+    `;
+    return;
+  }
+
+  if (tab === "funding") {
+    content.innerHTML = renderAdminDetailRows(
+      data.funding_requests,
+      "150px 110px 110px 120px 160px minmax(180px,1fr)",
+      {
+        head: `
+          <span>Тип</span><span>Сумма</span><span>Статус</span>
+          <span>Сеть</span><span>Дата</span><span>Адрес / TXID</span>
+        `,
+        row: (item) => `
+          <div class="admin-detail-table-row" style="--detail-cols:150px 110px 110px 120px 160px minmax(180px,1fr)">
+            <strong>${item.type === "deposit" ? "Пополнение" : "Вывод"}</strong>
+            <span>${formatAdminMoney(item.amount)}</span>
+            <span>${escapeHtml(item.status || "—")}</span>
+            <span>${escapeHtml(item.network || "—")}</span>
+            <span>${formatDateTime(item.created_at)}</span>
+            <small>${escapeHtml(item.txid || item.wallet_address || "—")}</small>
+          </div>
+        `,
+      }
+    );
+    return;
+  }
+
+  if (tab === "transfers") {
+    content.innerHTML = renderAdminDetailRows(
+      data.wallet_transfers,
+      "170px 170px 120px 170px",
+      {
+        head: `<span>Откуда</span><span>Куда</span><span>Сумма</span><span>Дата</span>`,
+        row: (item) => `
+          <div class="admin-detail-table-row" style="--detail-cols:170px 170px 120px 170px">
+            <span>${escapeHtml(item.from_wallet || "—")}</span>
+            <span>${escapeHtml(item.to_wallet || "—")}</span>
+            <strong>${formatAdminMoney(item.amount)}</strong>
+            <span>${formatDateTime(item.created_at)}</span>
+          </div>
+        `,
+      }
+    );
+    return;
+  }
+
+  if (tab === "terminal") {
+    const positions = renderAdminDetailRows(
+      data.terminal_positions,
+      "110px 90px 110px 110px 110px 110px 120px",
+      {
+        head: `<span>Пара</span><span>Сторона</span><span>Вход</span><span>Текущая</span><span>Количество</span><span>PnL</span><span>Статус</span>`,
+        row: (item) => `
+          <div class="admin-detail-table-row" style="--detail-cols:110px 90px 110px 110px 110px 110px 120px">
+            <strong>${escapeHtml(item.symbol || item.pair || "—")}</strong>
+            <span>${escapeHtml(item.side || "—")}</span>
+            <span>${safeFormatPrice(item.entry_price)}</span>
+            <span>${safeFormatPrice(item.current_price)}</span>
+            <span>${Number(item.quantity || 0)}</span>
+            <strong class="${aiClass(item.pnl)}">${Number(item.pnl || 0).toFixed(2)}</strong>
+            <span>${escapeHtml(item.status || "—")}</span>
+          </div>
+        `,
+      }
+    );
+
+    const orders = renderAdminDetailRows(
+      data.terminal_orders,
+      "110px 90px 100px 110px 110px 110px 160px",
+      {
+        head: `<span>Пара</span><span>Сторона</span><span>Тип</span><span>Цена</span><span>Количество</span><span>Статус</span><span>Дата</span>`,
+        row: (item) => `
+          <div class="admin-detail-table-row" style="--detail-cols:110px 90px 100px 110px 110px 110px 160px">
+            <strong>${escapeHtml(item.symbol || item.pair || "—")}</strong>
+            <span>${escapeHtml(item.side || "—")}</span>
+            <span>${escapeHtml(item.order_type || item.type || "—")}</span>
+            <span>${safeFormatPrice(item.price)}</span>
+            <span>${Number(item.quantity || 0)}</span>
+            <span>${escapeHtml(item.status || "—")}</span>
+            <span>${formatDateTime(item.created_at)}</span>
+          </div>
+        `,
+      }
+    );
+
+    const trades = renderAdminDetailRows(
+      data.terminal_trades,
+      "110px 90px 110px 110px 110px 110px 160px",
+      {
+        head: `<span>Пара</span><span>Сторона</span><span>Вход</span><span>Выход</span><span>Количество</span><span>PnL</span><span>Закрытие</span>`,
+        row: (item) => `
+          <div class="admin-detail-table-row" style="--detail-cols:110px 90px 110px 110px 110px 110px 160px">
+            <strong>${escapeHtml(item.symbol || item.pair || "—")}</strong>
+            <span>${escapeHtml(item.side || "—")}</span>
+            <span>${safeFormatPrice(item.entry_price)}</span>
+            <span>${safeFormatPrice(item.exit_price)}</span>
+            <span>${Number(item.quantity || 0)}</span>
+            <strong class="${aiClass(item.pnl)}">${Number(item.pnl || item.pnl_amount || 0).toFixed(2)}</strong>
+            <span>${formatDateTime(item.closed_at || item.created_at)}</span>
+          </div>
+        `,
+      }
+    );
+
+    content.innerHTML = `
+      <section class="admin-detail-section"><h3>Позиции</h3>${positions}</section>
+      <section class="admin-detail-section"><h3>Ордера</h3>${orders}</section>
+      <section class="admin-detail-section"><h3>История сделок</h3>${trades}</section>
+    `;
+    return;
+  }
+
+  if (tab === "ai") {
+    content.innerHTML = renderAdminDetailRows(
+      data.ai_trades,
+      "110px 90px 110px 110px 110px 100px 110px 160px",
+      {
+        head: `<span>Пара</span><span>Сторона</span><span>Вход</span><span>Выход</span><span>Валовая</span><span>Комиссия</span><span>Чистая</span><span>Закрытие</span>`,
+        row: (item) => {
+          const gross = Number(item.gross_pnl_amount ?? item.pnl_amount ?? 0);
+          const fee = Number(item.platform_fee_amount || 0);
+          const net = Number(item.net_pnl_amount ?? item.pnl_amount ?? 0);
+
+          return `
+            <div class="admin-detail-table-row" style="--detail-cols:110px 90px 110px 110px 110px 100px 110px 160px">
+              <strong>${escapeHtml(item.pair || "—")}</strong>
+              <span>${escapeHtml(item.side || "—")}</span>
+              <span>${safeFormatPrice(item.entry_price)}</span>
+              <span>${safeFormatPrice(item.exit_price)}</span>
+              <strong class="${aiClass(gross)}">${gross.toFixed(2)}</strong>
+              <span>${fee.toFixed(2)}</span>
+              <strong class="${aiClass(net)}">${net.toFixed(2)}</strong>
+              <span>${formatDateTime(item.closed_at)}</span>
+            </div>
+          `;
+        },
+      }
+    );
+    return;
+  }
+
+  content.innerHTML = renderAdminDetailRows(
+    data.transactions,
+    "150px 120px 110px 120px minmax(240px,1fr) 170px",
+    {
+      head: `<span>Тип</span><span>Сумма</span><span>Актив</span><span>Статус</span><span>Описание</span><span>Дата</span>`,
+      row: (item) => `
+        <div class="admin-detail-table-row" style="--detail-cols:150px 120px 110px 120px minmax(240px,1fr) 170px">
+          <strong>${escapeHtml(item.type || "—")}</strong>
+          <span>${formatAdminMoney(item.amount)}</span>
+          <span>${escapeHtml(item.asset || "USDT")}</span>
+          <span>${escapeHtml(item.status || "—")}</span>
+          <small>${escapeHtml(item.description || "—")}</small>
+          <span>${formatDateTime(item.created_at)}</span>
+        </div>
+      `,
+    }
+  );
+}
+
+async function openAdminUserDetails(user) {
+  if (!user) return;
+
+  $("adminUserDetailsModal").classList.remove("hidden");
+  $("adminUserDetailsTitle").textContent = user.username || "Пользователь";
+  $("adminUserDetailsSubtitle").textContent =
+    `${user.email || "—"} · ${user.fastboot_id || "—"}`;
+
+  $("adminUserDetailsSummary").innerHTML = "";
+  $("adminUserDetailsContent").innerHTML =
+    '<div class="admin-empty">Загрузка полной статистики…</div>';
+
+  try {
+    const { data, error } = await supabaseClient.rpc(
+      "admin_get_user_full_statistics",
+      { p_user_id: user.id }
+    );
+
+    if (error) throw error;
+
+    state.selectedAdminUserDetails = data || {};
+    renderAdminUserDetailsSummary();
+    renderAdminUserDetailsTab("overview");
+  } catch (error) {
+    console.error("Admin user details error:", error);
+    $("adminUserDetailsContent").innerHTML =
+      adminDetailEmpty(error.message || "Не удалось загрузить статистику");
+  }
+}
+
 function openAdminBalanceModal(u){if(!u)return;$("adminModalTitle").textContent="Изменение баланса";$("adminModalBody").innerHTML=`<div class="admin-modal-user"><strong>${escapeHtml(u.username||"User")}</strong><span>${escapeHtml(u.email||"")}</span></div><div class="modal-form"><label>Счёт<select id="adminWalletType"><option value="spot">Основной</option><option value="bot">AI Bot</option></select></label><label>Операция<select id="adminBalanceOperation"><option value="credit">Начислить</option><option value="debit">Списать</option></select></label><label>Сумма USDT<input id="adminBalanceAmount" type="number" min="0.01" step="0.01"></label><label>Причина<input id="adminBalanceReason" maxlength="300"></label><button id="confirmAdminBalanceButton" class="primary-action">Применить</button></div>`;$("adminModal").classList.remove("hidden");$("confirmAdminBalanceButton").onclick=async()=>{const amount=Number($("adminBalanceAmount").value);if(!(amount>0))return showToast("Введите сумму");try{const {error}=await supabaseClient.rpc("admin_adjust_user_balance",{p_user_id:u.id,p_wallet:$("adminWalletType").value,p_operation:$("adminBalanceOperation").value,p_amount:amount,p_reason:$("adminBalanceReason").value.trim()||null});if(error)throw error;$("adminModal").classList.add("hidden");showToast("Баланс обновлён");await loadAdminPanel($("adminUserSearch").value.trim());}catch(e){showToast(e.message||"Ошибка");}};}
 function openAdminRoleModal(u){if(!u)return;$("adminModalTitle").textContent="Изменение роли";$("adminModalBody").innerHTML=`<div class="admin-modal-user"><strong>${escapeHtml(u.username||"User")}</strong><span>${escapeHtml(u.email||"")}</span></div><div class="modal-form"><label>Роль<select id="adminNewRole"><option value="user" ${u.role==="user"?"selected":""}>user</option><option value="admin" ${u.role==="admin"?"selected":""}>admin</option></select></label><button id="confirmAdminRoleButton" class="primary-action">Сохранить</button></div>`;$("adminModal").classList.remove("hidden");$("confirmAdminRoleButton").onclick=async()=>{try{const {error}=await supabaseClient.rpc("admin_set_user_role",{p_user_id:u.id,p_role:$("adminNewRole").value});if(error)throw error;$("adminModal").classList.add("hidden");showToast("Роль изменена");await loadAdminPanel($("adminUserSearch").value.trim());}catch(e){showToast(e.message||"Ошибка");}};}
 async function processAdminFunding(id,action){if(!confirm(action==="approve"?"Одобрить заявку?":"Отклонить заявку?"))return;try{const {error}=await supabaseClient.rpc("admin_process_funding_request",{p_request_id:id,p_action:action,p_note:null});if(error)throw error;showToast(action==="approve"?"Заявка одобрена":"Заявка отклонена");await loadAdminPanel($("adminUserSearch").value.trim());}catch(e){showToast(e.message||"Ошибка");}}
-$("adminRefreshButton")?.addEventListener("click",()=>loadAdminPanel($("adminUserSearch").value.trim()));$("adminSearchButton")?.addEventListener("click",()=>loadAdminPanel($("adminUserSearch").value.trim()));$("adminUserSearch")?.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();loadAdminPanel(e.target.value.trim());}});$("closeAdminModalButton")?.addEventListener("click",()=>$("adminModal").classList.add("hidden"));
+$("adminRefreshButton")?.addEventListener("click",()=>loadAdminPanel($("adminUserSearch").value.trim()));$("adminSearchButton")?.addEventListener("click",()=>loadAdminPanel($("adminUserSearch").value.trim()));$("adminUserSearch")?.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();loadAdminPanel(e.target.value.trim());}});$("closeAdminUserDetailsModal")?.addEventListener("click", () => {
+  $("adminUserDetailsModal").classList.add("hidden");
+  state.selectedAdminUserDetails = null;
+});
+
+document.querySelectorAll("[data-user-details-tab]").forEach((button) => {
+  button.addEventListener("click", () => {
+    renderAdminUserDetailsTab(button.dataset.userDetailsTab);
+  });
+});
+
+$("closeAdminModalButton")?.addEventListener("click",()=>$("adminModal").classList.add("hidden"));
 
 
 function aiClass(value) {
