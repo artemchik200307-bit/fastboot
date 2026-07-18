@@ -1,3 +1,4 @@
+window.FASTBOOT_BUILD_VERSION = "3.4-terminal-balance-hard";
 const REST_BASE = "https://data-api.binance.vision";
 const WS_BASE = "wss://stream.binance.com:9443/ws";
 const $ = (id) => document.getElementById(id);
@@ -599,10 +600,35 @@ function renderWithdrawalOverview() {
   }
 }
 
+
+function ensureTerminalBalanceCard() {
+  if (document.getElementById("terminalBalanceCard")) return;
+
+  const botCard = document.getElementById("botBalanceCard")?.closest(
+    ".wallet-summary-card"
+  );
+
+  const grid = botCard?.parentElement;
+
+  if (!botCard || !grid) return;
+
+  const card = document.createElement("article");
+  card.className = "wallet-summary-card";
+  card.innerHTML = `
+    <span>Баланс терминала</span>
+    <strong id="terminalBalanceCard">0.00 USDT</strong>
+    <small>Средства для торговли в терминале</small>
+  `;
+
+  botCard.insertAdjacentElement("afterend", card);
+}
+
 function renderAccount() {
+  ensureTerminalBalanceCard();
   const spotBalance = Number(userWallet?.spot_balance || 0);
   const botBalance = Number(userWallet?.bot_balance || 0);
-  const total = spotBalance + botBalance;
+  const terminalBalance = Number(userWallet?.trading_balance || 0);
+  const total = spotBalance + botBalance + terminalBalance;
 
   if ($("totalBalance")) $("totalBalance").textContent =
     `$${total.toLocaleString("en-US", {
@@ -612,6 +638,8 @@ function renderAccount() {
 
   if ($("spotBalanceCard")) $("spotBalanceCard").textContent = `${spotBalance.toFixed(2)} USDT`;
   if ($("botBalanceCard")) $("botBalanceCard").textContent = `${botBalance.toFixed(2)} USDT`;
+  if ($("terminalBalanceCard")) $("terminalBalanceCard").textContent =
+    `${terminalBalance.toFixed(2)} USDT`;
 
   const pendingDeposits = state.deposits.filter(
     (item) => item.status === "pending"
@@ -661,10 +689,22 @@ function renderAccount() {
       <span>1.00</span>
       <span>$${botBalance.toFixed(2)}</span>
     </div>
+    <div class="portfolio-row">
+      <span class="asset-name">
+        <strong>USDT</strong>
+        <span>Торговый терминал</span>
+      </span>
+      <strong>${terminalBalance.toFixed(2)}</strong>
+      <span>1.00</span>
+      <span>$${terminalBalance.toFixed(2)}</span>
+    </div>
   `;
 
   const spotPercent = total > 0 ? (spotBalance / total) * 100 : 0;
   const botPercent = total > 0 ? (botBalance / total) * 100 : 0;
+  const terminalPercent = total > 0
+    ? (terminalBalance / total) * 100
+    : 0;
 
   if ($("allocationBars")) $("allocationBars").innerHTML = `
     <div class="allocation-item">

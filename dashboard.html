@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="ru">
 <head>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>F</text></svg>">
   <style>
     html:not(.auth-ready) body {
@@ -11,7 +14,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#080c12">
   <title>FASTBOOT — Личный кабинет</title>
-  <link rel="stylesheet" href="dashboard.css?v=spot-withdrawal-3-2">
+  <link rel="stylesheet" href="dashboard.css?v=terminal-balance-hard-3-4">
   <script src="https://unpkg.com/lightweight-charts@5.2.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
@@ -89,7 +92,7 @@
             <div class="balance-main">
               <span>Общий баланс</span>
               <strong id="totalBalance">$0.00</strong>
-              <small>Основной счёт + баланс AI-бота</small>
+              <small>Основной счёт + AI-бот + терминал</small>
             </div>
             <div class="account-actions">
               <button id="depositButton" class="primary-action" type="button">Пополнить</button>
@@ -109,6 +112,12 @@
               <span>AI Bot Wallet</span>
               <strong id="botBalanceCard">0.00 USDT</strong>
               <small>Средства автоматической торговли</small>
+            </article>
+
+            <article class="wallet-summary-card">
+              <span>Баланс терминала</span>
+              <strong id="terminalBalanceCard">0.00 USDT</strong>
+              <small>Средства для торговли в терминале</small>
             </article>
 
             <article class="wallet-summary-card">
@@ -735,6 +744,6 @@
   <div id="toast" class="toast hidden"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
-  <script src="dashboard-auth.js"></script>
+  <script src="dashboard-auth.js?v=terminal-balance-hard-3-4"></script>
 </body>
 </html>

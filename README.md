@@ -947,3 +947,31 @@ SQL выполнять не нужно.
 1. Выполнить `supabase-spot-withdrawal-rules-v3-2.sql`.
 2. Загрузить остальные файлы с заменой.
 3. Не заменять `supabase-config.js`.
+
+
+## Terminal Balance Dashboard 3.3
+
+Добавлено:
+
+- карточка «Баланс терминала» на Dashboard;
+- значение берётся из `wallets.trading_balance`;
+- общий баланс включает основной счёт, AI Bot и терминал;
+- терминальный баланс добавлен в портфель и распределение;
+- адаптивная сетка для пяти карточек.
+
+SQL выполнять не нужно.
+
+
+## Terminal Balance Hard Fix 3.4
+
+Исправлено:
+
+- добавлена версия к `dashboard-auth.js`, а не только к `dashboard.js`;
+- добавлены no-cache meta tags;
+- карточка терминала создаётся JavaScript-кодом, даже если загружен старый HTML;
+- значение берётся из `trading_balance`;
+- добавлен build marker `FASTBOOT_BUILD_VERSION`;
+- сетка карточек принудительно обновлена.
+
+После загрузки в Network должен быть файл:
+`dashboard.js?v=terminal-balance-hard-3-4`.
