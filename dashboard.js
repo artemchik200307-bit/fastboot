@@ -1,4 +1,4 @@
-window.FASTBOOT_BUILD_VERSION = "telegram-link-v1";
+window.FASTBOOT_BUILD_VERSION = "telegram-link-v2";
 const REST_BASE = "https://data-api.binance.vision";
 const WS_BASE = "wss://stream.binance.com:9443/ws";
 const $ = (id) => document.getElementById(id);
