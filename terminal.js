@@ -34,7 +34,15 @@
     positions: [],
     orders: [],
     trades: [],
+    marketSymbols: [],
   };
+
+  const EXCLUDED_SYMBOL_PARTS = [
+    "UPUSDT",
+    "DOWNUSDT",
+    "BULLUSDT",
+    "BEARUSDT",
+  ];
 
   function showToast(message) {
     const toast = $("toast");
@@ -102,6 +110,93 @@
     }
 
     throw lastError || new Error("Market API недоступен");
+  }
+
+  function isSupportedUsdtSymbol(symbol) {
+    const value = String(symbol || "").toUpperCase();
+
+    return (
+      value.endsWith("USDT") &&
+      !EXCLUDED_SYMBOL_PARTS.some((part) => value.endsWith(part)) &&
+      /^[A-Z0-9]{5,20}$/.test(value)
+    );
+  }
+
+  function renderSymbolOptions(symbols) {
+    const datalist = $("symbolOptions");
+    if (!datalist) return;
+
+    datalist.innerHTML = symbols
+      .map((symbol) => `<option value="${escapeHtml(symbol)}"></option>`)
+      .join("");
+  }
+
+  async function loadTopMarketSymbols() {
+    try {
+      const rows = await fetchJson("/api/v3/ticker/24hr");
+
+      const symbols = rows
+        .filter((item) => isSupportedUsdtSymbol(item.symbol))
+        .sort(
+          (a, b) =>
+            Number(b.quoteVolume || 0) - Number(a.quoteVolume || 0)
+        )
+        .slice(0, 100)
+        .map((item) => item.symbol);
+
+      state.marketSymbols = [...new Set([
+        "BTCUSDT",
+        "ETHUSDT",
+        "SOLUSDT",
+        ...symbols,
+      ])].slice(0, 100);
+
+      renderSymbolOptions(state.marketSymbols);
+    } catch (error) {
+      console.warn("Top symbols unavailable:", error);
+
+      state.marketSymbols = [
+        "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT",
+        "DOGEUSDT", "ADAUSDT", "AVAXUSDT", "LINKUSDT", "TRXUSDT",
+        "SUIUSDT", "TONUSDT", "DOTUSDT", "LTCUSDT", "BCHUSDT",
+        "NEARUSDT", "APTUSDT", "UNIUSDT", "ICPUSDT", "ETCUSDT",
+      ];
+
+      renderSymbolOptions(state.marketSymbols);
+    }
+  }
+
+  async function selectMarketSymbol(rawValue) {
+    const input = $("symbolSearch");
+    const symbol = String(rawValue || "")
+      .trim()
+      .replaceAll("/", "")
+      .replaceAll("-", "")
+      .toUpperCase();
+
+    if (!isSupportedUsdtSymbol(symbol)) {
+      if (input) input.value = currentSymbol;
+      showToast("Введите торговую пару к USDT");
+      return;
+    }
+
+    if (
+      state.marketSymbols.length &&
+      !state.marketSymbols.includes(symbol)
+    ) {
+      if (input) input.value = currentSymbol;
+      showToast("Выберите монету из списка топ-100");
+      return;
+    }
+
+    currentSymbol = symbol;
+    if (input) input.value = currentSymbol;
+
+    $("baseAssetLabel").textContent =
+      currentSymbol.replace(/USDT$/, "");
+
+    loadDrawings();
+    await loadMarket();
   }
 
   async function initializeSupabase() {
@@ -1109,12 +1204,23 @@
     $("mobileTerminalButton").onclick = closeChartMobile;
     $("chartBackButton").onclick = closeChartMobile;
 
-    $("symbolSelect").onchange = async (event) => {
-      currentSymbol = event.target.value;
-      $("baseAssetLabel").textContent = currentSymbol.replace("USDT", "");
-      loadDrawings();
-      await loadMarket();
-    };
+    const symbolSearch = $("symbolSearch");
+
+    symbolSearch.addEventListener("change", async () => {
+      await selectMarketSymbol(symbolSearch.value);
+    });
+
+    symbolSearch.addEventListener("keydown", async (event) => {
+      if (event.key !== "Enter") return;
+
+      event.preventDefault();
+      symbolSearch.blur();
+      await selectMarketSymbol(symbolSearch.value);
+    });
+
+    symbolSearch.addEventListener("input", () => {
+      symbolSearch.value = symbolSearch.value.toUpperCase();
+    });
 
     document.querySelectorAll("[data-interval]").forEach((button) => {
       button.onclick = async () => {
@@ -1280,10 +1386,12 @@
       await initializeSupabase();
       createChart();
       bindEvents();
+      await loadTopMarketSymbols();
       resizeDrawingCanvas();
       loadDrawings();
       setDrawingTool("cursor");
 
+      $("symbolSearch").value = currentSymbol;
       $("baseAssetLabel").textContent = currentSymbol.replace("USDT", "");
 
       await loadMarket();

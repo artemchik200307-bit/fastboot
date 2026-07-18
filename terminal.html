@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
   <meta name="theme-color" content="#0a1019">
   <title>FASTBOOT Terminal</title>
-  <link rel="stylesheet" href="terminal.css?v=mobile-bottom-tabs-3-1">
+  <link rel="stylesheet" href="terminal.css?v=top100-mobile-space-3-9">
   <script src="https://unpkg.com/lightweight-charts@5.0.8/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
@@ -22,18 +22,25 @@
         </div>
 
         <label class="symbol-picker">
-          <select id="symbolSelect" aria-label="Торговая пара">
-            <option>BTCUSDT</option>
-            <option>ETHUSDT</option>
-            <option>SOLUSDT</option>
-            <option>BNBUSDT</option>
-            <option>XRPUSDT</option>
-            <option>DOGEUSDT</option>
-            <option>ADAUSDT</option>
-            <option>AVAXUSDT</option>
-            <option>LINKUSDT</option>
-            <option>TRXUSDT</option>
-          </select>
+          <span class="symbol-search-icon">⌕</span>
+          <input
+            id="symbolSearch"
+            type="search"
+            list="symbolOptions"
+            value="BTCUSDT"
+            placeholder="Поиск монеты"
+            autocomplete="off"
+            autocapitalize="characters"
+            spellcheck="false"
+            aria-label="Поиск торговой пары"
+          >
+          <datalist id="symbolOptions">
+            <option value="BTCUSDT"></option>
+            <option value="ETHUSDT"></option>
+            <option value="SOLUSDT"></option>
+            <option value="BNBUSDT"></option>
+            <option value="XRPUSDT"></option>
+          </datalist>
         </label>
       </div>
     </header>
@@ -282,6 +289,6 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script src="terminal.js?v=mobile-bottom-tabs-3-1"></script>
+  <script src="terminal.js?v=top100-mobile-space-3-9"></script>
 </body>
 </html>
