@@ -1188,10 +1188,25 @@ function renderAdminUsers() {
 
         <strong>${Number(user.spot_balance || 0).toFixed(2)}</strong>
         <strong>${Number(user.bot_balance || 0).toFixed(2)}</strong>
-        <strong class="${aiClass(Number(user.ai_total_earned || 0))}">
-          ${Number(user.ai_total_earned || 0).toFixed(2)}
+        <strong class="${aiClass(Number(
+          user.ai_total_earned ??
+          user.total_ai_earned ??
+          user.total_earned ??
+          0
+        ))}">
+          ${Number(
+            user.ai_total_earned ??
+            user.total_ai_earned ??
+            user.total_earned ??
+            0
+          ).toFixed(2)}
         </strong>
-        <strong>${Number(user.ai_total_fees || 0).toFixed(2)}</strong>
+        <strong>${Number(
+          user.ai_total_fees ??
+          user.total_ai_fees ??
+          user.total_fees ??
+          0
+        ).toFixed(2)}</strong>
         <span>${formatDateTime(user.created_at)}</span>
 
         <div class="admin-row-actions">
