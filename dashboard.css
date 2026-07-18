@@ -6198,3 +6198,126 @@ html.is-admin #adminNavButton,
     text-align: center;
   }
 }
+
+
+/* ===== FASTBOOT TELEGRAM LINK V2 ===== */
+.telegram-bot-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 22px;
+  margin-bottom: 12px;
+  background:
+    radial-gradient(circle at right center, rgba(42,171,238,.18), transparent 35%),
+    rgba(17,24,35,.95);
+}
+
+.telegram-bot-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.telegram-bot-info > div:last-child {
+  min-width: 0;
+}
+
+.telegram-bot-info span {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.telegram-bot-info h3 {
+  margin: 6px 0 7px;
+  font-size: 22px;
+}
+
+.telegram-bot-info p {
+  max-width: 650px;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.telegram-logo-large {
+  flex: 0 0 auto;
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  font-size: 16px;
+}
+
+.telegram-open-bot-button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 22px;
+  text-align: center;
+}
+
+.telegram-features-card {
+  margin-bottom: 12px;
+}
+
+.telegram-features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.telegram-features-grid > div {
+  min-height: 118px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 15px;
+  background: var(--bg);
+}
+
+.telegram-features-grid span,
+.telegram-features-grid strong,
+.telegram-features-grid small {
+  display: block;
+}
+
+.telegram-features-grid span {
+  font-size: 22px;
+}
+
+.telegram-features-grid strong {
+  margin-top: 10px;
+}
+
+.telegram-features-grid small {
+  margin-top: 5px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+@media (max-width: 760px) {
+  .telegram-bot-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .telegram-open-bot-button {
+    width: 100%;
+  }
+
+  .telegram-features-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .telegram-bot-info {
+    align-items: flex-start;
+  }
+
+  .telegram-features-grid {
+    grid-template-columns: 1fr;
+  }
+}
