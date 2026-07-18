@@ -11,7 +11,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#080c12">
   <title>FASTBOOT — Личный кабинет</title>
-  <link rel="stylesheet" href="dashboard.css?v=withdrawal-rules-3-1">
+  <link rel="stylesheet" href="dashboard.css?v=spot-withdrawal-3-2">
   <script src="https://unpkg.com/lightweight-charts@5.2.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
@@ -129,19 +129,15 @@
               <span>Доступно к выводу</span>
               <strong id="withdrawalAvailableTotal">0.00 USDT</strong>
               <small>
-                Прибыль AI-бота и доступные реферальные бонусы.
-                Первоначальный вклад не входит в сумму вывода.
+                Баланс основного счёта. Минимальный вывод — 50 USDT.
+                Новую заявку можно создать один раз в 14 дней.
               </small>
             </div>
 
             <div class="withdrawal-availability-parts">
               <div>
-                <span>Прибыль AI-бота</span>
-                <strong id="withdrawalBotProfit">0.00 USDT</strong>
-              </div>
-              <div>
-                <span>Реферальные бонусы</span>
-                <strong id="withdrawalReferralBonus">0.00 USDT</strong>
+                <span>Основной счёт</span>
+                <strong id="withdrawalSpotBalance">0.00 USDT</strong>
               </div>
               <div>
                 <span>Следующий вывод</span>
@@ -151,7 +147,7 @@
 
             <div class="withdrawal-rules">
               <span>Минимум 50 USDT</span>
-              <span>Не чаще одного раза в 14 дней</span>
+              <span>Один вывод раз в 14 дней</span>
             </div>
           </article>
 

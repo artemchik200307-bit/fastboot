@@ -558,26 +558,24 @@ function portfolioValue(item) {
 function renderWithdrawalOverview() {
   const overview = state.withdrawalOverview || {};
 
-  const botProfit = Number(overview.bot_profit_available || 0);
-  const referralBonus = Number(overview.referral_bonus_available || 0);
-  const total = Number(overview.total_available || 0);
+  const available = Number(
+    overview.available_amount ??
+    userWallet?.spot_balance ??
+    0
+  );
+
   const nextAt = overview.next_withdrawal_at
     ? new Date(overview.next_withdrawal_at)
     : null;
 
   setText(
     "withdrawalAvailableTotal",
-    `${total.toFixed(2)} USDT`
+    `${available.toFixed(2)} USDT`
   );
 
   setText(
-    "withdrawalBotProfit",
-    `${botProfit.toFixed(2)} USDT`
-  );
-
-  setText(
-    "withdrawalReferralBonus",
-    `${referralBonus.toFixed(2)} USDT`
+    "withdrawalSpotBalance",
+    `${available.toFixed(2)} USDT`
   );
 
   setText(
@@ -592,9 +590,11 @@ function renderWithdrawalOverview() {
   const withdrawButton = $("withdrawButton");
 
   if (withdrawButton) {
-    withdrawButton.dataset.availableAmount = total.toFixed(8);
+    withdrawButton.dataset.availableAmount =
+      available.toFixed(8);
+
     withdrawButton.title = overview.can_withdraw
-      ? `Доступно ${total.toFixed(2)} USDT`
+      ? `Доступно ${available.toFixed(2)} USDT`
       : "Следующий вывод ещё недоступен";
   }
 }
@@ -815,23 +815,18 @@ function openMoneyModal(type) {
         <div class="withdrawal-modal-available">
           <span>Доступно к выводу</span>
           <strong>${Number(
-            state.withdrawalOverview?.total_available || 0
+            state.withdrawalOverview?.available_amount ??
+            userWallet?.spot_balance ??
+            0
           ).toFixed(2)} USDT</strong>
-          <small>
-            AI-прибыль: ${Number(
-              state.withdrawalOverview?.bot_profit_available || 0
-            ).toFixed(2)} USDT ·
-            Реферальные бонусы: ${Number(
-              state.withdrawalOverview?.referral_bonus_available || 0
-            ).toFixed(2)} USDT
-          </small>
+          <small>Баланс основного счёта</small>
         </div>
 
         <div class="crypto-warning">
           <strong>Правила вывода</strong>
           <p>Минимальный вывод — 50 USDT.</p>
           <p>Создать новую заявку можно один раз в 14 дней.</p>
-          <p>Выводится только заработок AI-бота и реферальные бонусы.</p>
+          <p>Доступная сумма равна балансу основного счёта.</p>
           <p>Вывод выполняется только в сети TRC20.</p>
         </div>
 
@@ -885,7 +880,9 @@ async function processMoneyAction(type) {
 
   if (type === "withdraw") {
     const available = Number(
-      state.withdrawalOverview?.total_available || 0
+      state.withdrawalOverview?.available_amount ??
+      userWallet?.spot_balance ??
+      0
     );
 
     if (!state.withdrawalOverview?.can_withdraw) {

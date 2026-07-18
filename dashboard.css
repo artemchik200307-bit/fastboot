@@ -5612,3 +5612,23 @@ html.is-admin #adminNavButton,
     grid-template-columns: 1fr;
   }
 }
+
+
+/* ===== SPOT WITHDRAWAL RULES 3.2 ===== */
+.withdrawal-availability-card {
+  grid-template-columns: minmax(240px, 1.2fr) minmax(300px, .8fr);
+}
+
+.withdrawal-availability-parts {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+@media (max-width: 800px) {
+  .withdrawal-availability-card {
+    grid-template-columns: 1fr;
+  }
+
+  .withdrawal-availability-parts {
+    grid-template-columns: 1fr;
+  }
+}
