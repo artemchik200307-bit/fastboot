@@ -122,13 +122,77 @@
     );
   }
 
-  function renderSymbolOptions(symbols) {
-    const datalist = $("symbolOptions");
-    if (!datalist) return;
+  function getFilteredSymbols(query = "") {
+    const normalized = String(query || "")
+      .trim()
+      .replaceAll("/", "")
+      .replaceAll("-", "")
+      .toUpperCase();
 
-    datalist.innerHTML = symbols
-      .map((symbol) => `<option value="${escapeHtml(symbol)}"></option>`)
-      .join("");
+    if (!normalized) return state.marketSymbols;
+
+    return state.marketSymbols.filter((symbol) =>
+      symbol.includes(normalized)
+    );
+  }
+
+  function renderSymbolOptions(symbols = state.marketSymbols) {
+    const dropdown = $("symbolDropdown");
+    if (!dropdown) return;
+
+    const rows = symbols.slice(0, 100);
+
+    dropdown.innerHTML = rows.length
+      ? rows.map((symbol) => {
+          const base = symbol.replace(/USDT$/, "");
+
+          return `
+            <button
+              class="symbol-option"
+              type="button"
+              role="option"
+              data-symbol="${escapeHtml(symbol)}"
+            >
+              <strong>${escapeHtml(base)}</strong>
+              <span>/USDT</span>
+            </button>
+          `;
+        }).join("")
+      : '<div class="symbol-empty">Монета не найдена</div>';
+
+    dropdown.querySelectorAll("[data-symbol]").forEach((button) => {
+      button.onclick = async () => {
+        await selectMarketSymbol(button.dataset.symbol);
+        closeSymbolDropdown();
+      };
+    });
+  }
+
+  function openSymbolDropdown() {
+    const dropdown = $("symbolDropdown");
+    const input = $("symbolSearch");
+
+    renderSymbolOptions(
+      getFilteredSymbols(input?.value || "")
+    );
+
+    dropdown?.classList.remove("hidden");
+    input?.setAttribute("aria-expanded", "true");
+  }
+
+  function closeSymbolDropdown() {
+    $("symbolDropdown")?.classList.add("hidden");
+    $("symbolSearch")?.setAttribute("aria-expanded", "false");
+  }
+
+  function toggleSymbolDropdown() {
+    const dropdown = $("symbolDropdown");
+
+    if (dropdown?.classList.contains("hidden")) {
+      openSymbolDropdown();
+    } else {
+      closeSymbolDropdown();
+    }
   }
 
   async function loadTopMarketSymbols() {
@@ -191,6 +255,7 @@
 
     currentSymbol = symbol;
     if (input) input.value = currentSymbol;
+    renderSymbolOptions(state.marketSymbols);
 
     $("baseAssetLabel").textContent =
       currentSymbol.replace(/USDT$/, "");
@@ -1206,20 +1271,42 @@
 
     const symbolSearch = $("symbolSearch");
 
-    symbolSearch.addEventListener("change", async () => {
-      await selectMarketSymbol(symbolSearch.value);
-    });
+    symbolSearch.addEventListener("focus", openSymbolDropdown);
+    symbolSearch.addEventListener("click", openSymbolDropdown);
+
+    $("toggleSymbolDropdown").onclick = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleSymbolDropdown();
+    };
 
     symbolSearch.addEventListener("keydown", async (event) => {
+      if (event.key === "Escape") {
+        closeSymbolDropdown();
+        symbolSearch.blur();
+        return;
+      }
+
       if (event.key !== "Enter") return;
 
       event.preventDefault();
-      symbolSearch.blur();
       await selectMarketSymbol(symbolSearch.value);
+      closeSymbolDropdown();
+      symbolSearch.blur();
     });
 
     symbolSearch.addEventListener("input", () => {
       symbolSearch.value = symbolSearch.value.toUpperCase();
+      renderSymbolOptions(
+        getFilteredSymbols(symbolSearch.value)
+      );
+      openSymbolDropdown();
+    });
+
+    document.addEventListener("click", (event) => {
+      if (!event.target.closest(".symbol-picker")) {
+        closeSymbolDropdown();
+      }
     });
 
     document.querySelectorAll("[data-interval]").forEach((button) => {
@@ -1310,10 +1397,8 @@
         const targetPanel = document.getElementById(targetId);
 
         if (targetPanel) {
-          targetPanel.scrollIntoView({
-            behavior: "smooth",
-            block: "nearest",
-          });
+          targetPanel.scrollTop = 0;
+          targetPanel.scrollLeft = 0;
         }
       };
     });

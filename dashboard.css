@@ -5954,3 +5954,22 @@ html.is-admin #adminNavButton,
     minmax(120px,.9fr) !important;
   min-width: 860px !important;
 }
+
+
+/* ===== TERMINAL IFRAME MOBILE SCROLL 4.3 ===== */
+@media (max-width: 760px) {
+  .terminal-frame-shell {
+    height: calc(100dvh - 78px) !important;
+    min-height: calc(100dvh - 78px) !important;
+    overflow: hidden !important;
+  }
+
+  .terminal-frame {
+    width: 100%;
+    height: 100% !important;
+    min-height: 100% !important;
+    border: 0;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
