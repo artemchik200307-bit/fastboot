@@ -1191,6 +1191,17 @@ $("transferFromBotButton").addEventListener(
 
 
 
+function formatQuantity(value) {
+  const number = Number(value || 0);
+
+  if (!Number.isFinite(number)) return "0";
+
+  return number.toLocaleString("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 8,
+  });
+}
+
 function safeFormatPrice(value) {
   const number = Number(value || 0);
 
@@ -1618,7 +1629,7 @@ function renderAdminUserDetailsTab(tab = "overview") {
             <div><dt>Username</dt><dd>${escapeHtml(profile.username || "—")}</dd></div>
             <div><dt>Роль</dt><dd>${escapeHtml(profile.role || "user")}</dd></div>
             <div><dt>Регистрация</dt><dd>${formatDateTime(profile.created_at)}</dd></div>
-            <div><dt>AI-бот</dt><dd>${data.ai_bot?.is_active ? "Включён" : "Выключен"}</dd></div>
+            <div><dt>AI-бот</dt><dd>${Boolean(data.ai_bot?.is_active) ? "Включён" : "Выключен"}</dd></div>
           </dl>
         </article>
 
@@ -1847,35 +1858,166 @@ async function openAdminUserDetails(user) {
   if (!user) return;
 
   $("adminUserDetailsModal").classList.remove("hidden");
-  $("adminUserDetailsTitle").textContent = user.username || "Пользователь";
+  $("adminUserDetailsTitle").textContent =
+    user.username || "Пользователь";
+
   $("adminUserDetailsSubtitle").textContent =
     `${user.email || "—"} · ${user.fastboot_id || "—"}`;
 
   $("adminUserDetailsSummary").innerHTML = "";
+
   $("adminUserDetailsContent").innerHTML =
     '<div class="admin-empty">Загрузка полной статистики…</div>';
 
-  try {
-    const { data, error } = await supabaseClient.rpc(
-      "admin_get_user_full_statistics",
-      { p_user_id: user.id }
+  const calls = {
+    core: supabaseClient.rpc("admin_get_user_core", {
+      p_user_id: user.id,
+    }),
+
+    funding: supabaseClient.rpc("admin_get_user_funding_history", {
+      p_user_id: user.id,
+    }),
+
+    transfers: supabaseClient.rpc("admin_get_user_transfer_history", {
+      p_user_id: user.id,
+    }),
+
+    operations: supabaseClient.rpc("admin_get_user_transaction_history", {
+      p_user_id: user.id,
+    }),
+
+    terminal: supabaseClient.rpc("admin_get_user_terminal_data", {
+      p_user_id: user.id,
+    }),
+
+    ai: supabaseClient.rpc("admin_get_user_ai_history", {
+      p_user_id: user.id,
+    }),
+
+    referral: supabaseClient.rpc("admin_get_user_referral_data", {
+      p_user_id: user.id,
+    }),
+  };
+
+  const keys = Object.keys(calls);
+  const results = await Promise.allSettled(
+    keys.map((key) => calls[key])
+  );
+
+  const loaded = {};
+
+  results.forEach((result, index) => {
+    const key = keys[index];
+
+    if (result.status === "fulfilled" && !result.value.error) {
+      loaded[key] = result.value.data;
+      return;
+    }
+
+    const error =
+      result.status === "fulfilled"
+        ? result.value.error
+        : result.reason;
+
+    console.warn(`Admin details section "${key}" unavailable:`, error);
+    loaded[key] = null;
+  });
+
+  const core =
+    typeof loaded.core === "string"
+      ? JSON.parse(loaded.core)
+      : (loaded.core || {});
+
+  const terminal =
+    typeof loaded.terminal === "string"
+      ? JSON.parse(loaded.terminal)
+      : (loaded.terminal || {});
+
+  const referral =
+    typeof loaded.referral === "string"
+      ? JSON.parse(loaded.referral)
+      : (loaded.referral || {});
+
+  state.selectedAdminUserDetails = {
+    profile: core.profile || {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      fastboot_id: user.fastboot_id,
+      role: user.role,
+      created_at: user.created_at,
+    },
+
+    balances: core.balances || {
+      spot_balance: Number(user.spot_balance || 0),
+      bot_balance: Number(user.bot_balance || 0),
+      trading_balance: Number(user.trading_balance || 0),
+      total_balance:
+        Number(user.spot_balance || 0) +
+        Number(user.bot_balance || 0) +
+        Number(user.trading_balance || 0),
+    },
+
+    ai_bot: core.ai_bot || {
+      user_id: user.id,
+      is_active: Boolean(user.ai_bot_active),
+    },
+
+    statistics: {
+      ...(core.statistics || {}),
+      terminal_trades_count:
+        terminal.statistics?.trades_count || 0,
+    },
+
+    funding_requests: Array.isArray(loaded.funding)
+      ? loaded.funding
+      : [],
+
+    wallet_transfers: Array.isArray(loaded.transfers)
+      ? loaded.transfers
+      : [],
+
+    transactions: Array.isArray(loaded.operations)
+      ? loaded.operations
+      : [],
+
+    terminal_positions: Array.isArray(terminal.positions)
+      ? terminal.positions
+      : [],
+
+    terminal_orders: Array.isArray(terminal.orders)
+      ? terminal.orders
+      : [],
+
+    terminal_trades: Array.isArray(terminal.trades)
+      ? terminal.trades
+      : [],
+
+    ai_trades: Array.isArray(loaded.ai)
+      ? loaded.ai
+      : [],
+
+    referral,
+  };
+
+  renderAdminUserDetailsSummary();
+  renderAdminUserDetailsTab("overview");
+
+  const failedSections = keys.filter((key, index) => {
+    const result = results[index];
+    return (
+      result.status !== "fulfilled" ||
+      Boolean(result.value?.error)
     );
+  });
 
-    if (error) throw error;
-
-    state.selectedAdminUserDetails =
-      typeof data === "string"
-        ? JSON.parse(data)
-        : (data || {});
-
-    renderAdminUserDetailsSummary();
-    renderAdminUserDetailsTab("overview");
-  } catch (error) {
-    console.error("Admin user details error:", error);
-    $("adminUserDetailsContent").innerHTML =
-      adminDetailEmpty(error.message || "Не удалось загрузить статистику");
+  if (failedSections.length) {
+    showToast(
+      `Часть данных недоступна: ${failedSections.join(", ")}`
+    );
   }
 }
+
 
 function openAdminBalanceModal(u){if(!u)return;$("adminModalTitle").textContent="Изменение баланса";$("adminModalBody").innerHTML=`<div class="admin-modal-user"><strong>${escapeHtml(u.username||"User")}</strong><span>${escapeHtml(u.email||"")}</span></div><div class="modal-form"><label>Счёт<select id="adminWalletType"><option value="spot">Основной</option><option value="bot">AI Bot</option></select></label><label>Операция<select id="adminBalanceOperation"><option value="credit">Начислить</option><option value="debit">Списать</option></select></label><label>Сумма USDT<input id="adminBalanceAmount" type="number" min="0.01" step="0.01"></label><label>Причина<input id="adminBalanceReason" maxlength="300"></label><button id="confirmAdminBalanceButton" class="primary-action">Применить</button></div>`;$("adminModal").classList.remove("hidden");$("confirmAdminBalanceButton").onclick=async()=>{const amount=Number($("adminBalanceAmount").value);if(!(amount>0))return showToast("Введите сумму");try{const {error}=await supabaseClient.rpc("admin_adjust_user_balance",{p_user_id:u.id,p_wallet:$("adminWalletType").value,p_operation:$("adminBalanceOperation").value,p_amount:amount,p_reason:$("adminBalanceReason").value.trim()||null});if(error)throw error;$("adminModal").classList.add("hidden");showToast("Баланс обновлён");await loadAdminPanel($("adminUserSearch").value.trim());}catch(e){showToast(e.message||"Ошибка");}};}
 function openAdminRoleModal(u){if(!u)return;$("adminModalTitle").textContent="Изменение роли";$("adminModalBody").innerHTML=`<div class="admin-modal-user"><strong>${escapeHtml(u.username||"User")}</strong><span>${escapeHtml(u.email||"")}</span></div><div class="modal-form"><label>Роль<select id="adminNewRole"><option value="user" ${u.role==="user"?"selected":""}>user</option><option value="admin" ${u.role==="admin"?"selected":""}>admin</option></select></label><button id="confirmAdminRoleButton" class="primary-action">Сохранить</button></div>`;$("adminModal").classList.remove("hidden");$("confirmAdminRoleButton").onclick=async()=>{try{const {error}=await supabaseClient.rpc("admin_set_user_role",{p_user_id:u.id,p_role:$("adminNewRole").value});if(error)throw error;$("adminModal").classList.add("hidden");showToast("Роль изменена");await loadAdminPanel($("adminUserSearch").value.trim());}catch(e){showToast(e.message||"Ошибка");}};}
