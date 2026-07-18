@@ -1,4 +1,4 @@
-window.FASTBOOT_BUILD_VERSION = "3.4-terminal-balance-hard";
+window.FASTBOOT_BUILD_VERSION = "telegram-link-v1";
 const REST_BASE = "https://data-api.binance.vision";
 const WS_BASE = "wss://stream.binance.com:9443/ws";
 const $ = (id) => document.getElementById(id);
@@ -83,6 +83,7 @@ const titles = {
   trading: "Торговый терминал",
   "market-analysis": "Анализ рынка",
   referral: "Referral",
+  telegram: "Telegram",
   admin: "Admin Panel",
   settings: "Настройки",
 };
@@ -127,6 +128,7 @@ function openSection(id) {
 
   if (id === "market-analysis") loadMarketAnalysis();
   if (id === "referral") loadReferralProgram();
+  if (id === "telegram") loadTelegramIntegration();
 
   if (id === "admin") {
     if (String(userProfile.role || "").trim().toLowerCase() !== "admin") {
@@ -397,6 +399,155 @@ async function transferReferralBalance() {
   } catch (error) {
     console.error(error);
     showToast(error.message || "Не удалось выполнить перевод");
+  }
+}
+
+
+async function loadTelegramIntegration() {
+  const statusElement = $("telegramStatus");
+  const badgeElement = $("telegramStatusBadge");
+  const accountElement = $("telegramAccountName");
+  const publicId =
+    userProfile.fastboot_id ||
+    `FB-${authUser.id.replaceAll("-", "").slice(0, 10).toUpperCase()}`;
+
+  setText("telegramFastbootId", publicId);
+  setText("telegramInstructionId", publicId);
+
+  if (statusElement) statusElement.textContent = "Проверка...";
+  if (badgeElement) {
+    badgeElement.textContent = "—";
+    badgeElement.classList.remove("connected");
+  }
+
+  try {
+    const { data, error } = await supabaseClient
+      .from("telegram_accounts")
+      .select(
+        "telegram_user_id,telegram_username,telegram_first_name,is_active,linked_at"
+      )
+      .eq("user_id", authUser.id)
+      .eq("is_active", true)
+      .limit(1);
+
+    if (error) throw error;
+
+    const account = Array.isArray(data) ? data[0] : null;
+
+    if (account) {
+      setText("telegramStatus", "Подключён");
+      setText(
+        "telegramAccountName",
+        account.telegram_username
+          ? `@${account.telegram_username}`
+          : account.telegram_first_name || `ID ${account.telegram_user_id}`
+      );
+
+      if (badgeElement) {
+        badgeElement.textContent = "АКТИВЕН";
+        badgeElement.classList.add("connected");
+      }
+
+      const generateButton = $("generateTelegramCodeButton");
+      if (generateButton) {
+        generateButton.textContent = "Создать новый код";
+      }
+    } else {
+      setText("telegramStatus", "Не подключён");
+      setText("telegramAccountName", "Не подключён");
+
+      if (badgeElement) {
+        badgeElement.textContent = "НЕ ПОДКЛЮЧЁН";
+        badgeElement.classList.remove("connected");
+      }
+    }
+  } catch (error) {
+    console.error("Telegram status load error:", error);
+    setText("telegramStatus", "Недоступно");
+    setText("telegramAccountName", "Не удалось проверить");
+
+    if (badgeElement) {
+      badgeElement.textContent = "ОШИБКА";
+      badgeElement.classList.remove("connected");
+    }
+  }
+}
+
+async function generateTelegramLinkCode() {
+  const button = $("generateTelegramCodeButton");
+  const copyButton = $("copyTelegramCodeButton");
+
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Создание кода...";
+  }
+
+  try {
+    const { data, error } = await supabaseClient.rpc(
+      "telegram_generate_link_code"
+    );
+
+    if (error) throw error;
+
+    const result = Array.isArray(data) ? data[0] : data;
+
+    if (!result?.code) {
+      throw new Error("Supabase не вернул код привязки");
+    }
+
+    const code = String(result.code);
+    const expiresAt = result.expires_at
+      ? new Date(result.expires_at)
+      : new Date(Date.now() + 10 * 60 * 1000);
+
+    setText("telegramLinkCode", code);
+    setText(
+      "telegramCodeExpiry",
+      `Код действует до ${expiresAt.toLocaleTimeString("ru-RU", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })}`
+    );
+
+    if (copyButton) {
+      copyButton.disabled = false;
+      copyButton.dataset.code = code;
+    }
+
+    showToast("Код привязки создан");
+  } catch (error) {
+    console.error("Telegram code generation error:", error);
+    showToast(error.message || "Не удалось создать код привязки");
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Создать новый код";
+    }
+  }
+}
+
+async function copyTelegramLinkCode() {
+  const button = $("copyTelegramCodeButton");
+  const code = button?.dataset.code || $("telegramLinkCode")?.textContent;
+
+  if (!code || !/^\d{6}$/.test(code.trim())) {
+    showToast("Сначала создайте код");
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(code.trim());
+    showToast("Код скопирован");
+  } catch {
+    const input = document.createElement("textarea");
+    input.value = code.trim();
+    input.style.position = "fixed";
+    input.style.opacity = "0";
+    document.body.appendChild(input);
+    input.select();
+    document.execCommand("copy");
+    input.remove();
+    showToast("Код скопирован");
   }
 }
 
@@ -3114,3 +3265,19 @@ document.addEventListener("keydown", (event) => {
     closeMobileBottomDrawer();
   }
 });
+
+const generateTelegramCodeButton = $("generateTelegramCodeButton");
+if (generateTelegramCodeButton) {
+  generateTelegramCodeButton.addEventListener(
+    "click",
+    generateTelegramLinkCode
+  );
+}
+
+const copyTelegramCodeButton = $("copyTelegramCodeButton");
+if (copyTelegramCodeButton) {
+  copyTelegramCodeButton.addEventListener(
+    "click",
+    copyTelegramLinkCode
+  );
+}
