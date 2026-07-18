@@ -1286,16 +1286,35 @@
 
     document.querySelectorAll("[data-bottom-tab]").forEach((button) => {
       button.onclick = () => {
-        document.querySelectorAll("[data-bottom-tab]").forEach((item) =>
-          item.classList.toggle("active", item === button)
-        );
+        const targetId = `${button.dataset.bottomTab}Tab`;
 
-        document.querySelectorAll(".tab-content").forEach((panel) =>
-          panel.classList.toggle(
-            "active",
-            panel.id === `${button.dataset.bottomTab}Tab`
-          )
-        );
+        document.querySelectorAll("[data-bottom-tab]").forEach((item) => {
+          item.classList.toggle("active", item === button);
+          item.setAttribute(
+            "aria-selected",
+            item === button ? "true" : "false"
+          );
+        });
+
+        document.querySelectorAll(".bottom-panel .tab-content").forEach((panel) => {
+          const isActive = panel.id === targetId;
+
+          panel.classList.toggle("active", isActive);
+          panel.hidden = !isActive;
+          panel.setAttribute(
+            "aria-hidden",
+            isActive ? "false" : "true"
+          );
+        });
+
+        const targetPanel = document.getElementById(targetId);
+
+        if (targetPanel) {
+          targetPanel.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+          });
+        }
       };
     });
 

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
   <meta name="theme-color" content="#0a1019">
   <title>FASTBOOT Terminal</title>
-  <link rel="stylesheet" href="terminal.css?v=mobile-tabs-scroll-4-0">
+  <link rel="stylesheet" href="terminal.css?v=mobile-single-tab-4-1">
   <script src="https://unpkg.com/lightweight-charts@5.0.8/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
@@ -189,16 +189,16 @@
 
     <section class="bottom-panel panel">
       <nav class="bottom-tabs">
-        <button data-bottom-tab="positions" class="active">
+        <button data-bottom-tab="positions" class="active" aria-selected="true">
           Позиции <span id="positionsCount">(0)</span>
         </button>
-        <button data-bottom-tab="orders">
+        <button data-bottom-tab="orders" aria-selected="false">
           Открытые ордера <span id="ordersCount">(0)</span>
         </button>
-        <button data-bottom-tab="trades">История сделок</button>
+        <button data-bottom-tab="trades" aria-selected="false">История сделок</button>
       </nav>
 
-      <div id="positionsTab" class="tab-content active">
+      <div id="positionsTab" class="tab-content active" aria-hidden="false">
         <div class="table-scroll">
           <table>
             <thead>
@@ -212,7 +212,7 @@
         </div>
       </div>
 
-      <div id="ordersTab" class="tab-content">
+      <div id="ordersTab" class="tab-content" hidden aria-hidden="true">
         <div class="table-scroll">
           <table>
             <thead>
@@ -226,7 +226,7 @@
         </div>
       </div>
 
-      <div id="tradesTab" class="tab-content">
+      <div id="tradesTab" class="tab-content" hidden aria-hidden="true">
         <div class="table-scroll">
           <table>
             <thead>
@@ -289,6 +289,6 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script src="terminal.js?v=top100-mobile-space-3-9"></script>
+  <script src="terminal.js?v=mobile-single-tab-4-1"></script>
 </body>
 </html>
