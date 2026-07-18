@@ -11,7 +11,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#080c12">
   <title>FASTBOOT — Личный кабинет</title>
-  <link rel="stylesheet" href="dashboard.css?v=admin-user-profit-fees-3-0">
+  <link rel="stylesheet" href="dashboard.css?v=withdrawal-rules-3-1">
   <script src="https://unpkg.com/lightweight-charts@5.2.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
@@ -123,6 +123,37 @@
               <small id="pendingWithdrawCount">0 заявок</small>
             </article>
           </div>
+
+          <article class="panel withdrawal-availability-card">
+            <div class="withdrawal-availability-main">
+              <span>Доступно к выводу</span>
+              <strong id="withdrawalAvailableTotal">0.00 USDT</strong>
+              <small>
+                Прибыль AI-бота и доступные реферальные бонусы.
+                Первоначальный вклад не входит в сумму вывода.
+              </small>
+            </div>
+
+            <div class="withdrawal-availability-parts">
+              <div>
+                <span>Прибыль AI-бота</span>
+                <strong id="withdrawalBotProfit">0.00 USDT</strong>
+              </div>
+              <div>
+                <span>Реферальные бонусы</span>
+                <strong id="withdrawalReferralBonus">0.00 USDT</strong>
+              </div>
+              <div>
+                <span>Следующий вывод</span>
+                <strong id="withdrawalNextDate">Доступен</strong>
+              </div>
+            </div>
+
+            <div class="withdrawal-rules">
+              <span>Минимум 50 USDT</span>
+              <span>Не чаще одного раза в 14 дней</span>
+            </div>
+          </article>
 
           <div class="account-grid">
             <article class="panel portfolio-panel">
@@ -326,7 +357,7 @@
             <iframe
               id="terminalFrame"
               class="terminal-frame"
-              src="terminal.html?v=balance-fix-2-5"
+              src="terminal.html?v=mobile-bottom-tabs-3-1"
               title="FASTBOOT Trading Terminal"
             ></iframe>
           </div>

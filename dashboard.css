@@ -5502,3 +5502,113 @@ html.is-admin #adminNavButton,
     min-width: 640px;
   }
 }
+
+
+/* ===== WITHDRAWAL RULES 3.1 ===== */
+.withdrawal-availability-card {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.15fr) minmax(360px, 1.5fr);
+  gap: 16px;
+  align-items: center;
+  margin-top: 14px;
+  padding: 18px;
+}
+
+.withdrawal-availability-main span,
+.withdrawal-availability-main strong,
+.withdrawal-availability-main small {
+  display: block;
+}
+
+.withdrawal-availability-main span {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.withdrawal-availability-main strong {
+  margin: 7px 0 5px;
+  font-size: 31px;
+}
+
+.withdrawal-availability-main small {
+  max-width: 520px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.withdrawal-availability-parts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 9px;
+}
+
+.withdrawal-availability-parts > div {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 12px;
+  background: rgba(255,255,255,.025);
+}
+
+.withdrawal-availability-parts span,
+.withdrawal-availability-parts strong {
+  display: block;
+}
+
+.withdrawal-availability-parts span {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.withdrawal-availability-parts strong {
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+.withdrawal-rules {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.withdrawal-rules span {
+  border: 1px solid rgba(111,145,255,.27);
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(111,145,255,.07);
+  color: #aebbe2;
+  font-size: 9px;
+}
+
+.withdrawal-modal-available {
+  border: 1px solid rgba(111,145,255,.32);
+  border-radius: 10px;
+  padding: 13px;
+  background: rgba(111,145,255,.08);
+}
+
+.withdrawal-modal-available span,
+.withdrawal-modal-available strong,
+.withdrawal-modal-available small {
+  display: block;
+}
+
+.withdrawal-modal-available span,
+.withdrawal-modal-available small {
+  color: var(--muted);
+}
+
+.withdrawal-modal-available strong {
+  margin: 5px 0;
+  font-size: 22px;
+}
+
+@media (max-width: 800px) {
+  .withdrawal-availability-card {
+    grid-template-columns: 1fr;
+  }
+
+  .withdrawal-availability-parts {
+    grid-template-columns: 1fr;
+  }
+}

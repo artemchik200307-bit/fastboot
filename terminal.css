@@ -845,3 +845,61 @@ body {
     display: none !important;
   }
 }
+
+
+/* ===== MOBILE TERMINAL BOTTOM TABS 3.1 ===== */
+@media (max-width: 760px) {
+  html,
+  body {
+    min-height: 100%;
+    height: auto !important;
+    overflow-y: auto !important;
+  }
+
+  .stats-row {
+    display: none !important;
+  }
+
+  .bottom-panel {
+    display: block !important;
+    width: 100%;
+    min-width: 0;
+    border-top: 1px solid var(--line);
+    background: var(--panel);
+  }
+
+  .bottom-tabs {
+    position: sticky;
+    top: 0;
+    z-index: 16;
+    display: flex !important;
+    max-width: 100vw;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    background: var(--panel);
+  }
+
+  .bottom-tabs button {
+    flex: 0 0 auto;
+    min-height: 44px;
+    white-space: nowrap;
+  }
+
+  .tab-content {
+    min-height: 210px;
+  }
+
+  .table-scroll {
+    max-width: 100vw;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .workspace {
+    min-height: calc(100dvh - 107px);
+  }
+
+  body.chart-open .bottom-panel {
+    display: block !important;
+  }
+}

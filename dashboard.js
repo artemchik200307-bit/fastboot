@@ -51,6 +51,7 @@ const state = {
   adminReferralOverview: null,
   adminReferralPartners: [],
   selectedReferralPartner: null,
+  withdrawalOverview: null,
   terminalJournalTrades: [],
   botBalance: Number(userWallet?.bot_balance || 0),
   botRunning: localStorage.getItem(storageKey("bot-running")) === "true",
@@ -402,6 +403,7 @@ async function loadSupabaseAccountData() {
     fundingResult,
     transactionResult,
     transferResult,
+    withdrawalOverviewResult,
   ] = await Promise.all([
     supabaseClient.rpc("get_my_wallet"),
 
@@ -425,12 +427,17 @@ async function loadSupabaseAccountData() {
       .eq("user_id", authUser.id)
       .order("created_at", { ascending: false })
       .limit(100),
+
+    supabaseClient.rpc("get_withdrawal_overview"),
   ]);
 
   if (walletResult.error) console.error("Wallet load error:", walletResult.error);
   if (fundingResult.error) console.error("Funding load error:", fundingResult.error);
   if (transactionResult.error) console.error("Transaction load error:", transactionResult.error);
   if (transferResult.error) console.error("Transfer load error:", transferResult.error);
+  if (withdrawalOverviewResult.error) {
+    console.error("Withdrawal overview error:", withdrawalOverviewResult.error);
+  }
 
   const loadedWallet = Array.isArray(walletResult.data)
     ? walletResult.data[0]
@@ -461,6 +468,9 @@ async function loadSupabaseAccountData() {
   state.fundingRequests = fundingResult.data || [];
   state.transactions = transactionResult.data || [];
   state.transfers = transferResult.data || [];
+  state.withdrawalOverview = Array.isArray(withdrawalOverviewResult.data)
+    ? withdrawalOverviewResult.data[0] || null
+    : withdrawalOverviewResult.data || null;
 
   try {
     const [botAccountResult, aiResultsResult] = await Promise.all([
@@ -492,6 +502,7 @@ async function loadSupabaseAccountData() {
   initializeUser();
   applySupabaseWalletToPortfolio();
   renderAccount();
+  renderWithdrawalOverview();
   renderAiAssistant();
 
   ensureReferralAccount().catch((error) => {
@@ -542,6 +553,50 @@ async function loadPrices() {
 
 function portfolioValue(item) {
   return item.amount * (state.prices[item.asset] || 0);
+}
+
+function renderWithdrawalOverview() {
+  const overview = state.withdrawalOverview || {};
+
+  const botProfit = Number(overview.bot_profit_available || 0);
+  const referralBonus = Number(overview.referral_bonus_available || 0);
+  const total = Number(overview.total_available || 0);
+  const nextAt = overview.next_withdrawal_at
+    ? new Date(overview.next_withdrawal_at)
+    : null;
+
+  setText(
+    "withdrawalAvailableTotal",
+    `${total.toFixed(2)} USDT`
+  );
+
+  setText(
+    "withdrawalBotProfit",
+    `${botProfit.toFixed(2)} USDT`
+  );
+
+  setText(
+    "withdrawalReferralBonus",
+    `${referralBonus.toFixed(2)} USDT`
+  );
+
+  setText(
+    "withdrawalNextDate",
+    overview.can_withdraw
+      ? "Доступен"
+      : nextAt
+        ? nextAt.toLocaleDateString("ru-RU")
+        : "Недоступен"
+  );
+
+  const withdrawButton = $("withdrawButton");
+
+  if (withdrawButton) {
+    withdrawButton.dataset.availableAmount = total.toFixed(8);
+    withdrawButton.title = overview.can_withdraw
+      ? `Доступно ${total.toFixed(2)} USDT`
+      : "Следующий вывод ещё недоступен";
+  }
 }
 
 function renderAccount() {
@@ -654,7 +709,7 @@ function renderOperations() {
 
 const FASTBOOT_TRC20_ADDRESS = "TVwAj44gxbPFTDH3KifsmqjfCtF54tj4DC";
 const FASTBOOT_MIN_DEPOSIT = 10;
-const FASTBOOT_MIN_WITHDRAW = 10;
+const FASTBOOT_MIN_WITHDRAW = 50;
 
 function setModalOpenState(isOpen) {
   document.body.classList.toggle("modal-open", Boolean(isOpen));
@@ -757,10 +812,27 @@ function openMoneyModal(type) {
           <div><span>Минимум</span><strong>${FASTBOOT_MIN_WITHDRAW} USDT</strong></div>
         </div>
 
+        <div class="withdrawal-modal-available">
+          <span>Доступно к выводу</span>
+          <strong>${Number(
+            state.withdrawalOverview?.total_available || 0
+          ).toFixed(2)} USDT</strong>
+          <small>
+            AI-прибыль: ${Number(
+              state.withdrawalOverview?.bot_profit_available || 0
+            ).toFixed(2)} USDT ·
+            Реферальные бонусы: ${Number(
+              state.withdrawalOverview?.referral_bonus_available || 0
+            ).toFixed(2)} USDT
+          </small>
+        </div>
+
         <div class="crypto-warning">
-          <strong>Проверьте адрес</strong>
+          <strong>Правила вывода</strong>
+          <p>Минимальный вывод — 50 USDT.</p>
+          <p>Создать новую заявку можно один раз в 14 дней.</p>
+          <p>Выводится только заработок AI-бота и реферальные бонусы.</p>
           <p>Вывод выполняется только в сети TRC20.</p>
-          <p>Средства должны находиться на основном счёте.</p>
         </div>
 
         <div class="modal-form">
@@ -809,6 +881,29 @@ async function processMoneyAction(type) {
   if (type === "withdraw" && amount < FASTBOOT_MIN_WITHDRAW) {
     showToast(`Минимальный вывод — ${FASTBOOT_MIN_WITHDRAW} USDT`);
     return;
+  }
+
+  if (type === "withdraw") {
+    const available = Number(
+      state.withdrawalOverview?.total_available || 0
+    );
+
+    if (!state.withdrawalOverview?.can_withdraw) {
+      const nextAt = state.withdrawalOverview?.next_withdrawal_at;
+      showToast(
+        nextAt
+          ? `Следующий вывод доступен ${new Date(nextAt).toLocaleDateString("ru-RU")}`
+          : "Вывод сейчас недоступен"
+      );
+      return;
+    }
+
+    if (amount > available) {
+      showToast(
+        `Доступно к выводу только ${available.toFixed(2)} USDT`
+      );
+      return;
+    }
   }
 
   button.disabled = true;

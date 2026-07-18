@@ -84,7 +84,7 @@
     if (window.fastbootProfile?.role === "admin") document.documentElement.classList.add("is-admin");
 
     const script = document.createElement("script");
-    script.src = "dashboard.js?v=admin-user-profit-fees-3-0";
+    script.src = "dashboard.js?v=withdrawal-rules-3-1";
     script.async = false;
 
     script.onerror = () => {
