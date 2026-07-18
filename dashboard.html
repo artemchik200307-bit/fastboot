@@ -14,7 +14,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#080c12">
   <title>FASTBOOT — Личный кабинет</title>
-  <link rel="stylesheet" href="dashboard.css?v=mobile-bottom-gap-4-4">
+  <link rel="stylesheet" href="dashboard.css?v=telegram-link-v1">
   <script src="https://unpkg.com/lightweight-charts@5.2.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
@@ -37,6 +37,9 @@
         </button>
         <button class="nav-item" data-section="referral">
           <span class="nav-icon">R</span><span>Referral</span>
+        </button>
+        <button class="nav-item" data-section="telegram">
+          <span class="nav-icon">TG</span><span>Telegram</span>
         </button>
       </nav>
 
@@ -639,6 +642,107 @@
     </form>
   </article>
 </section>
+
+        <section class="dashboard-section" id="telegram">
+          <div class="section-heading telegram-heading">
+            <div>
+              <span class="section-kicker">FASTBOOT TELEGRAM</span>
+              <h2>Telegram Bot</h2>
+              <p>
+                Подключите Telegram к своему FASTBOOT ID, чтобы получать
+                уведомления о сделках, балансах, пополнениях и выводах.
+              </p>
+            </div>
+          </div>
+
+          <div class="telegram-link-grid">
+            <article class="panel telegram-status-card">
+              <div class="telegram-card-head">
+                <div class="telegram-logo">TG</div>
+                <div>
+                  <span>Статус подключения</span>
+                  <strong id="telegramStatus">Проверка...</strong>
+                </div>
+                <span id="telegramStatusBadge" class="telegram-status-badge">
+                  —
+                </span>
+              </div>
+
+              <div class="telegram-account-details">
+                <div>
+                  <span>FASTBOOT ID</span>
+                  <strong id="telegramFastbootId">—</strong>
+                </div>
+                <div>
+                  <span>Telegram</span>
+                  <strong id="telegramAccountName">Не подключён</strong>
+                </div>
+              </div>
+
+              <button
+                id="generateTelegramCodeButton"
+                class="primary-action telegram-main-action"
+                type="button"
+              >
+                Получить код привязки
+              </button>
+            </article>
+
+            <article class="panel telegram-code-card">
+              <div class="panel-head">
+                <div>
+                  <h3>Код привязки</h3>
+                  <span>Одноразовый код действует 10 минут</span>
+                </div>
+              </div>
+
+              <div id="telegramCodeShell" class="telegram-code-shell">
+                <strong id="telegramLinkCode">— — — — — —</strong>
+                <button
+                  id="copyTelegramCodeButton"
+                  class="secondary-action"
+                  type="button"
+                  disabled
+                >
+                  Копировать
+                </button>
+              </div>
+
+              <div id="telegramCodeExpiry" class="telegram-code-expiry">
+                Нажмите кнопку, чтобы создать новый код.
+              </div>
+            </article>
+          </div>
+
+          <article class="panel telegram-instructions">
+            <div class="panel-head">
+              <div>
+                <h3>Как подключить Telegram</h3>
+                <span>Привязка занимает меньше минуты</span>
+              </div>
+            </div>
+
+            <div class="telegram-steps">
+              <div>
+                <span>1</span>
+                <p>Откройте пользовательского бота FASTBOOT в Telegram.</p>
+              </div>
+              <div>
+                <span>2</span>
+                <p>Отправьте команду <code>/start</code>.</p>
+              </div>
+              <div>
+                <span>3</span>
+                <p>Введите свой FASTBOOT ID: <strong id="telegramInstructionId">—</strong>.</p>
+              </div>
+              <div>
+                <span>4</span>
+                <p>Введите шестизначный код, созданный на этой странице.</p>
+              </div>
+            </div>
+          </article>
+        </section>
+
 
         
         <section class="dashboard-section" id="settings">
