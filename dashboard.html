@@ -14,7 +14,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#080c12">
   <title>FASTBOOT — Личный кабинет</title>
-  <link rel="stylesheet" href="dashboard.css?v=admin-user-full-stats-3-5">
+  <link rel="stylesheet" href="dashboard.css?v=admin-details-bot-toggle-3-6">
   <script src="https://unpkg.com/lightweight-charts@5.2.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
@@ -720,7 +720,12 @@
           <h2 id="adminUserDetailsTitle">Пользователь</h2>
           <small id="adminUserDetailsSubtitle">—</small>
         </div>
-        <button id="closeAdminUserDetailsModal" class="modal-close" type="button">×</button>
+        <div class="admin-user-details-actions">
+          <button id="adminToggleUserBotButton" class="secondary-action" type="button">
+            Управление AI
+          </button>
+          <button id="closeAdminUserDetailsModal" class="modal-close" type="button">×</button>
+        </div>
       </header>
 
       <div id="adminUserDetailsSummary" class="admin-user-details-summary"></div>

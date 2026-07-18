@@ -1547,6 +1547,15 @@ function renderAdminUserDetailsSummary() {
   const profile = data.profile || {};
   const balances = data.balances || {};
   const stats = data.statistics || {};
+  const bot = data.ai_bot || {};
+
+  const toggleButton = $("adminToggleUserBotButton");
+  if (toggleButton) {
+    const active = Boolean(bot.is_active);
+    toggleButton.textContent = active ? "Выключить AI-бота" : "Включить AI-бота";
+    toggleButton.classList.toggle("danger-action", active);
+    toggleButton.classList.toggle("primary-action", !active);
+  }
 
   $("adminUserDetailsTitle").textContent =
     profile.username || "Пользователь";
@@ -1788,6 +1797,52 @@ function renderAdminUserDetailsTab(tab = "overview") {
   );
 }
 
+
+async function toggleAdminUserBot() {
+  const data = getAdminUserDetailsData();
+  const profile = data.profile || {};
+  const bot = data.ai_bot || {};
+
+  if (!profile.id) {
+    showToast("Пользователь не выбран");
+    return;
+  }
+
+  const nextState = !Boolean(bot.is_active);
+  const button = $("adminToggleUserBotButton");
+
+  if (button) button.disabled = true;
+
+  try {
+    const { error } = await supabaseClient.rpc(
+      "admin_set_user_ai_bot_state",
+      {
+        p_user_id: profile.id,
+        p_is_active: nextState,
+      }
+    );
+
+    if (error) throw error;
+
+    state.selectedAdminUserDetails.ai_bot = {
+      ...bot,
+      user_id: profile.id,
+      is_active: nextState,
+    };
+
+    renderAdminUserDetailsSummary();
+    renderAdminUserDetailsTab(state.selectedAdminUserTab || "overview");
+
+    showToast(nextState ? "AI-бот включён" : "AI-бот выключен");
+    await loadAdminPanel($("adminUserSearch")?.value.trim() || "");
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || "Не удалось изменить статус AI-бота");
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
 async function openAdminUserDetails(user) {
   if (!user) return;
 
@@ -1808,7 +1863,11 @@ async function openAdminUserDetails(user) {
 
     if (error) throw error;
 
-    state.selectedAdminUserDetails = data || {};
+    state.selectedAdminUserDetails =
+      typeof data === "string"
+        ? JSON.parse(data)
+        : (data || {});
+
     renderAdminUserDetailsSummary();
     renderAdminUserDetailsTab("overview");
   } catch (error) {
@@ -1821,7 +1880,12 @@ async function openAdminUserDetails(user) {
 function openAdminBalanceModal(u){if(!u)return;$("adminModalTitle").textContent="Изменение баланса";$("adminModalBody").innerHTML=`<div class="admin-modal-user"><strong>${escapeHtml(u.username||"User")}</strong><span>${escapeHtml(u.email||"")}</span></div><div class="modal-form"><label>Счёт<select id="adminWalletType"><option value="spot">Основной</option><option value="bot">AI Bot</option></select></label><label>Операция<select id="adminBalanceOperation"><option value="credit">Начислить</option><option value="debit">Списать</option></select></label><label>Сумма USDT<input id="adminBalanceAmount" type="number" min="0.01" step="0.01"></label><label>Причина<input id="adminBalanceReason" maxlength="300"></label><button id="confirmAdminBalanceButton" class="primary-action">Применить</button></div>`;$("adminModal").classList.remove("hidden");$("confirmAdminBalanceButton").onclick=async()=>{const amount=Number($("adminBalanceAmount").value);if(!(amount>0))return showToast("Введите сумму");try{const {error}=await supabaseClient.rpc("admin_adjust_user_balance",{p_user_id:u.id,p_wallet:$("adminWalletType").value,p_operation:$("adminBalanceOperation").value,p_amount:amount,p_reason:$("adminBalanceReason").value.trim()||null});if(error)throw error;$("adminModal").classList.add("hidden");showToast("Баланс обновлён");await loadAdminPanel($("adminUserSearch").value.trim());}catch(e){showToast(e.message||"Ошибка");}};}
 function openAdminRoleModal(u){if(!u)return;$("adminModalTitle").textContent="Изменение роли";$("adminModalBody").innerHTML=`<div class="admin-modal-user"><strong>${escapeHtml(u.username||"User")}</strong><span>${escapeHtml(u.email||"")}</span></div><div class="modal-form"><label>Роль<select id="adminNewRole"><option value="user" ${u.role==="user"?"selected":""}>user</option><option value="admin" ${u.role==="admin"?"selected":""}>admin</option></select></label><button id="confirmAdminRoleButton" class="primary-action">Сохранить</button></div>`;$("adminModal").classList.remove("hidden");$("confirmAdminRoleButton").onclick=async()=>{try{const {error}=await supabaseClient.rpc("admin_set_user_role",{p_user_id:u.id,p_role:$("adminNewRole").value});if(error)throw error;$("adminModal").classList.add("hidden");showToast("Роль изменена");await loadAdminPanel($("adminUserSearch").value.trim());}catch(e){showToast(e.message||"Ошибка");}};}
 async function processAdminFunding(id,action){if(!confirm(action==="approve"?"Одобрить заявку?":"Отклонить заявку?"))return;try{const {error}=await supabaseClient.rpc("admin_process_funding_request",{p_request_id:id,p_action:action,p_note:null});if(error)throw error;showToast(action==="approve"?"Заявка одобрена":"Заявка отклонена");await loadAdminPanel($("adminUserSearch").value.trim());}catch(e){showToast(e.message||"Ошибка");}}
-$("adminRefreshButton")?.addEventListener("click",()=>loadAdminPanel($("adminUserSearch").value.trim()));$("adminSearchButton")?.addEventListener("click",()=>loadAdminPanel($("adminUserSearch").value.trim()));$("adminUserSearch")?.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();loadAdminPanel(e.target.value.trim());}});$("closeAdminUserDetailsModal")?.addEventListener("click", () => {
+$("adminRefreshButton")?.addEventListener("click",()=>loadAdminPanel($("adminUserSearch").value.trim()));$("adminSearchButton")?.addEventListener("click",()=>loadAdminPanel($("adminUserSearch").value.trim()));$("adminUserSearch")?.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();loadAdminPanel(e.target.value.trim());}});$("adminToggleUserBotButton")?.addEventListener(
+  "click",
+  toggleAdminUserBot
+);
+
+$("closeAdminUserDetailsModal")?.addEventListener("click", () => {
   $("adminUserDetailsModal").classList.add("hidden");
   state.selectedAdminUserDetails = null;
 });

@@ -5904,3 +5904,38 @@ html.is-admin #adminNavButton,
     text-align: left;
   }
 }
+
+
+/* ===== ADMIN DETAILS + BOT TOGGLE 3.6 ===== */
+.admin-user-details-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-user-details-actions .modal-close {
+  position: static;
+}
+
+.admin-user-details-actions button {
+  min-height: 38px;
+}
+
+@media (max-width: 700px) {
+  .admin-user-details-header {
+    align-items: flex-start;
+  }
+
+  .admin-user-details-actions {
+    flex-direction: column-reverse;
+    align-items: flex-end;
+  }
+
+  .admin-user-details-actions .secondary-action,
+  .admin-user-details-actions .primary-action,
+  .admin-user-details-actions .danger-action {
+    min-height: 34px;
+    padding: 6px 9px;
+    font-size: 9px;
+  }
+}
