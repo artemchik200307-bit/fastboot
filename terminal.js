@@ -23,6 +23,7 @@
   let volumeVisible = true;
   let spotBalance = 0;
   let activeProtectionPosition = null;
+  let symbolDropdownFilterActive = false;
   const closingPositionIds = new Set();
   const chartPriceLines = [];
 
@@ -38,7 +39,7 @@
     trades: [],
     marketSymbols: [],
     symbolSort: "VOLUME",
-    quantityMode: "COIN",
+    quantityMode: "USDT",
     leverage: DEFAULT_LEVERAGE,
   };
 
@@ -246,13 +247,11 @@
     const dropdown = $("symbolDropdown");
     const input = $("symbolSearch");
 
-    // При обычном клике сразу показываем полный список.
-    // Фильтрация начинается только после ввода нового текста.
+    symbolDropdownFilterActive = false;
     renderSymbolOptions(state.marketSymbols);
 
     dropdown?.classList.remove("hidden");
     input?.setAttribute("aria-expanded", "true");
-    input?.select();
   }
 
   function closeSymbolDropdown() {
@@ -351,6 +350,7 @@
     }
 
     currentSymbol = symbol;
+    symbolDropdownFilterActive = false;
     if (input) input.value = currentSymbol;
     renderSymbolOptions(state.marketSymbols);
 
@@ -891,8 +891,9 @@
     const base = currentSymbol.replace(/USDT$/, "");
     const coinMode = state.quantityMode === "COIN";
 
-    setTextSafe("quantityFieldTitle", coinMode ? "Количество" : "Объём");
+    setTextSafe("quantityFieldTitle", "Объём");
     setTextSafe("quantityUnitLabel", coinMode ? base : "USDT");
+    setTextSafe("quantityCoinOption", base);
     setTextSafe("baseAssetLabel", base);
 
     document.querySelectorAll("[data-quantity-mode]").forEach((button) => {
@@ -901,6 +902,32 @@
         button.dataset.quantityMode === state.quantityMode
       );
     });
+  }
+
+  function openQuantityUnitMenu() {
+    const menu = $("quantityUnitMenu");
+    const button = $("quantityUnitButton");
+
+    menu?.classList.remove("hidden");
+    button?.setAttribute("aria-expanded", "true");
+  }
+
+  function closeQuantityUnitMenu() {
+    const menu = $("quantityUnitMenu");
+    const button = $("quantityUnitButton");
+
+    menu?.classList.add("hidden");
+    button?.setAttribute("aria-expanded", "false");
+  }
+
+  function toggleQuantityUnitMenu() {
+    const menu = $("quantityUnitMenu");
+
+    if (menu?.classList.contains("hidden")) {
+      openQuantityUnitMenu();
+    } else {
+      closeQuantityUnitMenu();
+    }
   }
 
   function quantityFromInput(price) {
@@ -1613,10 +1640,13 @@
     });
 
     symbolSearch.addEventListener("input", () => {
+      symbolDropdownFilterActive = true;
       symbolSearch.value = symbolSearch.value.toUpperCase();
+
       renderSymbolOptions(
         getFilteredSymbols(symbolSearch.value)
       );
+
       $("symbolDropdown")?.classList.remove("hidden");
       symbolSearch.setAttribute("aria-expanded", "true");
     });
@@ -1624,6 +1654,10 @@
     document.addEventListener("click", (event) => {
       if (!event.target.closest(".symbol-picker")) {
         closeSymbolDropdown();
+      }
+
+      if (!event.target.closest(".quantity-input-box")) {
+        closeQuantityUnitMenu();
       }
     });
 
@@ -1710,16 +1744,46 @@
       };
     });
 
+    $("quantityUnitButton").onclick = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleQuantityUnitMenu();
+    };
+
     document.querySelectorAll("[data-quantity-mode]").forEach((button) => {
-      button.onclick = () => {
+      button.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
         const price = currentEntryPrice();
         const previousQuantity = quantityFromInput(price);
+
         state.quantityMode = button.dataset.quantityMode;
         updateQuantityModeLabels();
         setQuantityFromCoin(previousQuantity, price);
         updateOrderCalculation();
+        closeQuantityUnitMenu();
       };
     });
+
+    $("advancedOrderToggle").onclick = () => {
+      const toggle = $("advancedOrderToggle");
+      const fields = $("advancedOrderFields");
+      const isOpen = toggle.getAttribute("aria-checked") === "true";
+
+      toggle.setAttribute("aria-checked", isOpen ? "false" : "true");
+      toggle.classList.toggle("active", !isOpen);
+      fields.classList.toggle("hidden", isOpen);
+
+      if (!isOpen) {
+        setTimeout(() => {
+          fields.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+          });
+        }, 50);
+      }
+    };
 
     $("buyButton").onclick = () => placeOrder("LONG");
     $("sellButton").onclick = () => placeOrder("SHORT");

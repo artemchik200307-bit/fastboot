@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
   <meta name="theme-color" content="#0a1019">
   <title>FASTBOOT Terminal</title>
-  <link rel="stylesheet" href="terminal.css?v=terminal-v5-1-risk-leverage">
+  <link rel="stylesheet" href="terminal.css?v=terminal-v5-2-mobile-order-fix">
   <script src="https://unpkg.com/lightweight-charts@5.0.8/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
@@ -182,16 +182,29 @@
           <small id="leverageLimitText">Максимум для BTC: x100</small>
         </div>
 
-        <div class="quantity-mode-tabs">
-          <button class="active" data-quantity-mode="COIN" type="button">Количество в монете</button>
-          <button data-quantity-mode="USDT" type="button">Объём в USDT</button>
-        </div>
-
         <label>
-          <span id="quantityFieldTitle">Количество</span>
-          <div class="input-box">
+          <span id="quantityFieldTitle">Объём</span>
+          <div class="input-box quantity-input-box">
             <input id="orderQuantity" type="number" min="0" step="any">
-            <span id="quantityUnitLabel">BTC</span>
+            <button
+              id="quantityUnitButton"
+              class="quantity-unit-button"
+              type="button"
+              aria-expanded="false"
+              aria-controls="quantityUnitMenu"
+            >
+              <span id="quantityUnitLabel">USDT</span>
+              <i>⌄</i>
+            </button>
+
+            <div id="quantityUnitMenu" class="quantity-unit-menu hidden">
+              <button data-quantity-mode="USDT" class="active" type="button">
+                USDT
+              </button>
+              <button data-quantity-mode="COIN" type="button">
+                <span id="quantityCoinOption">BTC</span>
+              </button>
+            </div>
           </div>
         </label>
 
@@ -202,34 +215,54 @@
           <button data-percent="100" type="button">100%</button>
         </div>
 
-        <div class="protection-entry-grid">
-          <label>
-            Take Profit
-            <div class="input-box">
-              <input id="orderTakeProfit" type="number" min="0" step="any" placeholder="Не установлен">
-              <span>USDT</span>
-            </div>
-          </label>
+        <div class="advanced-toggle-row">
+          <div>
+            <strong>TP / SL и риск</strong>
+            <small>Дополнительные параметры сделки</small>
+          </div>
 
-          <label>
-            Stop Loss
-            <div class="input-box">
-              <input id="orderStopLoss" type="number" min="0" step="any" placeholder="Не установлен">
-              <span>USDT</span>
-            </div>
-          </label>
+          <button
+            id="advancedOrderToggle"
+            class="switch-toggle"
+            type="button"
+            role="switch"
+            aria-checked="false"
+            aria-controls="advancedOrderFields"
+          >
+            <span></span>
+          </button>
         </div>
 
-        <label>
-          Риск на сделку
-          <div class="input-box">
-            <input id="orderRisk" type="number" min="0" step="0.01" placeholder="Например 10">
-            <span>USDT</span>
+        <div id="advancedOrderFields" class="advanced-order-fields hidden">
+          <div class="protection-entry-grid">
+            <label>
+              Take Profit
+              <div class="input-box">
+                <input id="orderTakeProfit" type="number" min="0" step="any" placeholder="Не установлен">
+                <span>USDT</span>
+              </div>
+            </label>
+
+            <label>
+              Stop Loss
+              <div class="input-box">
+                <input id="orderStopLoss" type="number" min="0" step="any" placeholder="Не установлен">
+                <span>USDT</span>
+              </div>
+            </label>
           </div>
-          <small class="risk-helper">
-            При заполненных цене входа и Stop Loss объём рассчитывается автоматически.
-          </small>
-        </label>
+
+          <label>
+            Риск на сделку
+            <div class="input-box">
+              <input id="orderRisk" type="number" min="0" step="0.01" placeholder="Например 10">
+              <span>USDT</span>
+            </div>
+            <small class="risk-helper">
+              Укажите цену входа, Stop Loss и риск — объём рассчитается автоматически.
+            </small>
+          </label>
+        </div>
 
         <div class="calculation advanced-calculation">
           <div><span>Объём позиции</span><strong id="orderTotal">0.00 USDT</strong></div>
@@ -350,6 +383,6 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script src="terminal.js?v=terminal-v5-1-risk-leverage"></script>
+  <script src="terminal.js?v=terminal-v5-2-mobile-order-fix"></script>
 </body>
 </html>
