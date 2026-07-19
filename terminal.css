@@ -1768,3 +1768,42 @@ body {
     display: block;
   }
 }
+
+
+/* ===== FASTBOOT TERMINAL V5.3 DESKTOP ORDER SCROLL ===== */
+@media (min-width: 761px) {
+  .workspace {
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: hidden;
+  }
+
+  .order-panel {
+    min-height: 0 !important;
+    max-height: 100%;
+    overflow-y: auto !important;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    padding-bottom: 28px;
+  }
+
+  .order-panel::-webkit-scrollbar {
+    width: 9px;
+  }
+
+  .order-panel::-webkit-scrollbar-track {
+    background: rgba(255,255,255,.03);
+  }
+
+  .order-panel::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: rgba(130,144,165,.45);
+    background-clip: padding-box;
+  }
+
+  .order-buttons {
+    margin-bottom: 18px;
+  }
+}

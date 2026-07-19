@@ -376,12 +376,12 @@ begin
   where id = p_position_id;
 
   insert into public.terminal_trades(
-    user_id,symbol,side,entry_price,exit_price,quantity,pnl,pnl_percent,
+    position_id,user_id,symbol,side,entry_price,exit_price,quantity,pnl,pnl_percent,
     closed_at,leverage,margin,notional,gross_pnl,opening_fee,closing_fee,
     net_pnl,take_profit,stop_loss
   )
   values(
-    v_user_id,v_position.symbol,v_position.side,v_position.entry_price,
+    v_position.id,v_user_id,v_position.symbol,v_position.side,v_position.entry_price,
     p_exit_price,v_position.quantity,v_net_pnl,v_pnl_percent,now(),
     v_position.leverage,v_position.margin,v_position.notional,v_gross_pnl,
     v_position.opening_fee,v_close_fee,v_net_pnl,
