@@ -911,7 +911,7 @@ function renderOperations() {
 
 
 const FASTBOOT_TRC20_ADDRESS = "TVwAj44gxbPFTDH3KifsmqjfCtF54tj4DC";
-const FASTBOOT_MIN_DEPOSIT = 10;
+const FASTBOOT_MIN_DEPOSIT = 50;
 const FASTBOOT_MIN_WITHDRAW = 50;
 
 function setModalOpenState(isOpen) {

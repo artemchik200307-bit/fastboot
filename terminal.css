@@ -1414,3 +1414,179 @@ body {
     background: #0c1522 !important;
   }
 }
+
+
+/* ===== FASTBOOT TERMINAL V5: LEVERAGE / RISK / FILTERS ===== */
+.symbol-dropdown {
+  min-width: 330px;
+}
+
+.symbol-filter-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+  padding-bottom: 7px;
+  background: #111925;
+}
+
+.symbol-filter-bar button {
+  min-height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #172131;
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 850;
+}
+
+.symbol-filter-bar button.active {
+  border-color: rgba(111,145,255,.65);
+  background: rgba(111,145,255,.14);
+  color: white;
+}
+
+.symbol-list-head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  padding: 6px 11px;
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.symbol-name {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.symbol-name small {
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.field-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.field-title-row strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.leverage-block {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 10px;
+  background: rgba(111,145,255,.04);
+}
+
+.leverage-slider {
+  width: 100%;
+  margin-top: 9px;
+  accent-color: var(--blue);
+}
+
+.leverage-presets {
+  display: grid;
+  grid-template-columns: repeat(6,1fr);
+  gap: 4px;
+  margin-top: 7px;
+}
+
+.leverage-presets button,
+.quantity-mode-tabs button {
+  min-height: 29px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #172131;
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 850;
+}
+
+.leverage-presets button.active,
+.quantity-mode-tabs button.active {
+  border-color: rgba(111,145,255,.65);
+  background: rgba(111,145,255,.16);
+  color: white;
+}
+
+.leverage-block > small {
+  display: block;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.quantity-mode-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  margin-top: 12px;
+}
+
+.protection-entry-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.risk-helper {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.4;
+}
+
+.advanced-calculation {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 4px 9px;
+  background: rgba(10,16,25,.35);
+}
+
+.advanced-calculation .calculation-total {
+  border-bottom: 0;
+  padding-bottom: 8px;
+}
+
+.advanced-calculation .calculation-total strong {
+  color: var(--blue);
+}
+
+@media (max-width: 760px) {
+  .symbol-dropdown {
+    position: fixed;
+    top: 57px;
+    right: 8px;
+    left: 8px;
+    min-width: 0;
+    max-height: 62dvh;
+  }
+
+  .leverage-presets {
+    grid-template-columns: repeat(3,1fr);
+  }
+
+  .protection-entry-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .advanced-calculation > div {
+    gap: 6px;
+  }
+
+  .advanced-calculation strong {
+    text-align: right;
+  }
+}

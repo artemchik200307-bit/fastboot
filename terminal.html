@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
   <meta name="theme-color" content="#0a1019">
   <title>FASTBOOT Terminal</title>
-  <link rel="stylesheet" href="terminal.css?v=mobile-bottom-gap-4-4">
+  <link rel="stylesheet" href="terminal.css?v=terminal-v5-risk-leverage>
   <script src="https://unpkg.com/lightweight-charts@5.0.8/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
@@ -165,11 +165,33 @@
           </div>
         </label>
 
+        <div class="leverage-block">
+          <div class="field-title-row">
+            <span>Кредитное плечо</span>
+            <strong id="leverageValue">x10</strong>
+          </div>
+          <input id="leverageInput" class="leverage-slider" type="range" min="1" max="100" value="10" step="1">
+          <div class="leverage-presets">
+            <button data-leverage="1" type="button">x1</button>
+            <button data-leverage="5" type="button">x5</button>
+            <button data-leverage="10" type="button">x10</button>
+            <button data-leverage="20" type="button">x20</button>
+            <button data-leverage="50" type="button">x50</button>
+            <button data-leverage="100" type="button">x100</button>
+          </div>
+          <small id="leverageLimitText">Максимум для BTC: x100</small>
+        </div>
+
+        <div class="quantity-mode-tabs">
+          <button class="active" data-quantity-mode="COIN" type="button">Количество в монете</button>
+          <button data-quantity-mode="USDT" type="button">Объём в USDT</button>
+        </div>
+
         <label>
-          Количество
+          <span id="quantityFieldTitle">Количество</span>
           <div class="input-box">
             <input id="orderQuantity" type="number" min="0" step="any">
-            <span id="baseAssetLabel">BTC</span>
+            <span id="quantityUnitLabel">BTC</span>
           </div>
         </label>
 
@@ -180,9 +202,43 @@
           <button data-percent="100" type="button">100%</button>
         </div>
 
-        <div class="calculation">
-          <div><span>Сумма</span><strong id="orderTotal">0.00 USDT</strong></div>
-          <div><span>Комиссия</span><strong id="orderFee">0.00 USDT</strong></div>
+        <div class="protection-entry-grid">
+          <label>
+            Take Profit
+            <div class="input-box">
+              <input id="orderTakeProfit" type="number" min="0" step="any" placeholder="Не установлен">
+              <span>USDT</span>
+            </div>
+          </label>
+
+          <label>
+            Stop Loss
+            <div class="input-box">
+              <input id="orderStopLoss" type="number" min="0" step="any" placeholder="Не установлен">
+              <span>USDT</span>
+            </div>
+          </label>
+        </div>
+
+        <label>
+          Риск на сделку
+          <div class="input-box">
+            <input id="orderRisk" type="number" min="0" step="0.01" placeholder="Например 10">
+            <span>USDT</span>
+          </div>
+          <small class="risk-helper">
+            При заполненных цене входа и Stop Loss объём рассчитывается автоматически.
+          </small>
+        </label>
+
+        <div class="calculation advanced-calculation">
+          <div><span>Объём позиции</span><strong id="orderTotal">0.00 USDT</strong></div>
+          <div><span>Количество</span><strong id="calculatedQuantity">0 BTC</strong></div>
+          <div><span>Маржа</span><strong id="orderMargin">0.00 USDT</strong></div>
+          <div><span>Комиссия открытия 0.01%</span><strong id="orderOpenFee">0.00 USDT</strong></div>
+          <div><span>Комиссия закрытия 0.01%</span><strong id="orderCloseFee">0.00 USDT</strong></div>
+          <div><span>Риск до SL</span><strong id="calculatedRisk">0.00 USDT</strong></div>
+          <div class="calculation-total"><span>Маржа + комиссия открытия</span><strong id="orderRequired">0.00 USDT</strong></div>
         </div>
 
         <div class="order-buttons">
@@ -209,7 +265,7 @@
             <thead>
               <tr>
                 <th>Пара</th><th>Сторона</th><th>Вход</th><th>Текущая</th>
-                <th>Количество</th><th>Маржа</th><th>PnL</th><th>TP / SL</th><th></th>
+                <th>Количество</th><th>Плечо</th><th>Маржа</th><th>PnL</th><th>TP / SL</th><th></th>
               </tr>
             </thead>
             <tbody id="positionsBody"></tbody>
@@ -223,7 +279,7 @@
             <thead>
               <tr>
                 <th>Пара</th><th>Сторона</th><th>Тип</th><th>Цена</th>
-                <th>Количество</th><th>Резерв</th><th>Дата</th><th></th>
+                <th>Количество</th><th>Плечо</th><th>Резерв</th><th>TP / SL</th><th>Дата</th><th></th>
               </tr>
             </thead>
             <tbody id="ordersBody"></tbody>
@@ -237,7 +293,7 @@
             <thead>
               <tr>
                 <th>Пара</th><th>Сторона</th><th>Вход</th><th>Выход</th>
-                <th>Количество</th><th>PnL</th><th>Результат</th><th>Закрыта</th>
+                <th>Количество</th><th>Плечо</th><th>Комиссии</th><th>PnL</th><th>Результат</th><th>Закрыта</th>
               </tr>
             </thead>
             <tbody id="tradesBody"></tbody>

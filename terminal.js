@@ -7,6 +7,8 @@
     "https://data-api.binance.vision",
   ];
   const REFRESH_MS = 3000;
+  const TERMINAL_FEE_RATE = 0.0001; // 0.01% на открытие и 0.01% на закрытие
+  const DEFAULT_LEVERAGE = 10;
 
   let supabaseClient = null;
   let currentUser = null;
@@ -35,6 +37,9 @@
     orders: [],
     trades: [],
     marketSymbols: [],
+    symbolSort: "VOLUME",
+    quantityMode: "COIN",
+    leverage: DEFAULT_LEVERAGE,
   };
 
   const EXCLUDED_SYMBOL_PARTS = [
@@ -122,6 +127,46 @@
     );
   }
 
+  function getSymbolMaxLeverage(symbol = currentSymbol) {
+    return ["BTCUSDT", "ETHUSDT"].includes(String(symbol).toUpperCase())
+      ? 100
+      : 50;
+  }
+
+  function normalizeSymbolRow(item) {
+    if (typeof item === "string") {
+      return {
+        symbol: item,
+        changePercent: 0,
+        quoteVolume: 0,
+      };
+    }
+
+    return {
+      symbol: String(item?.symbol || "").toUpperCase(),
+      changePercent: Number(item?.changePercent ?? item?.priceChangePercent ?? 0),
+      quoteVolume: Number(item?.quoteVolume || 0),
+    };
+  }
+
+  function sortedMarketSymbols(rows) {
+    const items = rows.map(normalizeSymbolRow);
+
+    if (state.symbolSort === "GAINERS") {
+      return items.sort((a, b) => b.changePercent - a.changePercent);
+    }
+
+    if (state.symbolSort === "LOSERS") {
+      return items.sort((a, b) => a.changePercent - b.changePercent);
+    }
+
+    if (state.symbolSort === "ALPHA") {
+      return items.sort((a, b) => a.symbol.localeCompare(b.symbol));
+    }
+
+    return items.sort((a, b) => b.quoteVolume - a.quoteVolume);
+  }
+
   function getFilteredSymbols(query = "") {
     const normalized = String(query || "")
       .trim()
@@ -129,36 +174,65 @@
       .replaceAll("-", "")
       .toUpperCase();
 
-    if (!normalized) return state.marketSymbols;
+    const rows = normalized
+      ? state.marketSymbols.filter((item) =>
+          normalizeSymbolRow(item).symbol.includes(normalized)
+        )
+      : state.marketSymbols;
 
-    return state.marketSymbols.filter((symbol) =>
-      symbol.includes(normalized)
-    );
+    return sortedMarketSymbols(rows);
   }
 
   function renderSymbolOptions(symbols = state.marketSymbols) {
     const dropdown = $("symbolDropdown");
     if (!dropdown) return;
 
-    const rows = symbols.slice(0, 100);
+    const rows = sortedMarketSymbols(symbols).slice(0, 100);
 
-    dropdown.innerHTML = rows.length
-      ? rows.map((symbol) => {
-          const base = symbol.replace(/USDT$/, "");
+    dropdown.innerHTML = `
+      <div class="symbol-filter-bar">
+        <button data-symbol-sort="VOLUME" class="${state.symbolSort === "VOLUME" ? "active" : ""}" type="button">Объём</button>
+        <button data-symbol-sort="GAINERS" class="${state.symbolSort === "GAINERS" ? "active" : ""}" type="button">Рост %</button>
+        <button data-symbol-sort="LOSERS" class="${state.symbolSort === "LOSERS" ? "active" : ""}" type="button">Падение %</button>
+        <button data-symbol-sort="ALPHA" class="${state.symbolSort === "ALPHA" ? "active" : ""}" type="button">A–Z</button>
+      </div>
+      <div class="symbol-list-head">
+        <span>Монета</span><span>Изменение 24ч</span>
+      </div>
+      ${rows.length
+        ? rows.map((item) => {
+            const row = normalizeSymbolRow(item);
+            const base = row.symbol.replace(/USDT$/, "");
+            const changeClass = row.changePercent >= 0 ? "positive" : "negative";
 
-          return `
-            <button
-              class="symbol-option"
-              type="button"
-              role="option"
-              data-symbol="${escapeHtml(symbol)}"
-            >
-              <strong>${escapeHtml(base)}</strong>
-              <span>/USDT</span>
-            </button>
-          `;
-        }).join("")
-      : '<div class="symbol-empty">Монета не найдена</div>';
+            return `
+              <button
+                class="symbol-option"
+                type="button"
+                role="option"
+                data-symbol="${escapeHtml(row.symbol)}"
+              >
+                <span class="symbol-name">
+                  <strong>${escapeHtml(base)}</strong>
+                  <small>/USDT</small>
+                </span>
+                <span class="${changeClass}">
+                  ${row.changePercent >= 0 ? "+" : ""}${row.changePercent.toFixed(2)}%
+                </span>
+              </button>
+            `;
+          }).join("")
+        : '<div class="symbol-empty">Монета не найдена</div>'}
+    `;
+
+    dropdown.querySelectorAll("[data-symbol-sort]").forEach((button) => {
+      button.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        state.symbolSort = button.dataset.symbolSort;
+        renderSymbolOptions(getFilteredSymbols($("symbolSearch")?.value || ""));
+      };
+    });
 
     dropdown.querySelectorAll("[data-symbol]").forEach((button) => {
       button.onclick = async () => {
@@ -172,12 +246,13 @@
     const dropdown = $("symbolDropdown");
     const input = $("symbolSearch");
 
-    renderSymbolOptions(
-      getFilteredSymbols(input?.value || "")
-    );
+    // При обычном клике сразу показываем полный список.
+    // Фильтрация начинается только после ввода нового текста.
+    renderSymbolOptions(state.marketSymbols);
 
     dropdown?.classList.remove("hidden");
     input?.setAttribute("aria-expanded", "true");
+    input?.select();
   }
 
   function closeSymbolDropdown() {
@@ -206,14 +281,30 @@
             Number(b.quoteVolume || 0) - Number(a.quoteVolume || 0)
         )
         .slice(0, 100)
-        .map((item) => item.symbol);
+        .map((item) => ({
+          symbol: item.symbol,
+          changePercent: Number(item.priceChangePercent || 0),
+          quoteVolume: Number(item.quoteVolume || 0),
+        }));
 
-      state.marketSymbols = [...new Set([
-        "BTCUSDT",
-        "ETHUSDT",
-        "SOLUSDT",
-        ...symbols,
-      ])].slice(0, 100);
+      const priority = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
+      const map = new Map();
+
+      [...symbols].forEach((item) => map.set(item.symbol, item));
+
+      priority.reverse().forEach((symbol) => {
+        const existing = map.get(symbol) || {
+          symbol,
+          changePercent: 0,
+          quoteVolume: Number.MAX_SAFE_INTEGER,
+        };
+        map.delete(symbol);
+        map.set(symbol, existing);
+      });
+
+      state.marketSymbols = [...map.values()]
+        .sort((a, b) => b.quoteVolume - a.quoteVolume)
+        .slice(0, 100);
 
       renderSymbolOptions(state.marketSymbols);
     } catch (error) {
@@ -224,7 +315,11 @@
         "DOGEUSDT", "ADAUSDT", "AVAXUSDT", "LINKUSDT", "TRXUSDT",
         "SUIUSDT", "TONUSDT", "DOTUSDT", "LTCUSDT", "BCHUSDT",
         "NEARUSDT", "APTUSDT", "UNIUSDT", "ICPUSDT", "ETCUSDT",
-      ];
+      ].map((symbol) => ({
+        symbol,
+        changePercent: 0,
+        quoteVolume: 0,
+      }));
 
       renderSymbolOptions(state.marketSymbols);
     }
@@ -246,7 +341,9 @@
 
     if (
       state.marketSymbols.length &&
-      !state.marketSymbols.includes(symbol)
+      !state.marketSymbols.some(
+        (item) => normalizeSymbolRow(item).symbol === symbol
+      )
     ) {
       if (input) input.value = currentSymbol;
       showToast("Выберите монету из списка топ-100");
@@ -257,8 +354,8 @@
     if (input) input.value = currentSymbol;
     renderSymbolOptions(state.marketSymbols);
 
-    $("baseAssetLabel").textContent =
-      currentSymbol.replace(/USDT$/, "");
+    updateQuantityModeLabels();
+    updateLeverageLimit();
 
     loadDrawings();
     await loadMarket();
@@ -497,7 +594,7 @@
     await processLimitOrders();
     await processPositionProtection();
     renderTradingLevels();
-    updateOrderCalculation();
+    updateOrderCalculation({ fromRisk: Number($("orderRisk")?.value || 0) > 0 });
     renderDrawings();
   }
 
@@ -636,7 +733,7 @@
 
       try {
         const { error } = await supabaseClient.rpc(
-          "close_terminal_position",
+          "close_terminal_position_v2",
           {
             p_position_id: position.id,
             p_exit_price: currentPrice,
@@ -743,53 +840,224 @@
     );
   }
 
-  function updateOrderCalculation() {
-    const price =
-      currentOrderType() === "MARKET"
-        ? currentPrice
-        : Number($("orderPrice").value || 0);
+  function currentEntryPrice() {
+    return currentOrderType() === "MARKET"
+      ? Number(currentPrice || 0)
+      : Number($("orderPrice")?.value || 0);
+  }
 
-    const quantity = Number($("orderQuantity").value || 0);
-    const total = Math.max(price * quantity, 0);
+  function selectedLeverage() {
+    const max = getSymbolMaxLeverage();
+    const value = Math.max(
+      1,
+      Math.min(Number($("leverageInput")?.value || DEFAULT_LEVERAGE), max)
+    );
 
-    $("orderTotal").textContent = `${total.toFixed(2)} USDT`;
-    $("orderFee").textContent = `${(total * .001).toFixed(2)} USDT`;
+    state.leverage = value;
+    return value;
+  }
+
+  function updateLeverageLimit() {
+    const max = getSymbolMaxLeverage();
+    const input = $("leverageInput");
+    if (!input) return;
+
+    input.max = String(max);
+
+    if (Number(input.value) > max) {
+      input.value = String(max);
+    }
+
+    state.leverage = Number(input.value || DEFAULT_LEVERAGE);
+    setTextSafe("leverageValue", `x${state.leverage}`);
+    setTextSafe(
+      "leverageLimitText",
+      `Максимум для ${currentSymbol.replace("USDT", "")}: x${max}`
+    );
+
+    document.querySelectorAll("[data-leverage]").forEach((button) => {
+      const value = Number(button.dataset.leverage);
+      button.hidden = value > max;
+      button.classList.toggle("active", value === state.leverage);
+    });
+  }
+
+  function setTextSafe(id, value) {
+    const element = $(id);
+    if (element) element.textContent = value;
+  }
+
+  function updateQuantityModeLabels() {
+    const base = currentSymbol.replace(/USDT$/, "");
+    const coinMode = state.quantityMode === "COIN";
+
+    setTextSafe("quantityFieldTitle", coinMode ? "Количество" : "Объём");
+    setTextSafe("quantityUnitLabel", coinMode ? base : "USDT");
+    setTextSafe("baseAssetLabel", base);
+
+    document.querySelectorAll("[data-quantity-mode]").forEach((button) => {
+      button.classList.toggle(
+        "active",
+        button.dataset.quantityMode === state.quantityMode
+      );
+    });
+  }
+
+  function quantityFromInput(price) {
+    const raw = Number($("orderQuantity")?.value || 0);
+
+    if (!(raw > 0) || !(price > 0)) return 0;
+
+    return state.quantityMode === "USDT"
+      ? raw / price
+      : raw;
+  }
+
+  function setQuantityFromCoin(quantity, price) {
+    if (!(quantity > 0) || !(price > 0)) {
+      $("orderQuantity").value = "";
+      return;
+    }
+
+    $("orderQuantity").value =
+      state.quantityMode === "USDT"
+        ? (quantity * price).toFixed(2)
+        : quantity.toFixed(8);
+  }
+
+  function calculateRiskQuantity(price, stopLoss, risk) {
+    const distance = Math.abs(price - stopLoss);
+
+    if (!(price > 0) || !(stopLoss > 0) || !(risk > 0) || !(distance > 0)) {
+      return 0;
+    }
+
+    return risk / distance;
+  }
+
+  function maybeCalculateQuantityFromRisk() {
+    const price = currentEntryPrice();
+    const stopLoss = Number($("orderStopLoss")?.value || 0);
+    const risk = Number($("orderRisk")?.value || 0);
+
+    const quantity = calculateRiskQuantity(price, stopLoss, risk);
+
+    if (quantity > 0) {
+      setQuantityFromCoin(quantity, price);
+    }
+  }
+
+  function updateOrderCalculation({ fromRisk = false } = {}) {
+    const price = currentEntryPrice();
+
+    if (fromRisk) {
+      maybeCalculateQuantityFromRisk();
+    }
+
+    const quantity = quantityFromInput(price);
+    const notional = Math.max(price * quantity, 0);
+    const leverage = selectedLeverage();
+    const margin = leverage > 0 ? notional / leverage : 0;
+    const openingFee = notional * TERMINAL_FEE_RATE;
+    const closingFee = notional * TERMINAL_FEE_RATE;
+    const stopLoss = Number($("orderStopLoss")?.value || 0);
+    const risk = stopLoss > 0
+      ? Math.abs(price - stopLoss) * quantity
+      : 0;
+    const base = currentSymbol.replace(/USDT$/, "");
+
+    setTextSafe("orderTotal", `${notional.toFixed(2)} USDT`);
+    setTextSafe("calculatedQuantity", `${formatNumber(quantity)} ${base}`);
+    setTextSafe("orderMargin", `${margin.toFixed(2)} USDT`);
+    setTextSafe("orderOpenFee", `${openingFee.toFixed(2)} USDT`);
+    setTextSafe("orderCloseFee", `${closingFee.toFixed(2)} USDT`);
+    setTextSafe("calculatedRisk", `${risk.toFixed(2)} USDT`);
+    setTextSafe("orderRequired", `${(margin + openingFee).toFixed(2)} USDT`);
   }
 
   function setQuantityPercent(percent) {
-    const price =
-      currentOrderType() === "MARKET"
-        ? currentPrice
-        : Number($("orderPrice").value || 0);
+    const price = currentEntryPrice();
+    const leverage = selectedLeverage();
 
     if (!(price > 0)) {
       showToast("Цена ещё не загружена");
       return;
     }
 
-    const quantity = (tradingBalance * (Number(percent) / 100)) / price;
-    $("orderQuantity").value = quantity > 0 ? quantity.toFixed(8) : "";
+    // Процент рассчитывается от доступной маржи с учётом плеча и комиссии.
+    const available = tradingBalance * (Number(percent) / 100);
+    const maxNotional =
+      available / ((1 / leverage) + TERMINAL_FEE_RATE);
+    const quantity = maxNotional / price;
+
+    setQuantityFromCoin(quantity, price);
     updateOrderCalculation();
+  }
+
+  function validateProtection(side, price, takeProfit, stopLoss) {
+    if (takeProfit > 0) {
+      const invalid =
+        side === "LONG" ? takeProfit <= price : takeProfit >= price;
+
+      if (invalid) {
+        throw new Error(
+          side === "LONG"
+            ? "Для LONG Take Profit должен быть выше цены входа"
+            : "Для SHORT Take Profit должен быть ниже цены входа"
+        );
+      }
+    }
+
+    if (stopLoss > 0) {
+      const invalid =
+        side === "LONG" ? stopLoss >= price : stopLoss <= price;
+
+      if (invalid) {
+        throw new Error(
+          side === "LONG"
+            ? "Для LONG Stop Loss должен быть ниже цены входа"
+            : "Для SHORT Stop Loss должен быть выше цены входа"
+        );
+      }
+    }
   }
 
   async function placeOrder(side) {
     const type = currentOrderType();
-    const quantity = Number($("orderQuantity").value || 0);
-    const price =
-      type === "MARKET"
-        ? currentPrice
-        : Number($("orderPrice").value || 0);
+    const price = currentEntryPrice();
+    const quantity = quantityFromInput(price);
+    const leverage = selectedLeverage();
+    const takeProfit =
+      Number($("orderTakeProfit")?.value || 0) || null;
+    const stopLoss =
+      Number($("orderStopLoss")?.value || 0) || null;
+    const notional = price * quantity;
+    const openingFee = notional * TERMINAL_FEE_RATE;
+    const margin = notional / leverage;
 
     if (!(price > 0) || !(quantity > 0)) {
-      showToast("Введите цену и количество");
+      showToast("Введите цену и объём позиции");
       return;
     }
 
     try {
+      validateProtection(
+        side,
+        price,
+        Number(takeProfit || 0),
+        Number(stopLoss || 0)
+      );
+
+      if (margin + openingFee > tradingBalance) {
+        throw new Error(
+          `Недостаточно средств. Нужно ${(margin + openingFee).toFixed(2)} USDT`
+        );
+      }
+
       const rpc =
         type === "MARKET"
-          ? "open_terminal_market_position"
-          : "create_terminal_limit_order";
+          ? "open_terminal_market_position_v2"
+          : "create_terminal_limit_order_v2";
 
       const params =
         type === "MARKET"
@@ -798,19 +1066,34 @@
               p_side: side,
               p_price: currentPrice,
               p_quantity: quantity,
+              p_leverage: leverage,
+              p_take_profit: takeProfit,
+              p_stop_loss: stopLoss,
             }
           : {
               p_symbol: currentSymbol,
               p_side: side,
               p_limit_price: price,
               p_quantity: quantity,
+              p_leverage: leverage,
+              p_take_profit: takeProfit,
+              p_stop_loss: stopLoss,
             };
 
       const { error } = await supabaseClient.rpc(rpc, params);
       if (error) throw error;
 
       $("orderQuantity").value = "";
-      showToast(type === "MARKET" ? "Позиция открыта" : "Лимитный ордер создан");
+      $("orderRisk").value = "";
+      $("orderTakeProfit").value = "";
+      $("orderStopLoss").value = "";
+
+      showToast(
+        type === "MARKET"
+          ? "Позиция открыта"
+          : "Лимитный ордер создан"
+      );
+
       await loadAccountData();
     } catch (error) {
       console.error(error);
@@ -831,7 +1114,7 @@
 
     for (const order of matching) {
       const { error } = await supabaseClient.rpc(
-        "fill_terminal_limit_order",
+        "fill_terminal_limit_order_v2",
         {
           p_order_id: order.id,
           p_fill_price: currentPrice,
@@ -855,7 +1138,17 @@
           ? (currentPrice - entry) * quantity
           : (entry - currentPrice) * quantity;
 
-      return { ...position, current_price: currentPrice, live_pnl: pnl };
+      const estimatedCloseFee =
+        currentPrice * quantity * TERMINAL_FEE_RATE;
+
+      return {
+        ...position,
+        current_price: currentPrice,
+        live_pnl:
+          pnl -
+          Number(position.opening_fee || 0) -
+          estimatedCloseFee,
+      };
     });
 
     renderPositions();
@@ -872,7 +1165,7 @@
               ? currentPrice
               : Number(position.entry_price));
 
-          const pnl =
+          const grossPnl =
             Number.isFinite(Number(position.live_pnl))
               ? Number(position.live_pnl)
               : position.side === "LONG"
@@ -880,6 +1173,13 @@
                   Number(position.quantity)
                 : (Number(position.entry_price) - livePrice) *
                   Number(position.quantity);
+
+          const estimatedCloseFee =
+            livePrice * Number(position.quantity) * TERMINAL_FEE_RATE;
+          const pnl =
+            grossPnl -
+            Number(position.opening_fee || 0) -
+            estimatedCloseFee;
 
           return `
             <tr>
@@ -890,6 +1190,7 @@
               <td>${formatPrice(position.entry_price)}</td>
               <td>${formatPrice(livePrice)}</td>
               <td>${formatNumber(position.quantity)}</td>
+              <td>x${Number(position.leverage || 1)}</td>
               <td>${Number(position.margin).toFixed(2)} USDT</td>
               <td class="${pnl >= 0 ? "positive" : "negative"}">
                 ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USDT
@@ -917,7 +1218,7 @@
             </tr>
           `;
         }).join("")
-      : '<tr><td colspan="9" class="empty-row">Открытых позиций нет</td></tr>';
+      : '<tr><td colspan="10" class="empty-row">Открытых позиций нет</td></tr>';
 
     document.querySelectorAll("[data-close-position]").forEach((button) => {
       button.onclick = () => closePosition(button.dataset.closePosition);
@@ -940,12 +1241,19 @@
             <td>${escapeHtml(order.order_type)}</td>
             <td>${formatPrice(order.price)}</td>
             <td>${formatNumber(order.quantity)}</td>
+            <td>x${Number(order.leverage || 1)}</td>
             <td>${Number(order.reserved_amount).toFixed(2)} USDT</td>
+            <td>
+              <div class="position-protection">
+                <span class="tp">TP: ${Number(order.take_profit) > 0 ? formatPrice(order.take_profit) : "—"}</span>
+                <span class="sl">SL: ${Number(order.stop_loss) > 0 ? formatPrice(order.stop_loss) : "—"}</span>
+              </div>
+            </td>
             <td>${formatDate(order.created_at)}</td>
             <td><button data-cancel-order="${order.id}">Отменить</button></td>
           </tr>
         `).join("")
-      : '<tr><td colspan="8" class="empty-row">Открытых ордеров нет</td></tr>';
+      : '<tr><td colspan="10" class="empty-row">Открытых ордеров нет</td></tr>';
 
     document.querySelectorAll("[data-cancel-order]").forEach((button) => {
       button.onclick = () => cancelOrder(button.dataset.cancelOrder);
@@ -954,25 +1262,34 @@
 
   function renderTrades() {
     $("tradesBody").innerHTML = state.trades.length
-      ? state.trades.map((trade) => `
-          <tr>
-            <td><strong>${escapeHtml(trade.symbol)}</strong></td>
-            <td class="${trade.side === "LONG" ? "positive" : "negative"}">${escapeHtml(trade.side)}</td>
-            <td>${formatPrice(trade.entry_price)}</td>
-            <td>${formatPrice(trade.exit_price)}</td>
-            <td>${formatNumber(trade.quantity)}</td>
-            <td class="${Number(trade.pnl) >= 0 ? "positive" : "negative"}">${Number(trade.pnl) >= 0 ? "+" : ""}${Number(trade.pnl).toFixed(2)} USDT</td>
-            <td class="${Number(trade.pnl_percent) >= 0 ? "positive" : "negative"}">${Number(trade.pnl_percent) >= 0 ? "+" : ""}${Number(trade.pnl_percent).toFixed(2)}%</td>
-            <td>${formatDate(trade.closed_at)}</td>
-          </tr>
-        `).join("")
-      : '<tr><td colspan="8" class="empty-row">История сделок пуста</td></tr>';
+      ? state.trades.map((trade) => {
+          const totalFees =
+            Number(trade.opening_fee || 0) +
+            Number(trade.closing_fee || 0);
+          const pnl = Number(trade.pnl ?? trade.net_pnl ?? 0);
+
+          return `
+            <tr>
+              <td><strong>${escapeHtml(trade.symbol)}</strong></td>
+              <td class="${trade.side === "LONG" ? "positive" : "negative"}">${escapeHtml(trade.side)}</td>
+              <td>${formatPrice(trade.entry_price)}</td>
+              <td>${formatPrice(trade.exit_price)}</td>
+              <td>${formatNumber(trade.quantity)}</td>
+              <td>x${Number(trade.leverage || 1)}</td>
+              <td>${totalFees.toFixed(2)} USDT</td>
+              <td class="${pnl >= 0 ? "positive" : "negative"}">${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USDT</td>
+              <td class="${Number(trade.pnl_percent) >= 0 ? "positive" : "negative"}">${Number(trade.pnl_percent) >= 0 ? "+" : ""}${Number(trade.pnl_percent).toFixed(2)}%</td>
+              <td>${formatDate(trade.closed_at)}</td>
+            </tr>
+          `;
+        }).join("")
+      : '<tr><td colspan="10" class="empty-row">История сделок пуста</td></tr>';
   }
 
   async function closePosition(positionId) {
     try {
       const { error } = await supabaseClient.rpc(
-        "close_terminal_position",
+        "close_terminal_position_v2",
         {
           p_position_id: positionId,
           p_exit_price: currentPrice,
@@ -1300,7 +1617,8 @@
       renderSymbolOptions(
         getFilteredSymbols(symbolSearch.value)
       );
-      openSymbolDropdown();
+      $("symbolDropdown")?.classList.remove("hidden");
+      symbolSearch.setAttribute("aria-expanded", "true");
     });
 
     document.addEventListener("click", (event) => {
@@ -1366,8 +1684,43 @@
       button.onclick = () => setQuantityPercent(button.dataset.percent);
     });
 
-    $("orderPrice").oninput = updateOrderCalculation;
+    $("orderPrice").oninput = () =>
+      updateOrderCalculation({ fromRisk: Number($("orderRisk").value || 0) > 0 });
+
     $("orderQuantity").oninput = updateOrderCalculation;
+    $("orderTakeProfit").oninput = updateOrderCalculation;
+    $("orderStopLoss").oninput = () =>
+      updateOrderCalculation({ fromRisk: Number($("orderRisk").value || 0) > 0 });
+    $("orderRisk").oninput = () =>
+      updateOrderCalculation({ fromRisk: true });
+
+    $("leverageInput").oninput = () => {
+      updateLeverageLimit();
+      updateOrderCalculation();
+    };
+
+    document.querySelectorAll("[data-leverage]").forEach((button) => {
+      button.onclick = () => {
+        const max = getSymbolMaxLeverage();
+        $("leverageInput").value = String(
+          Math.min(Number(button.dataset.leverage), max)
+        );
+        updateLeverageLimit();
+        updateOrderCalculation();
+      };
+    });
+
+    document.querySelectorAll("[data-quantity-mode]").forEach((button) => {
+      button.onclick = () => {
+        const price = currentEntryPrice();
+        const previousQuantity = quantityFromInput(price);
+        state.quantityMode = button.dataset.quantityMode;
+        updateQuantityModeLabels();
+        setQuantityFromCoin(previousQuantity, price);
+        updateOrderCalculation();
+      };
+    });
+
     $("buyButton").onclick = () => placeOrder("LONG");
     $("sellButton").onclick = () => placeOrder("SHORT");
 
@@ -1496,7 +1849,8 @@
       setDrawingTool("cursor");
 
       $("symbolSearch").value = currentSymbol;
-      $("baseAssetLabel").textContent = currentSymbol.replace("USDT", "");
+      updateQuantityModeLabels();
+      updateLeverageLimit();
 
       await loadMarket();
 
