@@ -29,6 +29,38 @@ if (!supabaseClient || !authUser || !userProfile) {
 
 const storageKey = (name) => `fastboot-${authUser.id}-${name}`;
 
+
+const FASTBOOT_AI_API_URL =
+  window.FASTBOOT_AI_API_URL ||
+  localStorage.getItem("FASTBOOT_AI_API_URL") ||
+  "";
+
+const MANUAL_FEE_RATE = 0.0001;
+
+function aiApi(path, options = {}) {
+  if (!FASTBOOT_AI_API_URL) {
+    return Promise.reject(
+      new Error("FASTBOOT_AI_API_URL не настроен")
+    );
+  }
+
+  return fetch(`${FASTBOOT_AI_API_URL}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+  }).then(async (response) => {
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(data.detail || data.message || `AI API ${response.status}`);
+    }
+
+    return data;
+  });
+}
+
 const state = {
   section: "overview",
   portfolio: [
@@ -2451,6 +2483,409 @@ async function setAiBotStatus(active) {
 $("startBotButton").addEventListener("click", () => setAiBotStatus(true));
 $("stopBotButton").addEventListener("click", () => setAiBotStatus(false));
 
+
+function manualMaxLeverage(symbol) {
+  return ["BTCUSDT", "ETHUSDT"].includes(String(symbol).toUpperCase())
+    ? 100
+    : 50;
+}
+
+function manualMaintenanceRate(symbol) {
+  return ["BTCUSDT", "ETHUSDT"].includes(String(symbol).toUpperCase())
+    ? 0.005
+    : 0.01;
+}
+
+function calculateManualTrade(signal, riskUsd, leverage) {
+  const entry = Number(signal.entry_price);
+  const stopLoss = Number(signal.stop_loss);
+  const takeProfit = Number(signal.take_profit);
+  const distance = Math.abs(entry - stopLoss);
+
+  if (!(entry > 0) || !(distance > 0) || !(riskUsd > 0)) {
+    throw new Error("Некорректные параметры сигнала");
+  }
+
+  const quantity = riskUsd / distance;
+  const notional = quantity * entry;
+  const margin = notional / leverage;
+  const mmr = manualMaintenanceRate(signal.symbol);
+
+  const liquidationPrice =
+    signal.side === "LONG"
+      ? (
+          entry * quantity - margin
+        ) / (
+          quantity * (1 - mmr - MANUAL_FEE_RATE)
+        )
+      : (
+          entry * quantity + margin
+        ) / (
+          quantity * (1 + mmr + MANUAL_FEE_RATE)
+        );
+
+  const expectedProfit =
+    Math.abs(takeProfit - entry) * quantity;
+
+  return {
+    quantity,
+    notional,
+    margin,
+    liquidationPrice: Math.max(liquidationPrice, 0),
+    expectedLoss: riskUsd,
+    expectedProfit,
+    rr: expectedProfit / riskUsd,
+    openingFee: notional * MANUAL_FEE_RATE,
+  };
+}
+
+async function loadAiAssistantMode() {
+  try {
+    const { data, error } = await supabaseClient.rpc(
+      "get_ai_assistant_settings"
+    );
+
+    if (error) throw error;
+
+    const settings = Array.isArray(data) ? data[0] : data;
+    state.aiMode = settings?.active_mode || "AUTO";
+  } catch (error) {
+    console.warn("AI mode unavailable:", error);
+    state.aiMode = "AUTO";
+  }
+
+  renderAiMode();
+}
+
+function renderAiMode() {
+  const manual = state.aiMode === "MANUAL";
+
+  $("aiAutoModeButton")?.classList.toggle("active", !manual);
+  $("aiManualModeButton")?.classList.toggle("active", manual);
+  $("aiAutomaticModeContent")?.classList.toggle("hidden", manual);
+  $("aiManualModeContent")?.classList.toggle("hidden", !manual);
+
+  if (manual) {
+    loadManualSignals();
+  }
+}
+
+async function setAiAssistantMode(mode) {
+  try {
+    const { error } = await supabaseClient.rpc(
+      "set_ai_assistant_mode",
+      { p_mode: mode }
+    );
+
+    if (error) throw error;
+
+    state.aiMode = mode;
+    renderAiMode();
+
+    showToast(
+      mode === "MANUAL"
+        ? "Ручной AI-режим включён"
+        : "Автоматический AI-режим включён"
+    );
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || "Не удалось изменить режим");
+  }
+}
+
+async function loadManualSignals() {
+  const grid = $("manualSignalsGrid");
+  if (!grid) return;
+
+  grid.innerHTML = '<div class="admin-empty">Загрузка сигналов...</div>';
+
+  try {
+    const { data, error } = await supabaseClient
+      .from("ai_manual_signals")
+      .select("*")
+      .eq("status", "ACTIVE")
+      .gt("valid_until", new Date().toISOString())
+      .order("created_at", { ascending: false })
+      .limit(30);
+
+    if (error) throw error;
+
+    state.manualSignals = data || [];
+    renderManualSignals();
+  } catch (error) {
+    console.error(error);
+    grid.innerHTML =
+      '<div class="admin-empty">Не удалось загрузить сигналы</div>';
+  }
+}
+
+function renderManualSignals() {
+  const grid = $("manualSignalsGrid");
+  if (!grid) return;
+
+  grid.innerHTML = state.manualSignals.length
+    ? state.manualSignals.map((signal) => `
+        <article class="manual-signal-card">
+          <div class="manual-signal-top">
+            <div>
+              <strong>${escapeHtml(signal.symbol)}</strong>
+              <span class="${signal.side === "LONG" ? "positive" : "negative"}">
+                ${escapeHtml(signal.side)}
+              </span>
+            </div>
+            <span class="manual-confidence">
+              ${Number(signal.confidence || 0).toFixed(0)}%
+            </span>
+          </div>
+
+          <div class="manual-signal-levels">
+            <div><span>ENTRY</span><strong>${safeFormatPrice(signal.entry_price)}</strong></div>
+            <div><span>SL</span><strong>${safeFormatPrice(signal.stop_loss)}</strong></div>
+            <div><span>TP</span><strong>${safeFormatPrice(signal.take_profit)}</strong></div>
+          </div>
+
+          <p>${escapeHtml(signal.summary || "Торговый сценарий готов к проверке.")}</p>
+
+          <div class="manual-signal-meta">
+            <span>${escapeHtml(signal.order_type || "MARKET")}</span>
+            <span>до ${formatDateOnly(signal.valid_until)}</span>
+          </div>
+
+          <div class="manual-signal-actions">
+            <button data-manual-analysis="${signal.id}" class="secondary-action" type="button">
+              Анализ
+            </button>
+            <button data-manual-open="${signal.id}" class="primary-action" type="button">
+              Открыть сделку
+            </button>
+          </div>
+        </article>
+      `).join("")
+    : '<div class="admin-empty">Активных сигналов пока нет</div>';
+
+  document.querySelectorAll("[data-manual-open]").forEach((button) => {
+    button.onclick = () => openManualTrade(button.dataset.manualOpen);
+  });
+
+  document.querySelectorAll("[data-manual-analysis]").forEach((button) => {
+    button.onclick = () => openManualAnalysis(button.dataset.manualAnalysis);
+  });
+}
+
+function getManualSignal(signalId) {
+  return state.manualSignals.find((item) => item.id === signalId);
+}
+
+function openManualTrade(signalId) {
+  const signal = getManualSignal(signalId);
+  if (!signal) return;
+
+  state.selectedManualSignal = signal;
+
+  $("manualTradeSignalSummary").innerHTML = `
+    <strong>${escapeHtml(signal.symbol)} ${escapeHtml(signal.side)}</strong>
+    <span>ENTRY ${safeFormatPrice(signal.entry_price)}</span>
+    <span>SL ${safeFormatPrice(signal.stop_loss)}</span>
+    <span>TP ${safeFormatPrice(signal.take_profit)}</span>
+  `;
+
+  const max = manualMaxLeverage(signal.symbol);
+  $("manualLeverageInput").max = String(max);
+  $("manualLeverageMax").textContent = `x${max}`;
+
+  if (Number($("manualLeverageInput").value) > max) {
+    $("manualLeverageInput").value = String(max);
+  }
+
+  updateManualTradeQuote();
+  $("manualTradeModal").classList.remove("hidden");
+}
+
+function updateManualTradeQuote() {
+  const signal = state.selectedManualSignal;
+  if (!signal) return;
+
+  try {
+    const risk = Number($("manualRiskInput").value || 0);
+    const leverage = Number($("manualLeverageInput").value || 1);
+    const quote = calculateManualTrade(signal, risk, leverage);
+    const base = signal.symbol.replace(/USDT$/, "");
+
+    $("manualLeverageValue").textContent = `x${leverage}`;
+    $("manualQuantity").textContent =
+      `${quote.quantity.toFixed(8).replace(/0+$/, "").replace(/\.$/, "")} ${base}`;
+    $("manualNotional").textContent = `${quote.notional.toFixed(2)} USDT`;
+    $("manualMargin").textContent = `${quote.margin.toFixed(2)} USDT`;
+    $("manualLiquidation").textContent =
+      safeFormatPrice(quote.liquidationPrice);
+    $("manualLoss").textContent = `${quote.expectedLoss.toFixed(2)} USDT`;
+    $("manualProfit").textContent = `${quote.expectedProfit.toFixed(2)} USDT`;
+    $("manualRR").textContent = `1:${quote.rr.toFixed(2)}`;
+  } catch (error) {
+    console.warn(error);
+  }
+}
+
+async function confirmManualTrade() {
+  const signal = state.selectedManualSignal;
+  if (!signal) return;
+
+  const button = $("confirmManualTradeButton");
+  button.disabled = true;
+
+  try {
+    const risk = Number($("manualRiskInput").value || 0);
+    const leverage = Number($("manualLeverageInput").value || 1);
+
+    const { data, error } = await supabaseClient.rpc(
+      "execute_ai_manual_signal",
+      {
+        p_signal_id: signal.id,
+        p_risk_usd: risk,
+        p_leverage: leverage,
+      }
+    );
+
+    if (error) throw error;
+
+    $("manualTradeModal").classList.add("hidden");
+    state.selectedManualSignal = null;
+    showToast("AI-сделка открыта");
+
+    await loadSupabaseAccountData();
+    await loadManualSignals();
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || "Не удалось открыть сделку");
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function renderAgentReport(agentAnalysis) {
+  const agents = agentAnalysis || {};
+
+  return Object.entries(agents).map(([name, report]) => `
+    <article>
+      <div>
+        <strong>${escapeHtml(
+          String(name)
+            .replaceAll("_", " ")
+            .replace(/\b\w/g, (letter) => letter.toUpperCase())
+        )}</strong>
+        <span>${Number(report?.confidence || 0).toFixed(0)}%</span>
+      </div>
+      <p>${escapeHtml(report?.summary || "Нет данных")}</p>
+    </article>
+  `).join("");
+}
+
+function renderManualAnalysisChart(signal) {
+  const chart = $("manualAnalysisChart");
+  const data = signal.chart_analysis || {};
+  const levels = data.levels || [];
+
+  chart.innerHTML = `
+    <div class="manual-chart-schematic">
+      <div class="manual-chart-price entry">
+        <span>ENTRY</span><strong>${safeFormatPrice(signal.entry_price)}</strong>
+      </div>
+      <div class="manual-chart-price tp">
+        <span>TP</span><strong>${safeFormatPrice(signal.take_profit)}</strong>
+      </div>
+      <div class="manual-chart-price sl">
+        <span>SL</span><strong>${safeFormatPrice(signal.stop_loss)}</strong>
+      </div>
+      <div class="manual-chart-lines">
+        ${(levels.length ? levels : [
+          { label: "Liquidity", price: signal.take_profit },
+          { label: "Entry zone", price: signal.entry_price },
+          { label: "Invalidation", price: signal.stop_loss },
+        ]).map((level) => `
+          <div>
+            <span>${escapeHtml(level.label || "Level")}</span>
+            <i></i>
+            <strong>${safeFormatPrice(level.price)}</strong>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function openManualAnalysis(signalId) {
+  const signal = getManualSignal(signalId);
+  if (!signal) return;
+
+  $("manualAnalysisTitle").textContent =
+    `${signal.symbol} ${signal.side}`;
+  $("manualAnalysisConfidence").textContent =
+    `${Number(signal.confidence || 0).toFixed(0)}%`;
+  $("manualAnalysisSummary").textContent =
+    signal.summary || "Подробный анализ отсутствует.";
+
+  $("manualAgentsReport").innerHTML =
+    renderAgentReport(signal.agent_analysis);
+
+  renderManualAnalysisChart(signal);
+  $("manualAnalysisModal").classList.remove("hidden");
+}
+
+async function requestManualScan() {
+  const button = $("scanManualSignalsButton");
+  button.disabled = true;
+
+  try {
+    if (FASTBOOT_AI_API_URL) {
+      await aiApi("/api/v1/scan", { method: "POST" });
+      showToast("Сканирование рынка запущено");
+    } else {
+      showToast("AI API не настроен. Используются сохранённые сигналы.");
+    }
+
+    setTimeout(loadManualSignals, 1500);
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || "Не удалось запустить анализ");
+  } finally {
+    button.disabled = false;
+  }
+}
+
+$("aiAutoModeButton")?.addEventListener("click", () =>
+  setAiAssistantMode("AUTO")
+);
+
+$("aiManualModeButton")?.addEventListener("click", () =>
+  setAiAssistantMode("MANUAL")
+);
+
+$("refreshManualSignalsButton")?.addEventListener(
+  "click",
+  loadManualSignals
+);
+
+$("scanManualSignalsButton")?.addEventListener(
+  "click",
+  requestManualScan
+);
+
+$("closeManualTradeModal")?.addEventListener("click", () => {
+  $("manualTradeModal").classList.add("hidden");
+  state.selectedManualSignal = null;
+});
+
+$("closeManualAnalysisModal")?.addEventListener("click", () => {
+  $("manualAnalysisModal").classList.add("hidden");
+});
+
+$("manualRiskInput")?.addEventListener("input", updateManualTradeQuote);
+$("manualLeverageInput")?.addEventListener("input", updateManualTradeQuote);
+$("confirmManualTradeButton")?.addEventListener(
+  "click",
+  confirmManualTrade
+);
+
 function localDateValue(date = new Date()) {
   const offset = date.getTimezoneOffset();
 
@@ -3281,3 +3716,5 @@ if (copyTelegramCodeButton) {
     copyTelegramLinkCode
   );
 }
+
+document.addEventListener('DOMContentLoaded', loadAiAssistantMode);

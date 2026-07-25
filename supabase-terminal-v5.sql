@@ -377,12 +377,13 @@ begin
 
   insert into public.terminal_trades(
     position_id,user_id,symbol,side,entry_price,exit_price,quantity,pnl,pnl_percent,
-    closed_at,leverage,margin,notional,gross_pnl,opening_fee,closing_fee,
+    opened_at,closed_at,leverage,margin,notional,gross_pnl,opening_fee,closing_fee,
     net_pnl,take_profit,stop_loss
   )
   values(
     v_position.id,v_user_id,v_position.symbol,v_position.side,v_position.entry_price,
-    p_exit_price,v_position.quantity,v_net_pnl,v_pnl_percent,now(),
+    p_exit_price,v_position.quantity,v_net_pnl,v_pnl_percent,
+    coalesce(v_position.opened_at, now()),now(),
     v_position.leverage,v_position.margin,v_position.notional,v_gross_pnl,
     v_position.opening_fee,v_close_fee,v_net_pnl,
     v_position.take_profit,v_position.stop_loss
@@ -431,3 +432,239 @@ before insert or update of amount,type
 on public.funding_requests
 for each row
 execute function public.fastboot_enforce_min_deposit();
+
+-- ===== FASTBOOT TERMINAL V5.5: TP/SL + LIQUIDATION =====
+
+alter table public.terminal_positions
+  add column if not exists maintenance_margin_rate numeric not null default 0.01,
+  add column if not exists liquidation_price numeric,
+  add column if not exists close_reason text;
+
+alter table public.terminal_trades
+  add column if not exists liquidation_price numeric,
+  add column if not exists maintenance_margin_rate numeric,
+  add column if not exists close_reason text;
+
+create or replace function public.fastboot_maintenance_margin_rate(
+  p_symbol text
+)
+returns numeric
+language sql
+immutable
+as $$
+  select case
+    when upper(p_symbol) in ('BTCUSDT','ETHUSDT') then 0.005
+    else 0.01
+  end;
+$$;
+
+create or replace function public.fastboot_liquidation_price(
+  p_symbol text,
+  p_side text,
+  p_entry_price numeric,
+  p_quantity numeric,
+  p_margin numeric,
+  p_fee_rate numeric default 0.0001
+)
+returns numeric
+language plpgsql
+immutable
+as $$
+declare
+  v_mmr numeric := public.fastboot_maintenance_margin_rate(p_symbol);
+  v_price numeric;
+begin
+  if p_entry_price <= 0 or p_quantity <= 0 or p_margin <= 0 then
+    return null;
+  end if;
+
+  if upper(p_side) = 'LONG' then
+    v_price :=
+      ((p_entry_price * p_quantity) - p_margin) /
+      (p_quantity * (1 - p_fee_rate - v_mmr));
+  elsif upper(p_side) = 'SHORT' then
+    v_price :=
+      ((p_entry_price * p_quantity) + p_margin) /
+      (p_quantity * (1 + p_fee_rate + v_mmr));
+  else
+    return null;
+  end if;
+
+  return greatest(v_price, 0);
+end;
+$$;
+
+-- Пересчитываем уже открытые позиции.
+update public.terminal_positions
+set
+  maintenance_margin_rate =
+    public.fastboot_maintenance_margin_rate(symbol),
+  liquidation_price =
+    public.fastboot_liquidation_price(
+      symbol,
+      side,
+      entry_price,
+      quantity,
+      margin,
+      0.0001
+    )
+where status = 'open';
+
+create or replace function public.close_terminal_position_v3(
+  p_position_id uuid,
+  p_exit_price numeric,
+  p_close_reason text default 'MANUAL'
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_position public.terminal_positions;
+  v_exit_price numeric;
+  v_exit_notional numeric;
+  v_gross_pnl numeric;
+  v_close_fee numeric;
+  v_net_pnl numeric;
+  v_return_amount numeric;
+  v_pnl_percent numeric;
+  v_trade_id uuid;
+  v_reason text := upper(coalesce(p_close_reason,'MANUAL'));
+begin
+  select * into v_position
+  from public.terminal_positions
+  where id = p_position_id
+    and user_id = v_user_id
+    and status = 'open'
+  for update;
+
+  if not found then
+    raise exception 'Открытая позиция не найдена';
+  end if;
+
+  if v_reason not in ('MANUAL','TAKE_PROFIT','STOP_LOSS','LIQUIDATION') then
+    raise exception 'Некорректная причина закрытия';
+  end if;
+
+  v_exit_price := p_exit_price;
+
+  if v_reason = 'LIQUIDATION' then
+    v_exit_price := coalesce(
+      v_position.liquidation_price,
+      public.fastboot_liquidation_price(
+        v_position.symbol,
+        v_position.side,
+        v_position.entry_price,
+        v_position.quantity,
+        v_position.margin,
+        0.0001
+      )
+    );
+  end if;
+
+  if v_exit_price is null or v_exit_price <= 0 then
+    raise exception 'Некорректная цена закрытия';
+  end if;
+
+  v_exit_notional := v_exit_price * v_position.quantity;
+
+  v_gross_pnl := case
+    when v_position.side = 'LONG'
+      then (v_exit_price - v_position.entry_price) * v_position.quantity
+    else (v_position.entry_price - v_exit_price) * v_position.quantity
+  end;
+
+  v_close_fee := v_exit_notional * 0.0001;
+  v_net_pnl :=
+    v_gross_pnl -
+    coalesce(v_position.opening_fee,0) -
+    v_close_fee;
+
+  if v_reason = 'LIQUIDATION' then
+    -- При изолированной ликвидации залог позиции считается потерянным.
+    v_return_amount := 0;
+    v_net_pnl := -v_position.margin - coalesce(v_position.opening_fee,0);
+  else
+    v_return_amount :=
+      greatest(
+        v_position.margin + v_gross_pnl - v_close_fee,
+        0
+      );
+  end if;
+
+  v_pnl_percent := case
+    when v_position.margin > 0
+      then (v_net_pnl / v_position.margin) * 100
+    else 0
+  end;
+
+  update public.wallets
+  set trading_balance = trading_balance + v_return_amount,
+      updated_at = now()
+  where user_id = v_user_id;
+
+  update public.terminal_positions
+  set
+    status = 'closed',
+    close_reason = v_reason
+  where id = p_position_id;
+
+  insert into public.terminal_trades(
+    position_id,user_id,symbol,side,entry_price,exit_price,quantity,pnl,pnl_percent,
+    opened_at,closed_at,leverage,margin,notional,gross_pnl,opening_fee,closing_fee,
+    net_pnl,take_profit,stop_loss,liquidation_price,maintenance_margin_rate,
+    close_reason
+  )
+  values(
+    v_position.id,v_user_id,v_position.symbol,v_position.side,
+    v_position.entry_price,v_exit_price,v_position.quantity,v_net_pnl,
+    v_pnl_percent,coalesce(v_position.opened_at,now()),now(),
+    v_position.leverage,v_position.margin,v_position.notional,v_gross_pnl,
+    v_position.opening_fee,v_close_fee,v_net_pnl,
+    v_position.take_profit,v_position.stop_loss,
+    v_position.liquidation_price,v_position.maintenance_margin_rate,
+    v_reason
+  )
+  returning id into v_trade_id;
+
+  return v_trade_id;
+end;
+$$;
+
+grant execute on function public.close_terminal_position_v3(
+  uuid,numeric,text
+) to authenticated;
+
+-- Оборачиваем старые функции открытия, чтобы после создания записывать ликвидацию.
+create or replace function public.fastboot_set_position_liquidation()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.maintenance_margin_rate :=
+    public.fastboot_maintenance_margin_rate(new.symbol);
+
+  new.liquidation_price :=
+    public.fastboot_liquidation_price(
+      new.symbol,
+      new.side,
+      new.entry_price,
+      new.quantity,
+      new.margin,
+      0.0001
+    );
+
+  return new;
+end;
+$$;
+
+drop trigger if exists fastboot_position_liquidation
+on public.terminal_positions;
+
+create trigger fastboot_position_liquidation
+before insert or update of entry_price,quantity,margin,leverage,side,symbol
+on public.terminal_positions
+for each row
+execute function public.fastboot_set_position_liquidation();

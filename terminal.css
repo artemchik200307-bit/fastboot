@@ -1807,3 +1807,20 @@ body {
     margin-bottom: 18px;
   }
 }
+
+
+/* ===== FASTBOOT TERMINAL V5.5 LIQUIDATION ===== */
+.liquidation-price {
+  color: #ffb15c;
+  font-weight: 800;
+}
+
+.position-protection .liq {
+  color: #ffb15c;
+}
+
+@media (max-width: 760px) {
+  .liquidation-price {
+    white-space: nowrap;
+  }
+}

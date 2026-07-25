@@ -330,6 +330,28 @@ async function start() {
 start();
 
 
+const projectInfoModal = document.getElementById("projectInfoModal");
+
 document.getElementById("learnMoreButton")?.addEventListener("click", () => {
-  showToast("Модули FASTBOOT AI находятся в разработке");
+  projectInfoModal?.classList.remove("hidden");
+  document.body.classList.add("modal-open");
+});
+
+document.getElementById("closeProjectInfoModal")?.addEventListener("click", () => {
+  projectInfoModal?.classList.add("hidden");
+  document.body.classList.remove("modal-open");
+});
+
+projectInfoModal?.addEventListener("click", (event) => {
+  if (event.target === projectInfoModal) {
+    projectInfoModal.classList.add("hidden");
+    document.body.classList.remove("modal-open");
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !projectInfoModal?.classList.contains("hidden")) {
+    projectInfoModal.classList.add("hidden");
+    document.body.classList.remove("modal-open");
+  }
 });

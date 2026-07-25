@@ -177,15 +177,6 @@
             управление рисками в едином интерфейсе.
           </p>
         </div>
-
-        <div class="ai-status-card">
-          <span class="ai-status-label">Статус продукта</span>
-          <strong>В разработке</strong>
-          <p>
-            Модули будут подключаться постепенно после тестирования на
-            исторических и демонстрационных данных.
-          </p>
-        </div>
       </div>
 
       <div class="ai-features-grid">
@@ -325,5 +316,74 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
   <script src="app.js"></script>
+
+  <div id="projectInfoModal" class="project-info-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="projectInfoTitle">
+    <article class="project-info-card">
+      <button id="closeProjectInfoModal" class="project-info-close" type="button" aria-label="Закрыть">×</button>
+
+      <span class="section-kicker">FASTBOOT PLATFORM</span>
+      <h2 id="projectInfoTitle">Как устроен FASTBOOT</h2>
+
+      <p class="project-info-lead">
+        FASTBOOT объединяет анализ рынка, автоматический AI-режим,
+        ручные торговые сигналы, управление риском и торговый терминал.
+      </p>
+
+      <div class="project-info-grid">
+        <section>
+          <strong>AI Assistant</strong>
+          <p>
+            Специализированные агенты анализируют цену, объёмы, новости,
+            ликвидность, структуру рынка и действия крупных участников.
+          </p>
+        </section>
+
+        <section>
+          <strong>Два режима</strong>
+          <p>
+            В автоматическом режиме система сопровождает сделки самостоятельно.
+            В ручном пользователь изучает анализ и подтверждает каждый вход.
+          </p>
+        </section>
+
+        <section>
+          <strong>Risk Engine</strong>
+          <p>
+            Перед входом рассчитываются объём позиции, маржа, кредитное плечо,
+            ожидаемый убыток, потенциальная прибыль и цена ликвидации.
+          </p>
+        </section>
+
+        <section>
+          <strong>Trading Terminal</strong>
+          <p>
+            Ручная торговля с Market и Limit ордерами, TP/SL,
+            кредитным плечом, историей сделок и контролем комиссий.
+          </p>
+        </section>
+      </div>
+
+      <div class="project-info-article">
+        <h3>Как формируется торговый сценарий</h3>
+        <p>
+          Сначала быстрый сканер отбирает монеты с заметным изменением цены,
+          объёма или волатильности. Затем шесть AI-агентов формируют независимые
+          оценки. Trading Assistant объединяет их в сценарий, а Risk Management
+          проверяет вход, Stop Loss, Take Profit и соотношение риска к прибыли.
+        </p>
+        <p>
+          AI не должен напрямую распоряжаться балансом. Сначала создаётся сигнал,
+          затем сервер повторно проверяет цену и риск, и только после подтверждения
+          пользователя отправляет ордер на исполнение.
+        </p>
+      </div>
+
+      <p class="project-info-risk">
+        Торговля цифровыми активами связана с риском. Расчёты и сигналы
+        не гарантируют положительный результат.
+      </p>
+    </article>
+  </div>
+
 </body>
 </html>

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
   <meta name="theme-color" content="#0a1019">
   <title>FASTBOOT Terminal</title>
-  <link rel="stylesheet" href="terminal.css?v=terminal-v5-3-scroll-close-fix">
+  <link rel="stylesheet" href="terminal.css?v=fastboot-v6-chart-viewport">
   <script src="https://unpkg.com/lightweight-charts@5.0.8/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
@@ -298,7 +298,7 @@
             <thead>
               <tr>
                 <th>Пара</th><th>Сторона</th><th>Вход</th><th>Текущая</th>
-                <th>Количество</th><th>Плечо</th><th>Маржа</th><th>PnL</th><th>TP / SL</th><th></th>
+                <th>Количество</th><th>Плечо</th><th>Маржа</th><th>Ликвидация</th><th>PnL</th><th>TP / SL</th><th></th>
               </tr>
             </thead>
             <tbody id="positionsBody"></tbody>
@@ -326,7 +326,7 @@
             <thead>
               <tr>
                 <th>Пара</th><th>Сторона</th><th>Вход</th><th>Выход</th>
-                <th>Количество</th><th>Плечо</th><th>Комиссии</th><th>PnL</th><th>Результат</th><th>Закрыта</th>
+                <th>Количество</th><th>Плечо</th><th>Комиссии</th><th>PnL</th><th>Результат</th><th>Причина</th><th>Закрыта</th>
               </tr>
             </thead>
             <tbody id="tradesBody"></tbody>
@@ -383,6 +383,6 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script src="terminal.js?v=terminal-v5-3-scroll-close-fix"></script>
+  <script src="terminal.js?v=fastboot-v6-chart-viewport"></script>
 </body>
 </html>

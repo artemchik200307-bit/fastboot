@@ -7,7 +7,9 @@
     "https://data-api.binance.vision",
   ];
   const REFRESH_MS = 3000;
-  const TERMINAL_FEE_RATE = 0.0001; // 0.01% на открытие и 0.01% на закрытие
+  const TERMINAL_FEE_RATE = 0.0001; // 0.01% на открытие и закрытие
+  const BTC_ETH_MAINTENANCE_RATE = 0.005;
+  const ALTCOIN_MAINTENANCE_RATE = 0.01;
   const DEFAULT_LEVERAGE = 10;
 
   let supabaseClient = null;
@@ -18,6 +20,8 @@
   let tradingBalance = 0;
 
   let chart = null;
+  let chartViewportKey = "";
+  let chartHasInitialFit = false;
   let candleSeries = null;
   let volumeSeries = null;
   let volumeVisible = true;
@@ -581,8 +585,15 @@
       }))
     );
 
-    chart.timeScale().fitContent();
-    chart.timeScale().applyOptions({ rightOffset: 18 });
+    const viewportKey = `${currentSymbol}:${currentInterval}`;
+    const symbolOrIntervalChanged = chartViewportKey !== viewportKey;
+
+    if (!chartHasInitialFit || symbolOrIntervalChanged) {
+      chart.timeScale().fitContent();
+      chart.timeScale().applyOptions({ rightOffset: 18 });
+      chartViewportKey = viewportKey;
+      chartHasInitialFit = true;
+    }
 
     if (!$("orderPrice").value || $("priceField").hidden) {
       $("orderPrice").value = currentPrice.toFixed(
@@ -693,6 +704,20 @@
         if (Number(position.stop_loss) > 0) {
           addTradingLevel(position.stop_loss, "SL", "#ff5572", 2);
         }
+
+        const liquidationPrice = Number(
+          position.liquidation_price ||
+          calculateLiquidationPrice(position)
+        );
+
+        if (liquidationPrice > 0) {
+          addTradingLevel(
+            liquidationPrice,
+            "LIQ",
+            "#ff9f43",
+            3
+          );
+        }
       });
 
     state.orders
@@ -707,54 +732,172 @@
       });
   }
 
-  async function processPositionProtection() {
-    const triggered = state.positions.filter((position) => {
+  function maintenanceMarginRate(symbol) {
+    return ["BTCUSDT", "ETHUSDT"].includes(String(symbol).toUpperCase())
+      ? BTC_ETH_MAINTENANCE_RATE
+      : ALTCOIN_MAINTENANCE_RATE;
+  }
+
+  function calculateLiquidationPrice(position) {
+    const entry = Number(position.entry_price || 0);
+    const quantity = Number(position.quantity || 0);
+    const margin = Number(position.margin || 0);
+    const mmr = Number(
+      position.maintenance_margin_rate ||
+      maintenanceMarginRate(position.symbol)
+    );
+
+    if (!(entry > 0) || !(quantity > 0) || !(margin > 0)) return 0;
+
+    if (position.side === "LONG") {
+      const denominator =
+        quantity * (1 - TERMINAL_FEE_RATE - mmr);
+
+      return denominator > 0
+        ? Math.max((entry * quantity - margin) / denominator, 0)
+        : 0;
+    }
+
+    const denominator =
+      quantity * (1 + TERMINAL_FEE_RATE + mmr);
+
+    return denominator > 0
+      ? Math.max((entry * quantity + margin) / denominator, 0)
+      : 0;
+  }
+
+  async function fetchLatestPricesForPositions() {
+    const symbols = [...new Set(
+      state.positions
+        .filter((position) => position.status === "open")
+        .map((position) => position.symbol)
+    )];
+
+    const priceEntries = await Promise.all(
+      symbols.map(async (symbol) => {
+        try {
+          if (symbol === currentSymbol && currentPrice > 0) {
+            return [symbol, currentPrice];
+          }
+
+          const ticker = await fetchJson(
+            `/api/v3/ticker/price?symbol=${encodeURIComponent(symbol)}`
+          );
+
+          return [symbol, Number(ticker.price || 0)];
+        } catch (error) {
+          console.warn(`Price unavailable for ${symbol}:`, error);
+          return [symbol, 0];
+        }
+      })
+    );
+
+    return Object.fromEntries(priceEntries);
+  }
+
+  function positionTrigger(position, marketPrice) {
+    const price = Number(marketPrice || 0);
+    if (!(price > 0)) return null;
+
+    const tp = Number(position.take_profit || 0);
+    const sl = Number(position.stop_loss || 0);
+    const liquidation = Number(
+      position.liquidation_price ||
+      calculateLiquidationPrice(position)
+    );
+
+    // Ликвидация имеет высший приоритет.
+    if (liquidation > 0) {
       if (
-        position.symbol !== currentSymbol ||
+        (position.side === "LONG" && price <= liquidation) ||
+        (position.side === "SHORT" && price >= liquidation)
+      ) {
+        return {
+          reason: "LIQUIDATION",
+          executionPrice: liquidation,
+          label: "ликвидации",
+        };
+      }
+    }
+
+    if (tp > 0) {
+      if (
+        (position.side === "LONG" && price >= tp) ||
+        (position.side === "SHORT" && price <= tp)
+      ) {
+        return {
+          reason: "TAKE_PROFIT",
+          executionPrice: tp,
+          label: "Take Profit",
+        };
+      }
+    }
+
+    if (sl > 0) {
+      if (
+        (position.side === "LONG" && price <= sl) ||
+        (position.side === "SHORT" && price >= sl)
+      ) {
+        return {
+          reason: "STOP_LOSS",
+          executionPrice: sl,
+          label: "Stop Loss",
+        };
+      }
+    }
+
+    return null;
+  }
+
+  async function processPositionProtection() {
+    if (!state.positions.length) return;
+
+    const prices = await fetchLatestPricesForPositions();
+    const triggered = [];
+
+    for (const position of state.positions) {
+      if (
+        position.status !== "open" ||
         closingPositionIds.has(position.id)
       ) {
-        return false;
+        continue;
       }
 
-      const tp = Number(position.take_profit || 0);
-      const sl = Number(position.stop_loss || 0);
+      const trigger = positionTrigger(
+        position,
+        prices[position.symbol]
+      );
 
-      if (position.side === "LONG") {
-        return (tp > 0 && currentPrice >= tp) ||
-          (sl > 0 && currentPrice <= sl);
+      if (trigger) {
+        triggered.push({ position, trigger });
       }
+    }
 
-      return (tp > 0 && currentPrice <= tp) ||
-        (sl > 0 && currentPrice >= sl);
-    });
-
-    for (const position of triggered) {
+    for (const item of triggered) {
+      const { position, trigger } = item;
       closingPositionIds.add(position.id);
 
       try {
         const { error } = await supabaseClient.rpc(
-          "close_terminal_position_v2",
+          "close_terminal_position_v3",
           {
             p_position_id: position.id,
-            p_exit_price: currentPrice,
+            p_exit_price: trigger.executionPrice,
+            p_close_reason: trigger.reason,
           }
         );
 
         if (error) throw error;
 
         showToast(
-          `${position.symbol}: позиция закрыта по ${
-            Number(position.take_profit) > 0 &&
-            (
-              (position.side === "LONG" && currentPrice >= Number(position.take_profit)) ||
-              (position.side === "SHORT" && currentPrice <= Number(position.take_profit))
-            )
-              ? "Take Profit"
-              : "Stop Loss"
-          }`
+          `${position.symbol}: позиция закрыта по ${trigger.label}`
         );
       } catch (error) {
-        console.error("TP/SL close error:", error);
+        console.error("Protection close error:", error);
+        showToast(
+          error.message ||
+          `${position.symbol}: не удалось закрыть позицию`
+        );
       } finally {
         closingPositionIds.delete(position.id);
       }
@@ -779,6 +922,10 @@
         position.symbol === currentSymbol
           ? currentPrice
           : position.entry_price
+      )}</span>
+      <span>Цена ликвидации: ${formatPrice(
+        position.liquidation_price ||
+        calculateLiquidationPrice(position)
       )}</span>
     `;
 
@@ -1219,6 +1366,12 @@
               <td>${formatNumber(position.quantity)}</td>
               <td>x${Number(position.leverage || 1)}</td>
               <td>${Number(position.margin).toFixed(2)} USDT</td>
+              <td class="liquidation-price">
+                ${formatPrice(
+                  position.liquidation_price ||
+                  calculateLiquidationPrice(position)
+                )}
+              </td>
               <td class="${pnl >= 0 ? "positive" : "negative"}">
                 ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USDT
               </td>
@@ -1245,7 +1398,7 @@
             </tr>
           `;
         }).join("")
-      : '<tr><td colspan="10" class="empty-row">Открытых позиций нет</td></tr>';
+      : '<tr><td colspan="11" class="empty-row">Открытых позиций нет</td></tr>';
 
     document.querySelectorAll("[data-close-position]").forEach((button) => {
       button.onclick = () => closePosition(button.dataset.closePosition);
@@ -1306,20 +1459,30 @@
               <td>${totalFees.toFixed(2)} USDT</td>
               <td class="${pnl >= 0 ? "positive" : "negative"}">${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USDT</td>
               <td class="${Number(trade.pnl_percent) >= 0 ? "positive" : "negative"}">${Number(trade.pnl_percent) >= 0 ? "+" : ""}${Number(trade.pnl_percent).toFixed(2)}%</td>
+              <td>${escapeHtml(
+                trade.close_reason === "TAKE_PROFIT"
+                  ? "Take Profit"
+                  : trade.close_reason === "STOP_LOSS"
+                    ? "Stop Loss"
+                    : trade.close_reason === "LIQUIDATION"
+                      ? "Ликвидация"
+                      : "Вручную"
+              )}</td>
               <td>${formatDate(trade.closed_at)}</td>
             </tr>
           `;
         }).join("")
-      : '<tr><td colspan="10" class="empty-row">История сделок пуста</td></tr>';
+      : '<tr><td colspan="11" class="empty-row">История сделок пуста</td></tr>';
   }
 
   async function closePosition(positionId) {
     try {
       const { error } = await supabaseClient.rpc(
-        "close_terminal_position_v2",
+        "close_terminal_position_v3",
         {
           p_position_id: positionId,
           p_exit_price: currentPrice,
+          p_close_reason: "MANUAL",
         }
       );
 
@@ -1581,8 +1744,6 @@
         Math.max($("terminalChart").clientHeight, 300)
       );
       resizeDrawingCanvas();
-      chart.timeScale().fitContent();
-      chart.timeScale().applyOptions({ rightOffset: 18 });
       renderDrawings();
     });
   }

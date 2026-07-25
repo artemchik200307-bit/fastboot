@@ -244,6 +244,18 @@
             </div>
           </div>
 
+          <div class="ai-mode-switcher" role="tablist" aria-label="Режим AI Assistant">
+            <button id="aiAutoModeButton" class="active" data-ai-mode="AUTO" type="button">
+              <strong>Автоматический</strong>
+              <span>Текущая стратегия</span>
+            </button>
+            <button id="aiManualModeButton" data-ai-mode="MANUAL" type="button">
+              <strong>Ручной</strong>
+              <span>Сигналы шести агентов</span>
+            </button>
+          </div>
+
+          <div id="aiAutomaticModeContent">
           <div class="ai-hero-grid">
             <article class="ai-balance-card">
               <div class="ai-card-top">
@@ -325,6 +337,50 @@
             </div>
           </article>
 
+          </div>
+
+          <section id="aiManualModeContent" class="ai-manual-mode hidden">
+            <div class="ai-manual-toolbar">
+              <div>
+                <span class="section-kicker">MANUAL AI SIGNALS</span>
+                <h3>Торговые сценарии</h3>
+                <p>Сигналы формируются после согласования оценок шести AI-агентов.</p>
+              </div>
+
+              <div class="ai-manual-actions">
+                <button id="refreshManualSignalsButton" class="secondary-action" type="button">
+                  Обновить
+                </button>
+                <button id="scanManualSignalsButton" class="primary-action" type="button">
+                  Запустить анализ
+                </button>
+              </div>
+            </div>
+
+            <div id="manualSignalsGrid" class="manual-signals-grid">
+              <div class="admin-empty">Сигналы загружаются...</div>
+            </div>
+
+            <article class="panel ai-agents-overview">
+              <div class="panel-head">
+                <div>
+                  <h3>AI-агенты ручного режима</h3>
+                  <span>Каждый агент отвечает за отдельную часть анализа</span>
+                </div>
+              </div>
+
+              <div class="ai-agent-grid">
+                <div><strong>AI Market Analysis</strong><span>Техника, фундаментал, объём, волатильность и корреляции.</span></div>
+                <div><strong>AI News Analysis</strong><span>Крипто- и макроновости, важность и ожидаемая реакция.</span></div>
+                <div><strong>AI Smart Money System</strong><span>Структура, FVG, order blocks и снятие ликвидности.</span></div>
+                <div><strong>AI Risk Management</strong><span>Риск, объём позиции, R/R, SL/TP и дневные лимиты.</span></div>
+                <div><strong>AI Trading Assistant</strong><span>Сценарий, торговый план и объяснение логики.</span></div>
+                <div><strong>Institutional Analysis</strong><span>Крупные игроки, аномалии и альтернативные сценарии.</span></div>
+              </div>
+            </article>
+          </section>
+
+          <div id="aiSharedStatistics">
           <div class="ai-stat-grid">
             <article><span>Сегодня</span><strong id="botDayPnl">0.00%</strong><small id="botDayAmount">0.00 USDT</small></article>
             <article><span>7 дней</span><strong id="botWeekPnl">0.00%</strong><small id="botWeekAmount">0.00 USDT</small></article>
@@ -358,6 +414,7 @@
               </div>
             </div>
           </article>
+          </div>
         </section>
 
         <section class="dashboard-section terminal-host-section" id="trading">
@@ -922,5 +979,65 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
   <script src="dashboard-auth.js?v=terminal-balance-hard-3-4"></script>
+
+  <div id="manualTradeModal" class="modal hidden">
+    <div class="modal-card ai-manual-trade-modal">
+      <button id="closeManualTradeModal" class="close-modal" type="button">×</button>
+      <h2>Открыть AI-сделку</h2>
+
+      <div id="manualTradeSignalSummary" class="manual-trade-summary"></div>
+
+      <label>
+        Риск на сделку
+        <div class="input-box">
+          <input id="manualRiskInput" type="number" min="0.01" step="0.01" value="10">
+          <span>USDT</span>
+        </div>
+      </label>
+
+      <label>
+        Кредитное плечо
+        <input id="manualLeverageInput" type="range" min="1" max="100" value="10">
+        <div class="manual-leverage-row">
+          <span>x1</span>
+          <strong id="manualLeverageValue">x10</strong>
+          <span id="manualLeverageMax">x100</span>
+        </div>
+      </label>
+
+      <div class="manual-trade-calculation">
+        <div><span>Количество</span><strong id="manualQuantity">—</strong></div>
+        <div><span>Объём позиции</span><strong id="manualNotional">—</strong></div>
+        <div><span>Маржа</span><strong id="manualMargin">—</strong></div>
+        <div><span>Цена ликвидации</span><strong id="manualLiquidation">—</strong></div>
+        <div><span>Ожидаемый убыток</span><strong id="manualLoss">—</strong></div>
+        <div><span>Ожидаемый профит</span><strong id="manualProfit">—</strong></div>
+        <div><span>R/R</span><strong id="manualRR">—</strong></div>
+      </div>
+
+      <button id="confirmManualTradeButton" class="primary" type="button">
+        Подтвердить вход
+      </button>
+    </div>
+  </div>
+
+  <div id="manualAnalysisModal" class="modal hidden">
+    <div class="modal-card ai-analysis-modal">
+      <button id="closeManualAnalysisModal" class="close-modal" type="button">×</button>
+
+      <div class="manual-analysis-heading">
+        <div>
+          <span class="section-kicker">MULTI-AGENT REPORT</span>
+          <h2 id="manualAnalysisTitle">Анализ монеты</h2>
+        </div>
+        <span id="manualAnalysisConfidence" class="ai-return-badge">—</span>
+      </div>
+
+      <div id="manualAnalysisSummary" class="manual-analysis-summary"></div>
+      <div id="manualAnalysisChart" class="manual-analysis-chart"></div>
+      <div id="manualAgentsReport" class="manual-agents-report"></div>
+    </div>
+  </div>
+
 </body>
 </html>
