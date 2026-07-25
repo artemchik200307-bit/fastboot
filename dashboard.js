@@ -77,6 +77,10 @@ const state = {
   operationFilter: "all",
   aiBotAccount: null,
   aiTradeResults: [],
+  manualPositions: [],
+  adminManualOverview: null,
+  adminManualTrades: [],
+  adminManualTab: "open",
   adminAiOpenTrades: [],
   adminBotStatuses: [],
   referralOverview: null,
@@ -659,7 +663,7 @@ async function loadSupabaseAccountData() {
     : withdrawalOverviewResult.data || null;
 
   try {
-    const [botAccountResult, aiResultsResult] = await Promise.all([
+    const [botAccountResult, aiResultsResult, manualPositionsResult] = await Promise.all([
       supabaseClient
         .from("ai_bot_accounts")
         .select("user_id, is_active, started_at, stopped_at, initial_balance, created_at, updated_at")
@@ -670,19 +674,30 @@ async function loadSupabaseAccountData() {
         .from("user_ai_trade_results")
         .select("*")
         .eq("user_id", authUser.id)
+        .eq("trade_source", "AUTO")
         .order("created_at", { ascending: false })
         .limit(200),
+
+      supabaseClient
+        .from("ai_manual_positions")
+        .select("*")
+        .eq("user_id", authUser.id)
+        .order("opened_at", { ascending: false })
+        .limit(300),
     ]);
 
     if (botAccountResult.error) console.warn("AI account unavailable:", botAccountResult.error);
-    if (aiResultsResult.error) console.warn("AI history unavailable:", aiResultsResult.error);
+    if (aiResultsResult.error) console.warn("Automatic AI history unavailable:", aiResultsResult.error);
+    if (manualPositionsResult.error) console.warn("Manual trading history unavailable:", manualPositionsResult.error);
 
     state.aiBotAccount = botAccountResult.data || null;
     state.aiTradeResults = aiResultsResult.data || [];
+    state.manualPositions = manualPositionsResult.data || [];
   } catch (error) {
     console.warn("AI data load skipped:", error);
     state.aiBotAccount = null;
     state.aiTradeResults = [];
+    state.manualPositions = [];
   }
 
   initializeUser();
@@ -1438,6 +1453,8 @@ async function loadAdminPanel(search = "") {
       botStatuses,
       referralOverview,
       referralPartners,
+      manualOverview,
+      manualTrades,
     ] = await Promise.all([
         supabaseClient.rpc("admin_platform_overview"),
         supabaseClient.rpc("admin_list_users", {
@@ -1455,6 +1472,10 @@ async function loadAdminPanel(search = "") {
         supabaseClient.rpc("admin_referral_overview"),
         supabaseClient.rpc("admin_list_referral_partners", {
           p_limit: 20,
+        }),
+        supabaseClient.rpc("admin_manual_trading_overview"),
+        supabaseClient.rpc("admin_list_manual_trades", {
+          p_status: null, p_limit: 500, p_offset: 0,
         }),
       ]);
 
@@ -1475,6 +1496,8 @@ async function loadAdminPanel(search = "") {
       referralOverview.data?.[0] || referralOverview.data || {};
 
     state.adminReferralPartners = referralPartners.data || [];
+    state.adminManualOverview = manualOverview.error ? null : (manualOverview.data || {});
+    state.adminManualTrades = manualTrades.error ? [] : (manualTrades.data || []);
 
     const botMap = new Map(
       state.adminBotStatuses.map((item) => [
@@ -1492,13 +1515,14 @@ async function loadAdminPanel(search = "") {
     renderAdminUsers();
     renderAdminFunding();
     renderAdminReferral();
+    renderAdminManualTrading();
   } catch (error) {
     console.error(error);
     showToast(error.message || "Ошибка Admin Panel");
   }
 }
 
-function renderAdminOverview(){const d=state.adminOverview||{};$("adminUsersCount").textContent=Number(d.users_count||0).toLocaleString("ru-RU");$("adminTotalBalance").textContent=`${Number(d.total_platform_balance||0).toFixed(2)} USDT`;$("adminPendingCount").textContent=Number(d.pending_requests_count||0);$("adminAdminsCount").textContent=Number(d.admins_count||0);}
+function renderAdminOverview(){const d=state.adminOverview||{};const m=state.adminManualOverview||{};$("adminUsersCount").textContent=Number(d.users_count||0).toLocaleString("ru-RU");$("adminTotalBalance").textContent=`${Number(d.total_platform_balance||0).toFixed(2)} USDT`;$("adminPendingCount").textContent=Number(d.pending_requests_count||0);$("adminAdminsCount").textContent=Number(d.admins_count||0);setText("adminManualOpenCount",Number(m.open_positions_count||0).toLocaleString("ru-RU"));setText("adminManualTradesCount",Number(m.closed_trades_count||0).toLocaleString("ru-RU"));setText("adminManualNetPnl",`${Number(m.net_pnl||0).toFixed(2)} USDT`);setText("adminManualFees",`${Number(m.total_fees||0).toFixed(2)} USDT`);}
 function renderAdminUsers() {
   const users = state.adminUsers;
 
@@ -1666,6 +1690,42 @@ async function openReferralPartnerDetails(partnerId) {
     $("partnerDetailsReferrals").innerHTML =
       '<div class="admin-empty">Не удалось загрузить рефералов</div>';
   }
+}
+
+
+function renderAdminManualTrading() {
+  const overview = state.adminManualOverview || {};
+  const rows = (state.adminManualTrades || []).filter((item) =>
+    state.adminManualTab === "open" ? item.status === "OPEN" : item.status === "CLOSED"
+  );
+
+  if ($("adminManualSummary")) {
+    $("adminManualSummary").innerHTML = `
+      <article><span>Пользователей</span><strong>${Number(overview.users_count || 0)}</strong></article>
+      <article><span>Открыто</span><strong>${Number(overview.open_positions_count || 0)}</strong></article>
+      <article><span>Закрыто</span><strong>${Number(overview.closed_trades_count || 0)}</strong></article>
+      <article><span>Win rate</span><strong>${Number(overview.win_rate || 0).toFixed(1)}%</strong></article>
+      <article><span>Оборот</span><strong>${Number(overview.total_notional || 0).toFixed(2)} USDT</strong></article>
+      <article><span>Чистый PnL</span><strong class="${aiClass(overview.net_pnl)}">${Number(overview.net_pnl || 0).toFixed(2)} USDT</strong></article>`;
+  }
+
+  document.querySelectorAll("[data-admin-manual-tab]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.adminManualTab === state.adminManualTab);
+  });
+
+  if (!$("adminManualTradingList")) return;
+  $("adminManualTradingList").innerHTML = rows.length ? `
+    <div class="admin-manual-table-head"><span>Пользователь</span><span>Пара</span><span>Сторона</span><span>Статус</span><span>Вход / выход</span><span>Объём</span><span>PnL</span><span>Дата</span></div>
+    ${rows.map((item) => `<div class="admin-manual-table-row">
+      <div><strong>${escapeHtml(item.username || "User")}</strong><small>${escapeHtml(item.email || item.fastboot_id || "—")}</small></div>
+      <strong>${escapeHtml(item.symbol || "—")}</strong>
+      <span class="ai-side-badge ${String(item.side || "").toLowerCase()}">${escapeHtml(item.side || "—")}</span>
+      <span>${escapeHtml(item.status || "—")}</span>
+      <span>${safeFormatPrice(item.entry_price)}${item.exit_price ? ` → ${safeFormatPrice(item.exit_price)}` : ""}</span>
+      <span>${Number(item.notional || 0).toFixed(2)} USDT</span>
+      <strong class="${aiClass(item.net_pnl)}">${Number(item.net_pnl || 0).toFixed(2)} USDT</strong>
+      <span>${formatDateTime(item.closed_at || item.opened_at)}</span>
+    </div>`).join("")}` : '<div class="admin-empty">Данных по выбранному разделу нет</div>';
 }
 
 function renderAdminFunding(){
@@ -1837,6 +1897,8 @@ function renderAdminUserDetailsTab(tab = "overview") {
             <div><dt>Комиссия AI</dt><dd>${formatAdminMoney(stats.ai_fees)}</dd></div>
             <div><dt>Сделок AI</dt><dd>${Number(stats.ai_trades_count || 0)}</dd></div>
             <div><dt>Сделок терминала</dt><dd>${Number(stats.terminal_trades_count || 0)}</dd></div>
+            <div><dt>Ручных сделок</dt><dd>${Number(data.manual_statistics?.closed_trades_count || 0)}</dd></div>
+            <div><dt>Ручной PnL</dt><dd>${formatAdminMoney(data.manual_statistics?.net_pnl || 0)}</dd></div>
           </dl>
         </article>
       </div>
@@ -1987,6 +2049,23 @@ function renderAdminUserDetailsTab(tab = "overview") {
     return;
   }
 
+  if (tab === "manual") {
+    const manualRows = data.manual_positions || [];
+    content.innerHTML = renderAdminDetailRows(
+      manualRows,
+      "110px 90px 100px 110px 110px 110px 120px 150px",
+      {
+        head: `<span>Пара</span><span>Сторона</span><span>Статус</span><span>Вход</span><span>Выход</span><span>Объём</span><span>Чистый PnL</span><span>Дата</span>`,
+        row: (item) => `<div class="admin-detail-table-row" style="--detail-cols:110px 90px 100px 110px 110px 110px 120px 150px">
+          <strong>${escapeHtml(item.symbol || "—")}</strong><span>${escapeHtml(item.side || "—")}</span><span>${escapeHtml(item.status || "—")}</span>
+          <span>${safeFormatPrice(item.entry_price)}</span><span>${safeFormatPrice(item.exit_price)}</span><span>${Number(item.notional || 0).toFixed(2)}</span>
+          <strong class="${aiClass(item.net_pnl)}">${Number(item.net_pnl || 0).toFixed(2)}</strong><span>${formatDateTime(item.closed_at || item.opened_at)}</span>
+        </div>`,
+      }
+    );
+    return;
+  }
+
   content.innerHTML = renderAdminDetailRows(
     data.transactions,
     "150px 120px 110px 120px minmax(240px,1fr) 170px",
@@ -2092,6 +2171,10 @@ async function openAdminUserDetails(user) {
       p_user_id: user.id,
     }),
 
+    manual: supabaseClient.rpc("admin_get_user_manual_trading", {
+      p_user_id: user.id,
+    }),
+
     referral: supabaseClient.rpc("admin_get_user_referral_data", {
       p_user_id: user.id,
     }),
@@ -2135,6 +2218,11 @@ async function openAdminUserDetails(user) {
     typeof loaded.referral === "string"
       ? JSON.parse(loaded.referral)
       : (loaded.referral || {});
+
+  const manual =
+    typeof loaded.manual === "string"
+      ? JSON.parse(loaded.manual)
+      : (loaded.manual || {});
 
   state.selectedAdminUserDetails = {
     profile: core.profile || {
@@ -2195,6 +2283,9 @@ async function openAdminUserDetails(user) {
       ? loaded.ai
       : [],
 
+    manual_positions: Array.isArray(manual.positions) ? manual.positions : [],
+    manual_statistics: manual.statistics || {},
+
     referral,
   };
 
@@ -2220,6 +2311,8 @@ async function openAdminUserDetails(user) {
 function openAdminBalanceModal(u){if(!u)return;$("adminModalTitle").textContent="Изменение баланса";$("adminModalBody").innerHTML=`<div class="admin-modal-user"><strong>${escapeHtml(u.username||"User")}</strong><span>${escapeHtml(u.email||"")}</span></div><div class="modal-form"><label>Счёт<select id="adminWalletType"><option value="spot">Основной</option><option value="bot">AI Bot</option></select></label><label>Операция<select id="adminBalanceOperation"><option value="credit">Начислить</option><option value="debit">Списать</option></select></label><label>Сумма USDT<input id="adminBalanceAmount" type="number" min="0.01" step="0.01"></label><label>Причина<input id="adminBalanceReason" maxlength="300"></label><button id="confirmAdminBalanceButton" class="primary-action">Применить</button></div>`;$("adminModal").classList.remove("hidden");$("confirmAdminBalanceButton").onclick=async()=>{const amount=Number($("adminBalanceAmount").value);if(!(amount>0))return showToast("Введите сумму");try{const {error}=await supabaseClient.rpc("admin_adjust_user_balance",{p_user_id:u.id,p_wallet:$("adminWalletType").value,p_operation:$("adminBalanceOperation").value,p_amount:amount,p_reason:$("adminBalanceReason").value.trim()||null});if(error)throw error;$("adminModal").classList.add("hidden");showToast("Баланс обновлён");await loadAdminPanel($("adminUserSearch").value.trim());}catch(e){showToast(e.message||"Ошибка");}};}
 function openAdminRoleModal(u){if(!u)return;$("adminModalTitle").textContent="Изменение роли";$("adminModalBody").innerHTML=`<div class="admin-modal-user"><strong>${escapeHtml(u.username||"User")}</strong><span>${escapeHtml(u.email||"")}</span></div><div class="modal-form"><label>Роль<select id="adminNewRole"><option value="user" ${u.role==="user"?"selected":""}>user</option><option value="admin" ${u.role==="admin"?"selected":""}>admin</option></select></label><button id="confirmAdminRoleButton" class="primary-action">Сохранить</button></div>`;$("adminModal").classList.remove("hidden");$("confirmAdminRoleButton").onclick=async()=>{try{const {error}=await supabaseClient.rpc("admin_set_user_role",{p_user_id:u.id,p_role:$("adminNewRole").value});if(error)throw error;$("adminModal").classList.add("hidden");showToast("Роль изменена");await loadAdminPanel($("adminUserSearch").value.trim());}catch(e){showToast(e.message||"Ошибка");}};}
 async function processAdminFunding(id,action){if(!confirm(action==="approve"?"Одобрить заявку?":"Отклонить заявку?"))return;try{const {error}=await supabaseClient.rpc("admin_process_funding_request",{p_request_id:id,p_action:action,p_note:null});if(error)throw error;showToast(action==="approve"?"Заявка одобрена":"Заявка отклонена");await loadAdminPanel($("adminUserSearch").value.trim());}catch(e){showToast(e.message||"Ошибка");}}
+$("adminManualRefreshButton")?.addEventListener("click",()=>loadAdminPanel($("adminUserSearch")?.value.trim()||""));
+document.querySelectorAll("[data-admin-manual-tab]").forEach((button)=>button.addEventListener("click",()=>{state.adminManualTab=button.dataset.adminManualTab;renderAdminManualTrading();}));
 $("adminRefreshButton")?.addEventListener("click",()=>loadAdminPanel($("adminUserSearch").value.trim()));$("adminSearchButton")?.addEventListener("click",()=>loadAdminPanel($("adminUserSearch").value.trim()));$("adminUserSearch")?.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();loadAdminPanel(e.target.value.trim());}});$("adminToggleUserBotButton")?.addEventListener(
   "click",
   toggleAdminUserBot
@@ -2341,6 +2434,7 @@ function renderAiAssistant() {
 
   renderAiHistory();
   renderAiEquity();
+  renderManualTradingData();
 }
 
 function renderAiHistory() {
@@ -2564,9 +2658,11 @@ function renderAiMode() {
   $("aiManualModeButton")?.classList.toggle("active", manual);
   $("aiAutomaticModeContent")?.classList.toggle("hidden", manual);
   $("aiManualModeContent")?.classList.toggle("hidden", !manual);
+  $("aiSharedStatistics")?.classList.toggle("hidden", manual);
 
   if (manual) {
     loadManualSignals();
+    renderManualTradingData();
   }
 }
 
@@ -2759,6 +2855,58 @@ async function confirmManualTrade() {
     showToast(error.message || "Не удалось открыть сделку");
   } finally {
     button.disabled = false;
+  }
+}
+
+
+function renderManualTradingData() {
+  const positions = state.manualPositions || [];
+  const open = positions.filter((item) => item.status === "OPEN");
+  const closed = positions.filter((item) => item.status === "CLOSED");
+  const wins = closed.filter((item) => Number(item.net_pnl || 0) > 0).length;
+  const winRate = closed.length ? (wins / closed.length) * 100 : 0;
+  const margin = open.reduce((sum, item) => sum + Number(item.margin || 0), 0);
+  const gross = closed.reduce((sum, item) => sum + Number(item.gross_pnl || 0), 0);
+  const fees = closed.reduce((sum, item) => sum + Number(item.platform_fee || 0) + Number(item.opening_fee || 0), 0);
+  const net = closed.reduce((sum, item) => sum + Number(item.net_pnl || 0), 0);
+
+  setText("manualOpenCount", String(open.length));
+  setText("manualClosedCount", String(closed.length));
+  setText("manualMarginUsed", `Маржа ${margin.toFixed(2)} USDT`);
+  setText("manualWinRate", `Win rate ${winRate.toFixed(0)}%`);
+  setText("manualNetPnl", `${net >= 0 ? "+" : ""}${net.toFixed(2)} USDT`);
+  setText("manualGrossPnl", `Валовая ${gross >= 0 ? "+" : ""}${gross.toFixed(2)} USDT`);
+  setText("manualFees", `${fees.toFixed(2)} USDT`);
+  $("manualNetPnl")?.classList.add(aiClass(net));
+
+  if ($("manualOpenPositions")) {
+    $("manualOpenPositions").innerHTML = open.length ? open.map((item) => `
+      <div class="manual-trades-row">
+        <strong>${escapeHtml(item.symbol || "—")}</strong>
+        <span class="ai-side-badge ${String(item.side || "").toLowerCase()}">${escapeHtml(item.side || "—")}</span>
+        <span>${safeFormatPrice(item.entry_price)}</span>
+        <span>${safeFormatPrice(item.stop_loss)} / ${safeFormatPrice(item.take_profit)}</span>
+        <span>${Number(item.notional || 0).toFixed(2)} USDT</span>
+        <span>${Number(item.margin || 0).toFixed(2)} USDT · x${Number(item.leverage || 1)}</span>
+        <span>${formatDateTime(item.opened_at)}</span>
+      </div>`).join("") : '<div class="admin-empty">Открытых ручных позиций нет</div>';
+  }
+
+  if ($("manualTradeHistory")) {
+    $("manualTradeHistory").innerHTML = closed.length ? closed.map((item) => {
+      const grossPnl = Number(item.gross_pnl || 0);
+      const fee = Number(item.platform_fee || 0) + Number(item.opening_fee || 0);
+      const netPnl = Number(item.net_pnl || 0);
+      return `<div class="manual-trades-row manual-history-row">
+        <strong>${escapeHtml(item.symbol || "—")}</strong>
+        <span class="ai-side-badge ${String(item.side || "").toLowerCase()}">${escapeHtml(item.side || "—")}</span>
+        <span>${safeFormatPrice(item.entry_price)} → ${safeFormatPrice(item.exit_price)}</span>
+        <strong class="${aiClass(grossPnl)}">${grossPnl >= 0 ? "+" : ""}${grossPnl.toFixed(2)}</strong>
+        <span>${fee.toFixed(2)}</span>
+        <strong class="${aiClass(netPnl)}">${netPnl >= 0 ? "+" : ""}${netPnl.toFixed(2)}</strong>
+        <span>${formatDateTime(item.closed_at)}</span>
+      </div>`;
+    }).join("") : '<div class="admin-empty">История ручных сделок пуста</div>';
   }
 }
 
