@@ -4,16 +4,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     supabase_url: str
     supabase_service_role_key: str
-    groq_api_key: str | None = None
-    groq_model: str = "llama-3.3-70b-versatile"
-    scan_interval_minutes: int = 10
-    max_scan_symbols: int = 20
-    full_analysis_candidates: int = 8
+    scan_interval_minutes: int = 30
+    scan_concurrency: int = 4
+    minimum_signal_confidence: float = 55.0
 
     model_config = SettingsConfigDict(
-        env_file=".env",
-        case_sensitive=False,
-        extra="ignore",
+        env_file=".env", case_sensitive=False, extra="ignore"
     )
 
 
