@@ -4,6 +4,7 @@ import asyncio
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.market_data import top_symbols
@@ -14,6 +15,14 @@ from app.storage import save_signal
 app = FastAPI(
     title="FASTBOOT AI Service",
     version="6.0.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"https://.*\.onrender\.com",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 scheduler = AsyncIOScheduler()
