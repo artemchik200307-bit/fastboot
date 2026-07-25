@@ -33,7 +33,7 @@ const storageKey = (name) => `fastboot-${authUser.id}-${name}`;
 const FASTBOOT_AI_API_URL =
   window.FASTBOOT_AI_API_URL ||
   localStorage.getItem("FASTBOOT_AI_API_URL") ||
-  ""https://fastboot-ai.onrender.com";";
+  "https://fastboot-ai.onrender.com";
 
 const MANUAL_FEE_RATE = 0.0001;
 
