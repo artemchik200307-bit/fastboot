@@ -78,6 +78,9 @@ const state = {
   aiBotAccount: null,
   aiTradeResults: [],
   manualPositions: [],
+  aiTerminalPositions: [],
+  aiTerminalOrders: [],
+  aiEquity: 0,
   adminManualOverview: null,
   adminManualTrades: [],
   adminManualTab: "open",
@@ -663,7 +666,7 @@ async function loadSupabaseAccountData() {
     : withdrawalOverviewResult.data || null;
 
   try {
-    const [botAccountResult, aiResultsResult, manualPositionsResult] = await Promise.all([
+    const [botAccountResult, aiResultsResult, manualTradesResult, aiPositionsResult, aiOrdersResult] = await Promise.all([
       supabaseClient
         .from("ai_bot_accounts")
         .select("user_id, is_active, started_at, stopped_at, initial_balance, created_at, updated_at")
@@ -679,25 +682,50 @@ async function loadSupabaseAccountData() {
         .limit(200),
 
       supabaseClient
-        .from("ai_manual_positions")
+        .from("terminal_trades")
         .select("*")
         .eq("user_id", authUser.id)
-        .order("opened_at", { ascending: false })
+        .eq("trade_source", "AI")
+        .order("closed_at", { ascending: false })
         .limit(300),
+
+      supabaseClient
+        .from("terminal_positions")
+        .select("*")
+        .eq("user_id", authUser.id)
+        .eq("trade_source", "AI")
+        .eq("status", "open")
+        .order("opened_at", { ascending: false }),
+
+      supabaseClient
+        .from("terminal_orders")
+        .select("*")
+        .eq("user_id", authUser.id)
+        .eq("trade_source", "AI")
+        .eq("status", "open")
+        .order("created_at", { ascending: false }),
     ]);
 
     if (botAccountResult.error) console.warn("AI account unavailable:", botAccountResult.error);
     if (aiResultsResult.error) console.warn("Automatic AI history unavailable:", aiResultsResult.error);
-    if (manualPositionsResult.error) console.warn("Manual trading history unavailable:", manualPositionsResult.error);
+    if (manualTradesResult.error) console.warn("Manual AI history unavailable:", manualTradesResult.error);
+    if (aiPositionsResult.error) console.warn("AI terminal positions unavailable:", aiPositionsResult.error);
+    if (aiOrdersResult.error) console.warn("AI terminal orders unavailable:", aiOrdersResult.error);
 
     state.aiBotAccount = botAccountResult.data || null;
     state.aiTradeResults = aiResultsResult.data || [];
-    state.manualPositions = manualPositionsResult.data || [];
+    state.manualPositions = manualTradesResult.data || [];
+    state.aiTerminalPositions = aiPositionsResult.data || [];
+    state.aiTerminalOrders = aiOrdersResult.data || [];
+    await refreshAiBotEquity();
   } catch (error) {
     console.warn("AI data load skipped:", error);
     state.aiBotAccount = null;
     state.aiTradeResults = [];
     state.manualPositions = [];
+    state.aiTerminalPositions = [];
+    state.aiTerminalOrders = [];
+    state.aiEquity = Number(userWallet?.bot_balance || 0);
   }
 
   initializeUser();
@@ -836,7 +864,7 @@ function ensureTerminalBalanceCard() {
 function renderAccount() {
   ensureTerminalBalanceCard();
   const spotBalance = Number(userWallet?.spot_balance || 0);
-  const botBalance = Number(userWallet?.bot_balance || 0);
+  const botBalance = Number(state.aiEquity ?? userWallet?.bot_balance ?? 0);
   const terminalBalance = Number(userWallet?.trading_balance || 0);
   const total = spotBalance + botBalance + terminalBalance;
 
@@ -2361,9 +2389,48 @@ function aiPeriod(days) {
   };
 }
 
+async function refreshAiBotEquity() {
+  const freeBalance = Number(userWallet?.bot_balance || 0);
+  const positions = state.aiTerminalPositions || [];
+  const orders = state.aiTerminalOrders || [];
+
+  const symbols = [...new Set(positions.map((item) => item.symbol).filter(Boolean))];
+  const prices = {};
+
+  await Promise.all(symbols.map(async (symbol) => {
+    try {
+      const ticker = await fetchJson(`${REST_BASE}/api/v3/ticker/price?symbol=${encodeURIComponent(symbol)}`);
+      prices[symbol] = Number(ticker.price || 0);
+    } catch (error) {
+      console.warn(`AI equity price unavailable for ${symbol}:`, error);
+      prices[symbol] = Number(positions.find((item) => item.symbol === symbol)?.entry_price || 0);
+    }
+  }));
+
+  const openEquity = positions.reduce((sum, position) => {
+    const entry = Number(position.entry_price || 0);
+    const quantity = Number(position.quantity || 0);
+    const margin = Number(position.margin || 0);
+    const live = Number(prices[position.symbol] || entry);
+    const gross = position.side === "SHORT"
+      ? (entry - live) * quantity
+      : (live - entry) * quantity;
+    const estimatedCloseFee = live * quantity * MANUAL_FEE_RATE;
+    return sum + margin + gross - estimatedCloseFee;
+  }, 0);
+
+  const reserved = orders.reduce(
+    (sum, order) => sum + Number(order.reserved_amount || 0),
+    0
+  );
+
+  state.aiEquity = freeBalance + openEquity + reserved;
+  return state.aiEquity;
+}
+
 function renderAiAssistant() {
   const spot = Number(userWallet?.spot_balance || 0);
-  const bot = Number(userWallet?.bot_balance || 0);
+  const bot = Number(state.aiEquity ?? userWallet?.bot_balance ?? 0);
   const active = Boolean(state.aiBotAccount?.is_active);
   const initial = Number(state.aiBotAccount?.initial_balance || bot || 0);
 
@@ -2846,7 +2913,11 @@ async function confirmManualTrade() {
 
     $("manualTradeModal").classList.add("hidden");
     state.selectedManualSignal = null;
-    showToast("AI-сделка открыта");
+    showToast(
+      String(data?.order_type || "MARKET").toUpperCase() === "LIMIT"
+        ? "AI лимитный ордер создан в терминале"
+        : "AI позиция открыта в терминале"
+    );
 
     await loadSupabaseAccountData();
     await loadManualSignals();
@@ -2860,43 +2931,26 @@ async function confirmManualTrade() {
 
 
 function renderManualTradingData() {
-  const positions = state.manualPositions || [];
-  const open = positions.filter((item) => item.status === "OPEN");
-  const closed = positions.filter((item) => item.status === "CLOSED");
-  const wins = closed.filter((item) => Number(item.net_pnl || 0) > 0).length;
+  const closed = state.manualPositions || [];
+  const wins = closed.filter((item) => Number(item.net_pnl ?? item.pnl ?? 0) > 0).length;
   const winRate = closed.length ? (wins / closed.length) * 100 : 0;
-  const margin = open.reduce((sum, item) => sum + Number(item.margin || 0), 0);
   const gross = closed.reduce((sum, item) => sum + Number(item.gross_pnl || 0), 0);
-  const fees = closed.reduce((sum, item) => sum + Number(item.platform_fee || 0) + Number(item.opening_fee || 0), 0);
-  const net = closed.reduce((sum, item) => sum + Number(item.net_pnl || 0), 0);
+  const fees = closed.reduce((sum, item) =>
+    sum + Number(item.opening_fee || 0) + Number(item.closing_fee || 0), 0);
+  const net = closed.reduce((sum, item) => sum + Number(item.net_pnl ?? item.pnl ?? 0), 0);
 
-  setText("manualOpenCount", String(open.length));
   setText("manualClosedCount", String(closed.length));
-  setText("manualMarginUsed", `Маржа ${margin.toFixed(2)} USDT`);
   setText("manualWinRate", `Win rate ${winRate.toFixed(0)}%`);
   setText("manualNetPnl", `${net >= 0 ? "+" : ""}${net.toFixed(2)} USDT`);
   setText("manualGrossPnl", `Валовая ${gross >= 0 ? "+" : ""}${gross.toFixed(2)} USDT`);
   setText("manualFees", `${fees.toFixed(2)} USDT`);
   $("manualNetPnl")?.classList.add(aiClass(net));
 
-  if ($("manualOpenPositions")) {
-    $("manualOpenPositions").innerHTML = open.length ? open.map((item) => `
-      <div class="manual-trades-row">
-        <strong>${escapeHtml(item.symbol || "—")}</strong>
-        <span class="ai-side-badge ${String(item.side || "").toLowerCase()}">${escapeHtml(item.side || "—")}</span>
-        <span>${safeFormatPrice(item.entry_price)}</span>
-        <span>${safeFormatPrice(item.stop_loss)} / ${safeFormatPrice(item.take_profit)}</span>
-        <span>${Number(item.notional || 0).toFixed(2)} USDT</span>
-        <span>${Number(item.margin || 0).toFixed(2)} USDT · x${Number(item.leverage || 1)}</span>
-        <span>${formatDateTime(item.opened_at)}</span>
-      </div>`).join("") : '<div class="admin-empty">Открытых ручных позиций нет</div>';
-  }
-
   if ($("manualTradeHistory")) {
     $("manualTradeHistory").innerHTML = closed.length ? closed.map((item) => {
       const grossPnl = Number(item.gross_pnl || 0);
-      const fee = Number(item.platform_fee || 0) + Number(item.opening_fee || 0);
-      const netPnl = Number(item.net_pnl || 0);
+      const fee = Number(item.opening_fee || 0) + Number(item.closing_fee || 0);
+      const netPnl = Number(item.net_pnl ?? item.pnl ?? 0);
       return `<div class="manual-trades-row manual-history-row">
         <strong>${escapeHtml(item.symbol || "—")}</strong>
         <span class="ai-side-badge ${String(item.side || "").toLowerCase()}">${escapeHtml(item.side || "—")}</span>
@@ -3440,6 +3494,21 @@ document.addEventListener("visibilitychange", () => {
 });
 
 startAccountAutoRefresh();
+
+let aiEquityRefreshTimer = null;
+function startAiEquityAutoRefresh() {
+  if (aiEquityRefreshTimer) clearInterval(aiEquityRefreshTimer);
+  aiEquityRefreshTimer = setInterval(() => {
+    if (document.hidden) return;
+    refreshAiBotEquity()
+      .then(() => {
+        renderAccount();
+        renderAiAssistant();
+      })
+      .catch((error) => console.warn("AI equity refresh skipped:", error));
+  }, 5000);
+}
+startAiEquityAutoRefresh();
 
 initializeUser();
 applySupabaseWalletToPortfolio();

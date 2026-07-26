@@ -1824,3 +1824,6 @@ body {
     white-space: nowrap;
   }
 }
+
+
+.trade-source-badge{display:inline-flex;align-items:center;margin-left:7px;padding:2px 6px;border-radius:999px;font-size:10px;font-weight:800;letter-spacing:.04em;vertical-align:middle}.trade-source-badge.ai{background:rgba(92,134,255,.16);border:1px solid rgba(92,134,255,.45);color:#8eacff}.trade-source-badge.manual{background:rgba(130,144,165,.12);border:1px solid rgba(130,144,165,.28);color:#9ba7b8}

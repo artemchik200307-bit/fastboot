@@ -1276,25 +1276,38 @@
   }
 
   async function processLimitOrders() {
-    const matching = state.orders.filter((order) => {
-      if (order.symbol !== currentSymbol || order.status !== "open") return false;
+    const openOrders = state.orders.filter((order) => order.status === "open");
+    if (!openOrders.length) return;
 
-      const price = Number(order.price);
+    const symbols = [...new Set(openOrders.map((order) => order.symbol))];
+    const prices = {};
 
-      return order.side === "LONG"
-        ? currentPrice <= price
-        : currentPrice >= price;
+    await Promise.all(symbols.map(async (symbol) => {
+      try {
+        if (symbol === currentSymbol && currentPrice > 0) {
+          prices[symbol] = currentPrice;
+          return;
+        }
+        const ticker = await fetchJson(`/api/v3/ticker/price?symbol=${encodeURIComponent(symbol)}`);
+        prices[symbol] = Number(ticker.price || 0);
+      } catch (error) {
+        console.warn(`Limit price unavailable for ${symbol}:`, error);
+      }
+    }));
+
+    const matching = openOrders.filter((order) => {
+      const market = Number(prices[order.symbol] || 0);
+      const limit = Number(order.price || 0);
+      if (!(market > 0) || !(limit > 0)) return false;
+      return order.side === "LONG" ? market <= limit : market >= limit;
     });
 
     for (const order of matching) {
+      const fillPrice = Number(prices[order.symbol]);
       const { error } = await supabaseClient.rpc(
         "fill_terminal_limit_order_v2",
-        {
-          p_order_id: order.id,
-          p_fill_price: currentPrice,
-        }
+        { p_order_id: order.id, p_fill_price: fillPrice }
       );
-
       if (!error) showToast(`${order.symbol}: лимитный ордер исполнен`);
     }
 
@@ -1357,7 +1370,7 @@
 
           return `
             <tr>
-              <td><strong>${escapeHtml(position.symbol)}</strong></td>
+              <td><strong>${escapeHtml(position.symbol)}</strong>${position.trade_source === "AI" ? '<span class="trade-source-badge ai">AI</span>' : '<span class="trade-source-badge manual">MANUAL</span>'}</td>
               <td class="${position.side === "LONG" ? "positive" : "negative"}">
                 ${escapeHtml(position.side)}
               </td>
@@ -1416,7 +1429,7 @@
     $("ordersBody").innerHTML = state.orders.length
       ? state.orders.map((order) => `
           <tr>
-            <td><strong>${escapeHtml(order.symbol)}</strong></td>
+            <td><strong>${escapeHtml(order.symbol)}</strong>${order.trade_source === "AI" ? '<span class="trade-source-badge ai">AI</span>' : '<span class="trade-source-badge manual">MANUAL</span>'}</td>
             <td class="${order.side === "LONG" ? "positive" : "negative"}">${escapeHtml(order.side)}</td>
             <td>${escapeHtml(order.order_type)}</td>
             <td>${formatPrice(order.price)}</td>
@@ -1450,7 +1463,7 @@
 
           return `
             <tr>
-              <td><strong>${escapeHtml(trade.symbol)}</strong></td>
+              <td><strong>${escapeHtml(trade.symbol)}</strong>${trade.trade_source === "AI" ? '<span class="trade-source-badge ai">AI</span>' : '<span class="trade-source-badge manual">MANUAL</span>'}</td>
               <td class="${trade.side === "LONG" ? "positive" : "negative"}">${escapeHtml(trade.side)}</td>
               <td>${formatPrice(trade.entry_price)}</td>
               <td>${formatPrice(trade.exit_price)}</td>
