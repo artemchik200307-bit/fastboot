@@ -7,7 +7,7 @@
     "https://data-api.binance.vision",
   ];
   const REFRESH_MS = 3000;
-  const PROTECTION_REFRESH_MS = 1000;
+  const PROTECTION_REFRESH_MS = 500;
   const TERMINAL_FEE_RATE = 0.0001; // 0.01% на открытие и закрытие
   const BTC_ETH_MAINTENANCE_RATE = 0.005;
   const ALTCOIN_MAINTENANCE_RATE = 0.01;
@@ -781,22 +781,22 @@
   async function fetchLatestPricesForPositions() {
     const symbols = [...new Set(
       state.positions
-        .filter((position) => position.status === "open")
-        .map((position) => position.symbol)
+        .filter((position) => String(position.status || "").toLowerCase() === "open")
+        .map((position) => String(position.symbol || "").toUpperCase())
+        .filter(Boolean)
     )];
 
     const priceEntries = await Promise.all(
       symbols.map(async (symbol) => {
         try {
-          if (symbol === currentSymbol && currentPrice > 0) {
-            return [symbol, currentPrice];
-          }
-
+          // Protection must use a fresh exchange quote. Do not reuse the
+          // chart cache: the chart refreshes slower than liquidation checks.
           const ticker = await fetchJson(
             `/api/v3/ticker/price?symbol=${encodeURIComponent(symbol)}`
           );
+          const freshPrice = Number(ticker.price || 0);
 
-          return [symbol, Number(ticker.price || 0)];
+          return [symbol, Number.isFinite(freshPrice) ? freshPrice : 0];
         } catch (error) {
           console.warn(`Price unavailable for ${symbol}:`, error);
           return [symbol, 0];
@@ -811,6 +811,7 @@
     const price = Number(marketPrice || 0);
     if (!(price > 0)) return null;
 
+    const side = String(position.side || "").toUpperCase();
     const tp = Number(position.take_profit || 0);
     const sl = Number(position.stop_loss || 0);
     const liquidation = Number(
@@ -821,8 +822,8 @@
     // Ликвидация имеет высший приоритет.
     if (liquidation > 0) {
       if (
-        (position.side === "LONG" && price <= liquidation) ||
-        (position.side === "SHORT" && price >= liquidation)
+        (side === "LONG" && price <= liquidation) ||
+        (side === "SHORT" && price >= liquidation)
       ) {
         return {
           reason: "LIQUIDATION",
@@ -834,8 +835,8 @@
 
     if (tp > 0) {
       if (
-        (position.side === "LONG" && price >= tp) ||
-        (position.side === "SHORT" && price <= tp)
+        (side === "LONG" && price >= tp) ||
+        (side === "SHORT" && price <= tp)
       ) {
         return {
           reason: "TAKE_PROFIT",
@@ -847,8 +848,8 @@
 
     if (sl > 0) {
       if (
-        (position.side === "LONG" && price <= sl) ||
-        (position.side === "SHORT" && price >= sl)
+        (side === "LONG" && price <= sl) ||
+        (side === "SHORT" && price >= sl)
       ) {
         return {
           reason: "STOP_LOSS",
@@ -872,7 +873,7 @@
 
     for (const position of state.positions) {
       if (
-        position.status !== "open" ||
+        String(position.status || "").toLowerCase() !== "open" ||
         closingPositionIds.has(position.id)
       ) {
         continue;
@@ -880,7 +881,7 @@
 
       const trigger = positionTrigger(
         position,
-        prices[position.symbol]
+        prices[String(position.symbol || "").toUpperCase()]
       );
 
       if (trigger) {
