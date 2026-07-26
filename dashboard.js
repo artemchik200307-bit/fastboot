@@ -669,17 +669,17 @@ async function loadSupabaseAccountData() {
     const [botAccountResult, aiResultsResult, manualTradesResult, aiPositionsResult, aiOrdersResult] = await Promise.all([
       supabaseClient
         .from("ai_bot_accounts")
-        .select("user_id, is_active, started_at, stopped_at, initial_balance, created_at, updated_at")
+        .select("user_id, is_active, started_at, stopped_at, initial_balance, session_date, session_start_equity, daily_target_equity, daily_target_amount, trading_locked, target_reached_at, last_scan_at, created_at, updated_at")
         .eq("user_id", authUser.id)
         .maybeSingle(),
 
       supabaseClient
-        .from("user_ai_trade_results")
+        .from("terminal_trades")
         .select("*")
         .eq("user_id", authUser.id)
-        .eq("trade_source", "AUTO")
-        .order("created_at", { ascending: false })
-        .limit(200),
+        .eq("trade_source", "AI")
+        .order("closed_at", { ascending: false })
+        .limit(500),
 
       supabaseClient
         .from("terminal_trades")
@@ -713,7 +713,16 @@ async function loadSupabaseAccountData() {
     if (aiOrdersResult.error) console.warn("AI terminal orders unavailable:", aiOrdersResult.error);
 
     state.aiBotAccount = botAccountResult.data || null;
-    state.aiTradeResults = aiResultsResult.data || [];
+    state.aiTradeResults = (aiResultsResult.data || []).map((item) => ({
+      ...item,
+      pair: item.pair || item.symbol,
+      pnl_amount: Number(item.net_pnl ?? item.pnl ?? 0),
+      net_pnl_amount: Number(item.net_pnl ?? item.pnl ?? 0),
+      gross_pnl_amount: Number(item.gross_pnl ?? item.pnl ?? 0),
+      platform_fee_amount: Number(item.opening_fee || 0) + Number(item.closing_fee || 0),
+      created_at: item.closed_at || item.opened_at,
+      balance_after: item.balance_after ?? null,
+    }));
     state.manualPositions = manualTradesResult.data || [];
     state.aiTerminalPositions = aiPositionsResult.data || [];
     state.aiTerminalOrders = aiOrdersResult.data || [];
@@ -2543,6 +2552,7 @@ function renderAiHistory() {
         return `
           <div class="ai-history-row ai-history-row-fees">
             <strong>${escapeHtml(trade.pair)}</strong>
+            <small class="trade-source-badge ai">${trade.ai_mode === "AUTO" ? "AI AUTO" : "AI MANUAL"}</small>
             <span class="ai-side-badge ${trade.side.toLowerCase()}">
               ${escapeHtml(trade.side)}
             </span>
@@ -2585,7 +2595,17 @@ function renderAiEquity() {
     return;
   }
 
-  const values = rows.map((item) => Number(item.balance_after));
+  const initialForChart = Number(state.aiBotAccount?.initial_balance || userWallet?.bot_balance || 0);
+  let running = initialForChart;
+  const values = rows.map((item) => {
+    const explicit = Number(item.balance_after);
+    if (Number.isFinite(explicit) && explicit > 0) {
+      running = explicit;
+      return running;
+    }
+    running += Number(item.net_pnl_amount ?? item.net_pnl ?? item.pnl ?? 0);
+    return running;
+  });
   const width = 620;
   const height = 180;
   const pad = 18;

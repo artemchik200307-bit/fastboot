@@ -1391,7 +1391,7 @@
 
           return `
             <tr>
-              <td><strong>${escapeHtml(position.symbol)}</strong>${position.trade_source === "AI" ? '<span class="trade-source-badge ai">AI</span>' : '<span class="trade-source-badge manual">MANUAL</span>'}</td>
+              <td><strong>${escapeHtml(position.symbol)}</strong>${position.trade_source === "AI" ? `<span class="trade-source-badge ai">${position.ai_mode === "AUTO" ? "AI AUTO" : "AI MANUAL"}</span>` : '<span class="trade-source-badge manual">MANUAL</span>'}</td>
               <td class="${position.side === "LONG" ? "positive" : "negative"}">
                 ${escapeHtml(position.side)}
               </td>
@@ -1450,7 +1450,7 @@
     $("ordersBody").innerHTML = state.orders.length
       ? state.orders.map((order) => `
           <tr>
-            <td><strong>${escapeHtml(order.symbol)}</strong>${order.trade_source === "AI" ? '<span class="trade-source-badge ai">AI</span>' : '<span class="trade-source-badge manual">MANUAL</span>'}</td>
+            <td><strong>${escapeHtml(order.symbol)}</strong>${order.trade_source === "AI" ? `<span class="trade-source-badge ai">${order.ai_mode === "AUTO" ? "AI AUTO" : "AI MANUAL"}</span>` : '<span class="trade-source-badge manual">MANUAL</span>'}</td>
             <td class="${order.side === "LONG" ? "positive" : "negative"}">${escapeHtml(order.side)}</td>
             <td>${escapeHtml(order.order_type)}</td>
             <td>${formatPrice(order.price)}</td>
@@ -1484,7 +1484,7 @@
 
           return `
             <tr>
-              <td><strong>${escapeHtml(trade.symbol)}</strong>${trade.trade_source === "AI" ? '<span class="trade-source-badge ai">AI</span>' : '<span class="trade-source-badge manual">MANUAL</span>'}</td>
+              <td><strong>${escapeHtml(trade.symbol)}</strong>${trade.trade_source === "AI" ? `<span class="trade-source-badge ai">${trade.ai_mode === "AUTO" ? "AI AUTO" : "AI MANUAL"}</span>` : '<span class="trade-source-badge manual">MANUAL</span>'}</td>
               <td class="${trade.side === "LONG" ? "positive" : "negative"}">${escapeHtml(trade.side)}</td>
               <td>${formatPrice(trade.entry_price)}</td>
               <td>${formatPrice(trade.exit_price)}</td>
