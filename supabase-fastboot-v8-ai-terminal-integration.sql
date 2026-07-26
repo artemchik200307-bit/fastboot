@@ -377,6 +377,12 @@ end;
 $$;
 
 -- 6) Cancel returns reserved funds to the same wallet that funded the order.
+-- V8 hotfix: the previous database version may have this RPC with another
+-- return type. PostgreSQL cannot change a function return type with
+-- CREATE OR REPLACE, so remove only the old RPC definition first.
+-- This does NOT delete orders, positions, trades, wallets, or history.
+drop function if exists public.cancel_terminal_limit_order(uuid);
+
 create or replace function public.cancel_terminal_limit_order(p_order_id uuid)
 returns uuid
 language plpgsql

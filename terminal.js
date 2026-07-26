@@ -7,6 +7,7 @@
     "https://data-api.binance.vision",
   ];
   const REFRESH_MS = 3000;
+  const PROTECTION_REFRESH_MS = 1000;
   const TERMINAL_FEE_RATE = 0.0001; // 0.01% на открытие и закрытие
   const BTC_ETH_MAINTENANCE_RATE = 0.005;
   const ALTCOIN_MAINTENANCE_RATE = 0.01;
@@ -29,6 +30,7 @@
   let activeProtectionPosition = null;
   let symbolDropdownFilterActive = false;
   const closingPositionIds = new Set();
+  let protectionCheckRunning = false;
   const chartPriceLines = [];
 
   let drawingTool = "cursor";
@@ -53,6 +55,12 @@
     "BULLUSDT",
     "BEARUSDT",
   ];
+
+  // Keep the terminal universe aligned with the AI scanner.
+  const EXCLUDED_BASE_ASSETS = new Set([
+    "USDT", "USDC", "FDUSD", "TUSD", "USDP", "DAI", "BUSD",
+    "EUR", "GBP", "TRY", "BRL", "AUD", "RUB", "UAH", "ZAR",
+  ]);
 
   function showToast(message) {
     const toast = $("toast");
@@ -192,7 +200,7 @@
     const dropdown = $("symbolDropdown");
     if (!dropdown) return;
 
-    const rows = sortedMarketSymbols(symbols).slice(0, 100);
+    const rows = sortedMarketSymbols(symbols);
 
     dropdown.innerHTML = `
       <div class="symbol-filter-bar">
@@ -275,54 +283,58 @@
 
   async function loadTopMarketSymbols() {
     try {
-      const rows = await fetchJson("/api/v3/ticker/24hr");
+      const [exchangeInfo, rows] = await Promise.all([
+        fetchJson("/api/v3/exchangeInfo"),
+        fetchJson("/api/v3/ticker/24hr"),
+      ]);
 
-      const symbols = rows
-        .filter((item) => isSupportedUsdtSymbol(item.symbol))
-        .sort(
-          (a, b) =>
-            Number(b.quoteVolume || 0) - Number(a.quoteVolume || 0)
-        )
-        .slice(0, 100)
-        .map((item) => ({
-          symbol: item.symbol,
-          changePercent: Number(item.priceChangePercent || 0),
-          quoteVolume: Number(item.quoteVolume || 0),
-        }));
+      const tickerMap = new Map(
+        (Array.isArray(rows) ? rows : []).map((item) => [
+          String(item.symbol || "").toUpperCase(),
+          item,
+        ])
+      );
 
-      const priority = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
-      const map = new Map();
+      const symbols = (exchangeInfo?.symbols || [])
+        .filter((item) => {
+          const symbol = String(item.symbol || "").toUpperCase();
+          const base = String(item.baseAsset || "").toUpperCase();
 
-      [...symbols].forEach((item) => map.set(item.symbol, item));
+          return (
+            item.status === "TRADING" &&
+            item.quoteAsset === "USDT" &&
+            item.isSpotTradingAllowed !== false &&
+            isSupportedUsdtSymbol(symbol) &&
+            !EXCLUDED_BASE_ASSETS.has(base)
+          );
+        })
+        .map((item) => {
+          const symbol = String(item.symbol || "").toUpperCase();
+          const ticker = tickerMap.get(symbol) || {};
 
-      priority.reverse().forEach((symbol) => {
-        const existing = map.get(symbol) || {
-          symbol,
-          changePercent: 0,
-          quoteVolume: Number.MAX_SAFE_INTEGER,
-        };
-        map.delete(symbol);
-        map.set(symbol, existing);
-      });
+          return {
+            symbol,
+            changePercent: Number(ticker.priceChangePercent || 0),
+            quoteVolume: Number(ticker.quoteVolume || 0),
+          };
+        })
+        .sort((a, b) => b.quoteVolume - a.quoteVolume);
 
-      state.marketSymbols = [...map.values()]
-        .sort((a, b) => b.quoteVolume - a.quoteVolume)
-        .slice(0, 100);
-
+      state.marketSymbols = symbols;
       renderSymbolOptions(state.marketSymbols);
     } catch (error) {
-      console.warn("Top symbols unavailable:", error);
+      console.warn("Full symbol universe unavailable:", error);
 
-      state.marketSymbols = [
-        "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT",
-        "DOGEUSDT", "ADAUSDT", "AVAXUSDT", "LINKUSDT", "TRXUSDT",
-        "SUIUSDT", "TONUSDT", "DOTUSDT", "LTCUSDT", "BCHUSDT",
-        "NEARUSDT", "APTUSDT", "UNIUSDT", "ICPUSDT", "ETCUSDT",
-      ].map((symbol) => ({
-        symbol,
-        changePercent: 0,
-        quoteVolume: 0,
-      }));
+      // Fallback keeps the terminal usable if exchangeInfo is temporarily unavailable.
+      const rows = await fetchJson("/api/v3/ticker/24hr").catch(() => []);
+      state.marketSymbols = (Array.isArray(rows) ? rows : [])
+        .filter((item) => isSupportedUsdtSymbol(item.symbol))
+        .map((item) => ({
+          symbol: String(item.symbol || "").toUpperCase(),
+          changePercent: Number(item.priceChangePercent || 0),
+          quoteVolume: Number(item.quoteVolume || 0),
+        }))
+        .sort((a, b) => b.quoteVolume - a.quoteVolume);
 
       renderSymbolOptions(state.marketSymbols);
     }
@@ -850,9 +862,12 @@
   }
 
   async function processPositionProtection() {
-    if (!state.positions.length) return;
+    if (protectionCheckRunning || !state.positions.length) return;
 
-    const prices = await fetchLatestPricesForPositions();
+    protectionCheckRunning = true;
+
+    try {
+      const prices = await fetchLatestPricesForPositions();
     const triggered = [];
 
     for (const position of state.positions) {
@@ -903,9 +918,14 @@
       }
     }
 
-    if (triggered.length) {
-      await loadAccountData();
-      notifyParentJournalRefresh();
+      if (triggered.length) {
+        await loadAccountData();
+        notifyParentJournalRefresh();
+      }
+    } catch (error) {
+      console.error("Position protection monitor error:", error);
+    } finally {
+      protectionCheckRunning = false;
     }
   }
 
@@ -2100,6 +2120,11 @@
       }
 
       setInterval(refreshLoop, REFRESH_MS);
+      setInterval(() => {
+        processPositionProtection().catch((error) => {
+          console.error("Protection interval error:", error);
+        });
+      }, PROTECTION_REFRESH_MS);
     } catch (error) {
       console.error(error);
       showToast(error.message || "Не удалось запустить терминал");
