@@ -17,6 +17,7 @@ from app.storage import save_signal
 app = FastAPI(title="FASTBOOT AI Service", version="12.0.0")
 app.add_middleware(CORSMiddleware, allow_origin_regex=r"https://.*\.onrender\.com", allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 scheduler = AsyncIOScheduler()
+_auto_background_task: asyncio.Task | None = None
 scan_lock = asyncio.Lock()
 scan_status = {"running": False, "symbols_total": 0, "symbols_checked": 0, "signals_created": 0, "started_at": None, "finished_at": None}
 
@@ -67,7 +68,7 @@ async def startup() -> None:
     scheduler.add_job(
         monitor_auto_trading,
         "interval",
-        seconds=max(2, settings.auto_monitor_seconds),
+        seconds=max(15, settings.auto_monitor_seconds),
         id="auto_trade_monitor",
         replace_existing=True,
         max_instances=1,
@@ -106,11 +107,30 @@ async def analyze(symbol: str) -> dict:
 
 @app.post("/api/v1/auto/run")
 async def run_auto_now() -> dict:
-    """Admin/dev endpoint for testing the daily AUTO cycle without waiting for 08:00."""
-    return await run_daily_auto_session()
+    """Start one AUTO scan in background and return immediately."""
+    global _auto_background_task
+
+    if _auto_background_task and not _auto_background_task.done():
+        return {"status": "already_running"}
+
+    _auto_background_task = asyncio.create_task(run_daily_auto_session())
+    return {"status": "started"}
 
 
 @app.post("/api/v1/auto/monitor")
 async def monitor_auto_now() -> dict:
     """Admin/dev endpoint for testing limit fills, TP/SL/LIQ and daily target."""
     return await monitor_auto_trading()
+
+
+@app.get("/api/v1/auto/status")
+async def auto_status() -> dict:
+    if _auto_background_task is None:
+        return {"status": "idle"}
+    if not _auto_background_task.done():
+        return {"status": "running"}
+    try:
+        result = _auto_background_task.result()
+        return {"status": "finished", "result": result}
+    except Exception as error:  # noqa: BLE001
+        return {"status": "failed", "error": f"{type(error).__name__}: {error}"}

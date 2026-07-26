@@ -19,8 +19,17 @@ _auto_scan_lock = asyncio.Lock()
 _monitor_lock = asyncio.Lock()
 
 
-async def _db_call(fn, *args, **kwargs):
-    return await asyncio.to_thread(fn, *args, **kwargs)
+async def _db_call(fn, *args, retries: int = 3, base_delay: float = 0.6, **kwargs):
+    last_error = None
+    for attempt in range(retries):
+        try:
+            return await asyncio.to_thread(fn, *args, **kwargs)
+        except Exception as error:  # noqa: BLE001
+            last_error = error
+            if attempt + 1 >= retries:
+                raise
+            await asyncio.sleep(base_delay * (attempt + 1))
+    raise last_error
 
 
 async def _select(table: str, columns: str = "*", **equals):
@@ -76,11 +85,9 @@ async def _bot_equities(user_ids: set[str], prices: dict[str, float]) -> dict[st
         .eq("wallet_source", BOT_WALLET)
     )
 
-    wallets, positions, orders = await asyncio.gather(
-        _db_call(wallets_q.execute),
-        _db_call(pos_q.execute),
-        _db_call(order_q.execute),
-    )
+    wallets = await _db_call(wallets_q.execute)
+    positions = await _db_call(pos_q.execute)
+    orders = await _db_call(order_q.execute)
 
     equity = {str(uid): 0.0 for uid in user_ids}
     for row in wallets.data or []:
@@ -259,20 +266,22 @@ async def _auto_orders_positions():
         .eq("ai_mode", AUTO_MODE)
         .eq("status", "open")
     )
-    orders, positions = await asyncio.gather(
-        _db_call(orders_q.execute),
-        _db_call(positions_q.execute),
-    )
+    orders = await _db_call(orders_q.execute)
+    positions = await _db_call(positions_q.execute)
     return orders.data or [], positions.data or []
 
 
 async def monitor_auto_trading() -> dict:
     if _monitor_lock.locked():
-        return {"skipped": True}
+        return {"skipped": True, "reason": "previous cycle still running"}
 
     async with _monitor_lock:
-        orders, positions = await _auto_orders_positions()
-        accounts = await _active_accounts()
+        try:
+            orders, positions = await _auto_orders_positions()
+            accounts = await _active_accounts()
+        except Exception as error:  # noqa: BLE001
+            print(f"AUTO monitor temporary DB error: {type(error).__name__}: {error}")
+            return {"skipped": True, "reason": "temporary database error"}
 
         symbols = {
             str(row.get("symbol", "")).upper()
@@ -354,8 +363,13 @@ async def monitor_auto_trading() -> dict:
         # are force-closed/cancelled when the auto session reaches its target.
         if accounts:
             user_ids = {str(row["user_id"]) for row in accounts}
-            equity_symbols = await _all_bot_prices(user_ids)
-            equities = await _bot_equities(user_ids, equity_symbols)
+            try:
+                equity_symbols = await _all_bot_prices(user_ids)
+                equities = await _bot_equities(user_ids, equity_symbols)
+            except Exception as error:  # noqa: BLE001
+                print(f"AUTO equity temporary DB error: {type(error).__name__}: {error}")
+                return {"fills": fills, "closes": closes, "accounts": len(accounts), "equity_skipped": True}
+
             today = datetime.now(NY).date().isoformat()
 
             for account in accounts:
@@ -394,10 +408,8 @@ async def close_all_auto_for_user(user_id: str) -> None:
         .eq("ai_mode", AUTO_MODE)
         .eq("status", "open")
     )
-    positions, orders = await asyncio.gather(
-        _db_call(positions_q.execute),
-        _db_call(orders_q.execute),
-    )
+    positions = await _db_call(positions_q.execute)
+    orders = await _db_call(orders_q.execute)
     positions = positions.data or []
     orders = orders.data or []
 
