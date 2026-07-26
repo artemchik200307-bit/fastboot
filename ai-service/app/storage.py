@@ -22,6 +22,10 @@ def _get_client() -> Client:
     return _client
 
 
+def get_service_client() -> Client:
+    return _get_client()
+
+
 def _database_payload(signal: TradingSignal) -> dict[str, Any]:
     """Build a compact payload for Supabase.
 

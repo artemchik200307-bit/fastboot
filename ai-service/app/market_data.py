@@ -43,3 +43,18 @@ async def snapshot(symbol: str, interval: str = "15m") -> MarketSnapshot:
     ticker, klines = await _get(f"/api/v3/ticker/24hr?symbol={symbol}"), await _get(f"/api/v3/klines?symbol={symbol}&interval={interval}&limit=160")
     candles = [{"time": int(row[0] / 1000), "open": float(row[1]), "high": float(row[2]), "low": float(row[3]), "close": float(row[4]), "volume": float(row[5])} for row in klines]
     return MarketSnapshot(symbol=symbol, price=float(ticker["lastPrice"]), change_percent=float(ticker["priceChangePercent"]), quote_volume=float(ticker["quoteVolume"]), high=float(ticker["highPrice"]), low=float(ticker["lowPrice"]), candles=candles)
+
+
+async def latest_prices(symbols: list[str] | None = None) -> dict[str, float]:
+    rows = await _get("/api/v3/ticker/price")
+    wanted = {str(value).upper() for value in symbols} if symbols else None
+    prices: dict[str, float] = {}
+    for row in rows:
+        symbol = str(row.get("symbol", "")).upper()
+        if wanted is not None and symbol not in wanted:
+            continue
+        try:
+            prices[symbol] = float(row.get("price") or 0)
+        except (TypeError, ValueError):
+            continue
+    return prices

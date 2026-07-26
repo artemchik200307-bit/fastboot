@@ -4,15 +4,17 @@ import asyncio
 from datetime import UTC, datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
+from app.auto_trader import monitor_auto_trading, run_daily_auto_session, startup_catchup
 from app.market_data import top_symbols
 from app.orchestrator import analyze_symbol
 from app.storage import save_signal
 
-app = FastAPI(title="FASTBOOT AI Service", version="6.1.0")
+app = FastAPI(title="FASTBOOT AI Service", version="12.0.0")
 app.add_middleware(CORSMiddleware, allow_origin_regex=r"https://.*\.onrender\.com", allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 scheduler = AsyncIOScheduler()
 scan_lock = asyncio.Lock()
@@ -42,12 +44,43 @@ async def run_market_scan() -> dict:
 
 @app.on_event("startup")
 async def startup() -> None:
-    scheduler.add_job(run_market_scan, "interval", minutes=settings.scan_interval_minutes, max_instances=1, coalesce=True)
+    # Manual/background signal refresh can continue independently.
+    scheduler.add_job(
+        run_market_scan,
+        "interval",
+        minutes=settings.scan_interval_minutes,
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # AUTO trading session starts exactly at 08:00 New York time.
+    scheduler.add_job(
+        run_daily_auto_session,
+        CronTrigger(hour=8, minute=0, timezone="America/New_York"),
+        id="auto_daily_0800_ny",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # Server-side order/position protection + daily target monitor.
+    scheduler.add_job(
+        monitor_auto_trading,
+        "interval",
+        seconds=max(2, settings.auto_monitor_seconds),
+        id="auto_trade_monitor",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
     scheduler.start()
+
+    # If Render restarted after 08:00, do not miss the whole trading day.
+    asyncio.create_task(startup_catchup())
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok", "version": "6.1.0", "scan": scan_status}
+    return {"status": "ok", "version": "12.0.0", "scan": scan_status}
 
 @app.get("/api/v1/scan/status")
 async def get_scan_status() -> dict:
@@ -69,3 +102,15 @@ async def analyze(symbol: str) -> dict:
     if not signal:
         raise HTTPException(422, "Агенты не согласовали торговый сценарий")
     return save_signal(signal)
+
+
+@app.post("/api/v1/auto/run")
+async def run_auto_now() -> dict:
+    """Admin/dev endpoint for testing the daily AUTO cycle without waiting for 08:00."""
+    return await run_daily_auto_session()
+
+
+@app.post("/api/v1/auto/monitor")
+async def monitor_auto_now() -> dict:
+    """Admin/dev endpoint for testing limit fills, TP/SL/LIQ and daily target."""
+    return await monitor_auto_trading()
